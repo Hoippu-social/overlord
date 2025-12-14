@@ -1,0 +1,66 @@
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+    /* Brand Colors (Static) */
+    --color-primary: #6366F1;
+    --color-success: #10B981;
+    --color-destructive: #F43F5E;
+    --color-warning: #F59E0B;
+
+    /* Light Mode (Default) */
+    --bg-base: #FFFFFF;
+    --surface-card: #F2F3F5;
+    --surface-hover: #E3E5E8;
+    --text-primary: #060607;
+    --text-secondary: #4E5058;
+    --border-divider: #E3E5E8;
+}
+
+[data-theme="light"] {
+    --bg-base: #FFFFFF;
+    --surface-card: #F2F3F5;
+    --surface-hover: #E3E5E8;
+    --text-primary: #060607;
+    --text-secondary: #4E5058;
+    --border-divider: #E3E5E8;
+}
+
+.dark {
+    /* Dark Mode */
+    --bg-base: #313338;
+    --surface-card: #2B2D31;
+    --surface-hover: #404249;
+    --text-primary: #F2F3F5;
+    --text-secondary: #B5BAC1;
+    --border-divider: #1E1F22;
+}
+
+body {
+    font-family: 'Nunito', sans-serif;
+    background-color: var(--bg-base);
+    color: var(--text-primary);
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--bg-base);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--surface-hover);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--color-primary);
+}
