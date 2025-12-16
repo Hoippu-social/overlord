@@ -4,29 +4,20 @@ import botManager from '@/lib/botProcess';
 export async function GET() {
     try {
         const stats = await botManager.getStats();
-        const botStatus = botManager.getBotStatus();
-        const lavalinkStatus = botManager.getLavalinkStatus();
 
-        // Определение общего статуса
-        let overallStatus: 'ONLINE' | 'OFFLINE' | 'PARTLY';
-        if (botStatus === 'running' && lavalinkStatus === 'running') {
-            overallStatus = 'ONLINE';
-        } else if (botStatus === 'stopped' && lavalinkStatus === 'stopped') {
-            overallStatus = 'OFFLINE';
-        } else {
-            overallStatus = 'PARTLY';
-        }
+        // stats object from botManager now contains everything we need
+        // structure: { status, lavalink, bot, cpu, memory, uptime, ping ... }
 
         return NextResponse.json({
             cpu: stats.cpu || 0,
             memory: stats.memory || 0,
             uptime: stats.uptime || '0s',
             ping: stats.ping || 0,
-            botStatus: overallStatus,
+            botStatus: stats.status,
             modules: {
-                discord: botStatus === 'running',
-                lavalink: lavalinkStatus === 'running',
-                database: true // TODO: проверка подключения к БД
+                discord: stats.bot,
+                lavalink: stats.lavalink,
+                database: true // TODO: check db connection
             }
         });
     } catch (error) {

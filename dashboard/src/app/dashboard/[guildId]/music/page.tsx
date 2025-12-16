@@ -60,6 +60,11 @@ export default function MusicSettingsPage({ params }: { params: Promise<{ guildI
     const [channelMode, setChannelMode] = useState<'whitelist' | 'blacklist'>('blacklist');
     const [selectedChannels, setSelectedChannels] = useState<Set<string>>(new Set([]));
 
+    // UI State
+    const [isSaving, setIsSaving] = useState(false);
+    const [isDirty, setIsDirty] = useState(false);
+    const [initialLoaded, setInitialLoaded] = useState(false);
+
     useEffect(() => {
         // Load Roles
         fetch(`/api/guilds/${guildId}/roles`)
@@ -76,7 +81,74 @@ export default function MusicSettingsPage({ params }: { params: Promise<{ guildI
                 if (Array.isArray(data)) setChannels(data);
             })
             .catch(err => console.error('Failed to load channels:', err));
+
+        // Load existing music config
+        fetch(`/api/guilds/${guildId}/music`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.config) {
+                    const config = data.config;
+                    if (config.channelMode) setChannelMode(config.channelMode);
+                    if (config.allowedChannels) {
+                        try {
+                            const channels = JSON.parse(config.allowedChannels);
+                            setSelectedChannels(new Set(channels));
+                        } catch (e) { /* ignore parse errors */ }
+                    }
+                    if (config.djRoles) {
+                        try {
+                            const roles = JSON.parse(config.djRoles);
+                            setDjRoles(new Set(roles));
+                        } catch (e) { /* ignore parse errors */ }
+                    }
+                }
+                setInitialLoaded(true);
+            })
+            .catch(err => console.error('Failed to load music config:', err));
     }, [guildId]);
+
+    // Track dirty state after initial load
+    useEffect(() => {
+        if (initialLoaded) {
+            setIsDirty(true);
+        }
+    }, [djRoles, channelMode, selectedChannels, defaultVolume, maxDuration, maxDurationEnabled]);
+
+    // Save handler
+    const handleSave = async () => {
+        setIsSaving(true);
+        try {
+            const response = await fetch(`/api/guilds/${guildId}/music`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    channelMode,
+                    allowedChannels: Array.from(selectedChannels),
+                    djMode: djRoles.size > 0,
+                    djRoles: Array.from(djRoles),
+                }),
+            });
+            if (response.ok) {
+                setIsDirty(false);
+            } else {
+                console.error('Failed to save config');
+            }
+        } catch (error) {
+            console.error('Error saving config:', error);
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    // Reset handler
+    const handleReset = () => {
+        setDjRoles(new Set([]));
+        setChannelMode('blacklist');
+        setSelectedChannels(new Set([]));
+        setDefaultVolume(50);
+        setMaxDuration(30);
+        setMaxDurationEnabled(false);
+    };
 
     return (
         <div className="space-y-6">
@@ -98,6 +170,7 @@ export default function MusicSettingsPage({ params }: { params: Promise<{ guildI
                         </div>
 
                         <Select
+                            id="dj-roles-select"
                             items={roles}
                             label="Select DJ Roles"
                             variant="bordered"
@@ -111,7 +184,12 @@ export default function MusicSettingsPage({ params }: { params: Promise<{ guildI
                                 trigger: "min-h-unit-12 py-2",
                                 value: "text-large",
                                 popoverContent: "bg-surface border border-divider",
-                                listbox: "gap-2",
+                                listbox: "p-1",
+                            }}
+                            listboxProps={{
+                                itemClasses: {
+                                    base: "py-2 min-h-[48px]",
+                                },
                             }}
                             renderValue={(items: SelectedItems<Role>) => {
                                 return (
@@ -146,7 +224,7 @@ export default function MusicSettingsPage({ params }: { params: Promise<{ guildI
 
                                 return (
                                     <SelectItem key={role.id} textValue={role.name} className="data-[hover=true]:bg-default/40">
-                                        <div className="flex items-center gap-3 mb-6">
+                                        <div className="flex items-center gap-3 py-1">
                                             {/* Explicit Checkbox */}
                                             <Checkbox isSelected={isSelected} color="secondary" disableAnimation />
 
@@ -208,6 +286,7 @@ export default function MusicSettingsPage({ params }: { params: Promise<{ guildI
                         </div>
 
                         <Select
+                            id="channel-select"
                             items={channels}
                             label="Select Channels"
                             variant="bordered"
@@ -249,6 +328,7 @@ export default function MusicSettingsPage({ params }: { params: Promise<{ guildI
                                 <span className="text-lg font-semibold">{defaultVolume}%</span>
                             </div>
                             <Slider
+                                id="volume-slider"
                                 size="lg"
                                 step={1}
                                 maxValue={100}
@@ -273,6 +353,7 @@ export default function MusicSettingsPage({ params }: { params: Promise<{ guildI
                                 <p className="text-default-500 text-sm">Limit the length of songs that can be queued</p>
                             </div>
                             <Switch
+                                id="max-duration-switch"
                                 isSelected={maxDurationEnabled}
                                 onValueChange={setMaxDurationEnabled}
                                 color="warning"
@@ -302,10 +383,22 @@ export default function MusicSettingsPage({ params }: { params: Promise<{ guildI
 
                 {/* Save Button */}
                 <div className="flex gap-3 pt-4">
-                    <Button color="primary" size="lg" className="flex-1 font-semibold shadow-lg shadow-primary/20">
-                        Save Changes
+                    <Button
+                        color="primary"
+                        size="lg"
+                        className="flex-1 font-semibold shadow-lg shadow-primary/20"
+                        onPress={handleSave}
+                        isLoading={isSaving}
+                        isDisabled={!isDirty}
+                    >
+                        {isSaving ? 'Saving...' : 'Save Changes'}
                     </Button>
-                    <Button variant="flat" size="lg" className="font-semibold">
+                    <Button
+                        variant="flat"
+                        size="lg"
+                        className="font-semibold"
+                        onPress={handleReset}
+                    >
                         Reset Defaults
                     </Button>
                 </div>

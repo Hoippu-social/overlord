@@ -1,7 +1,17 @@
 import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 import { prisma } from '@/lib/prisma';
 
+// Helper to verify session
+async function verifySession() {
+    const session = (await cookies()).get('session');
+    return session?.value ? true : false;
+}
+
 export async function GET(request: Request, { params }: { params: Promise<{ guildId: string }> }) {
+    if (!(await verifySession())) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     const { guildId } = await params;
     const config = await prisma.musicConfig.findUnique({
         where: { guildId },
@@ -16,6 +26,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ guil
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ guildId: string }> }) {
+    if (!(await verifySession())) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     const { guildId } = await params;
     const body = await request.json();
 

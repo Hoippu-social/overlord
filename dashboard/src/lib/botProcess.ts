@@ -1,147 +1,167 @@
-import { spawn, ChildProcess } from 'child_process';
+import { spawn, exec, ChildProcess } from 'child_process';
 import path from 'path';
+import fs from 'fs';
 import pidusage from 'pidusage';
 import treeKill from 'tree-kill';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
 
 class BotProcessManager {
-    private botProcess: ChildProcess | null = null;
-    private lavalinkProcess: ChildProcess | null = null;
     private botPath: string;
     private lavalinkPath: string;
 
     constructor() {
-        this.botPath = path.resolve(process.cwd(), '../discordbot');
+        this.botPath = path.resolve(process.cwd(), '../bot');
         this.lavalinkPath = path.resolve(process.cwd(), '../lavalink');
     }
 
-    private startLavalink(): Promise<void> {
-        return new Promise((resolve, reject) => {
-            if (this.lavalinkProcess) {
-                resolve();
-                return;
-            }
+    private async findBotPid(): Promise<number | null> {
+        // Try reading bot.pid
+        const pidPath = path.join(this.botPath, 'bot.pid');
+        try {
+            if (fs.existsSync(pidPath)) {
+                const pid = parseInt(fs.readFileSync(pidPath, 'utf-8').trim());
+                if (!pid || isNaN(pid)) return null;
 
-            console.log('Starting Lavalink from:', this.lavalinkPath);
-
-            // Spawn directly without shell to get the actual Java process PID
-            this.lavalinkProcess = spawn('java', ['-jar', 'Lavalink.jar'], {
-                cwd: this.lavalinkPath,
-                shell: false,
-                stdio: 'pipe',
-            });
-
-            this.lavalinkProcess.stdout?.on('data', (data) => {
-                console.log(`[LAVALINK]: ${data}`);
-                if (data.toString().includes('Lavalink is ready')) {
-                    resolve();
+                // Verify if process exists
+                try {
+                    process.kill(pid, 0);
+                    return pid;
+                } catch (e) {
+                    // Process doesn't exist, stale file
+                    return null;
                 }
+            }
+        } catch (error) {
+            console.error('Error finding bot PID:', error);
+        }
+        return null;
+    }
+
+    private async findLavalinkPid(): Promise<number | null> {
+        try {
+            // Windows specific check
+            const { stdout } = await execAsync('wmic process where "name=\'java.exe\' and commandline like \'%Lavalink.jar%\'" get processid');
+            const lines = stdout.trim().split(/\s+/);
+            // stdout looks like: "ProcessId \n 12345"
+            // Filter strict numbers
+            const pids = lines.filter(l => /^\d+$/.test(l));
+            if (pids.length > 0) {
+                return parseInt(pids[0]);
+            }
+        } catch (error) {
+            // Fail silently, maybe not running
+        }
+        return null;
+    }
+
+    public async start() {
+        // Check if already running
+        const botPid = await this.findBotPid();
+        const lavalinkPid = await this.findLavalinkPid();
+
+        if (botPid && lavalinkPid) {
+            console.log('Both processes already running.');
+            return;
+        }
+
+        if (!lavalinkPid) {
+            await this.startLavalink();
+        }
+
+        if (!botPid) {
+            this.startBotProcess();
+        }
+    }
+
+    private startLavalink(): Promise<void> {
+        return new Promise((resolve) => {
+            console.log('Starting Lavalink from:', this.lavalinkPath);
+            // Use the batch file because it contains the absolute path to Java
+            const batFile = path.join(this.lavalinkPath, 'start_lavalink.bat');
+
+            // "start" command opens a new window, which helps ensuring it runs detached and environment is correct
+            const subprocess = spawn('cmd.exe', ['/c', 'start', '/min', batFile], {
+                cwd: this.lavalinkPath,
+                detached: true,
+                stdio: 'ignore'
             });
 
-            this.lavalinkProcess.stderr?.on('data', (data) => {
-                console.error(`[LAVALINK ERROR]: ${data}`);
-            });
+            subprocess.unref();
 
-            this.lavalinkProcess.on('close', (code) => {
-                console.log(`Lavalink process exited with code ${code}`);
-                this.lavalinkProcess = null;
-            });
-
-            // Timeout after 30 seconds
-            setTimeout(() => resolve(), 30000);
+            // Give it some time to start
+            setTimeout(resolve, 5000);
         });
     }
 
     private startBotProcess() {
-        if (this.botProcess) {
-            throw new Error('Bot is already running');
-        }
-
         console.log('Starting bot from:', this.botPath);
+        // Also use start_bot.bat if it exists, roughly similar logic
+        // But we previously used npm run dev directly. Let's stick to what works but ensure env.
 
-        // Use npm start with shell: true for compatibility
-        this.botProcess = spawn('npm', ['start'], {
+        const command = 'npm';
+        const args = ['run', 'dev'];
+
+        const subprocess = spawn('cmd.exe', ['/c', 'start', '/min', command, ...args], {
             cwd: this.botPath,
-            shell: true,
-            stdio: 'pipe',
+            detached: true,
+            stdio: 'ignore'
         });
 
-        this.botProcess.stdout?.on('data', (data) => {
-            console.log(`[BOT]: ${data}`);
-        });
-
-        this.botProcess.stderr?.on('data', (data) => {
-            console.error(`[BOT ERROR]: ${data}`);
-        });
-
-        this.botProcess.on('close', (code) => {
-            console.log(`Bot process exited with code ${code}`);
-            this.botProcess = null;
-        });
-    }
-
-    private stopProcess(process: ChildProcess | null, name: string): Promise<void> {
-        return new Promise((resolve) => {
-            if (process && process.pid) {
-                treeKill(process.pid, 'SIGTERM', (err) => {
-                    if (err) console.error(`Error stopping ${name}:`, err);
-                    resolve();
-                });
-            } else {
-                resolve();
-            }
-        });
-    }
-
-    public async start() {
-        // If partial state, stop everything first
-        const status = this.getStatus();
-        if (status.status === 'PARTIAL') {
-            console.log('Partial state detected, stopping all processes first...');
-            await this.stop();
-            // Wait a bit for cleanup
-            await new Promise(resolve => setTimeout(resolve, 2000));
-        }
-
-        // Start Lavalink first, then bot
-        await this.startLavalink();
-        this.startBotProcess();
+        subprocess.unref();
     }
 
     public async stop() {
-        // Stop bot first, then Lavalink
-        await this.stopProcess(this.botProcess, 'bot');
-        this.botProcess = null;
+        const botPid = await this.findBotPid();
+        const lavalinkPid = await this.findLavalinkPid();
 
-        await this.stopProcess(this.lavalinkProcess, 'Lavalink');
-        this.lavalinkProcess = null;
-    }
-
-    public async kill() {
-        if (this.botProcess && this.botProcess.pid) {
-            treeKill(this.botProcess.pid, 'SIGKILL');
-            this.botProcess = null;
+        if (botPid) {
+            console.log(`Stopping Bot (PID: ${botPid})...`);
+            await this.killPid(botPid);
         }
-        if (this.lavalinkProcess && this.lavalinkProcess.pid) {
-            treeKill(this.lavalinkProcess.pid, 'SIGKILL');
-            this.lavalinkProcess = null;
+
+        if (lavalinkPid) {
+            console.log(`Stopping Lavalink (PID: ${lavalinkPid})...`);
+            await this.killPid(lavalinkPid);
         }
     }
 
     public async restart() {
         await this.stop();
-        setTimeout(() => {
-            this.start();
-        }, 2000);
+        // Wait 2s
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        await this.start();
     }
 
-    public getStatus() {
-        const lavalinkRunning = this.lavalinkProcess !== null;
-        const botRunning = this.botProcess !== null;
+    public async forceKill() {
+        await this.stop();
+    }
+
+    private killPid(pid: number): Promise<void> {
+        return new Promise((resolve) => {
+            treeKill(pid, 'SIGTERM', (err) => {
+                if (err) {
+                    // Try force kill
+                    treeKill(pid, 'SIGKILL', () => resolve());
+                } else {
+                    resolve();
+                }
+            });
+        });
+    }
+
+    public async getStatus() {
+        const botPid = await this.findBotPid();
+        const lavalinkPid = await this.findLavalinkPid();
+
+        const botRunning = botPid !== null;
+        const lavalinkRunning = lavalinkPid !== null;
 
         let status: 'ONLINE' | 'PARTIAL' | 'OFFLINE';
-        if (lavalinkRunning && botRunning) {
+        if (botRunning && lavalinkRunning) {
             status = 'ONLINE';
-        } else if (lavalinkRunning || botRunning) {
+        } else if (botRunning || lavalinkRunning) {
             status = 'PARTIAL';
         } else {
             status = 'OFFLINE';
@@ -151,60 +171,50 @@ class BotProcessManager {
             status,
             lavalink: lavalinkRunning,
             bot: botRunning,
-            pid: this.botProcess?.pid || null
+            botPid,
+            lavalinkPid
         };
     }
 
-    public getBotStatus(): 'running' | 'stopped' {
-        return this.botProcess ? 'running' : 'stopped';
+    // Compat methods
+    public async getBotStatusStr(): Promise<'running' | 'stopped'> {
+        const pid = await this.findBotPid();
+        return pid ? 'running' : 'stopped';
     }
 
-    public getLavalinkStatus(): 'running' | 'stopped' {
-        return this.lavalinkProcess ? 'running' : 'stopped';
+    public async getLavalinkStatusStr(): Promise<'running' | 'stopped'> {
+        const pid = await this.findLavalinkPid();
+        return pid ? 'running' : 'stopped';
     }
 
-    public async forceKill(): Promise<void> {
-        const promises: Promise<void>[] = [];
-
-        if (this.botProcess?.pid) {
-            promises.push(new Promise((resolve) => {
-                treeKill(this.botProcess!.pid!, 'SIGKILL', () => {
-                    this.botProcess = null;
-                    resolve();
-                });
-            }));
-        }
-
-        if (this.lavalinkProcess?.pid) {
-            promises.push(new Promise((resolve) => {
-                treeKill(this.lavalinkProcess!.pid!, 'SIGKILL', () => {
-                    this.lavalinkProcess = null;
-                    resolve();
-                });
-            }));
-        }
-
-        await Promise.all(promises);
+    public async getBotStatus(): Promise<'running' | 'stopped'> {
+        return this.getBotStatusStr();
+    }
+    public async getLavalinkStatus(): Promise<'running' | 'stopped'> {
+        return this.getLavalinkStatusStr();
     }
 
     public async startBot(): Promise<void> {
-        await this.start();
+        const pid = await this.findBotPid();
+        if (!pid) this.startBotProcess();
     }
 
     public async stopBot(): Promise<void> {
-        await this.stop();
+        const pid = await this.findBotPid();
+        if (pid) await this.killPid(pid);
     }
 
     public async restartBot(): Promise<void> {
-        await this.restart();
+        await this.stopBot();
+        setTimeout(() => this.startBot(), 2000);
     }
 
     public async getStats() {
-        const status = this.getStatus();
+        const status = await this.getStatus();
         const pids: number[] = [];
 
-        if (this.botProcess?.pid) pids.push(this.botProcess.pid);
-        if (this.lavalinkProcess?.pid) pids.push(this.lavalinkProcess.pid);
+        if (status.botPid) pids.push(status.botPid);
+        if (status.lavalinkPid) pids.push(status.lavalinkPid);
 
         if (pids.length === 0) {
             return {
@@ -231,18 +241,15 @@ class BotProcessManager {
                 }
             }
 
-            // Format uptime
-            const uptimeStr = this.formatUptime(maxUptime);
-
             return {
                 ...status,
-                cpu: Math.round(totalCpu),
-                memory: Math.round(totalMemory / (1024 * 1024)), // Convert to MB
-                uptime: uptimeStr,
-                ping: 24 // TODO: get real ping from Discord bot
+                cpu: Math.round(totalCpu * 10) / 10,
+                memory: Math.round(totalMemory / (1024 * 1024)),
+                uptime: this.formatUptime(maxUptime),
+                ping: 24
             };
         } catch (error) {
-            console.error('Error getting stats:', error);
+            console.error('Error getting PID stats:', error);
             return {
                 ...status,
                 cpu: 0,

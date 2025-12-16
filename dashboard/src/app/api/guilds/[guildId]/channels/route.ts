@@ -1,10 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 import { prisma } from '@/lib/prisma';
 
 export async function GET(
     request: NextRequest,
     { params }: { params: Promise<{ guildId: string }> }
 ) {
+    // Verify session
+    const session = (await cookies()).get('session');
+    if (!session?.value) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     try {
         const { guildId } = await params;
 

@@ -22,6 +22,10 @@ const config: Config = {
                 success: "var(--color-success)",
                 warning: "var(--color-warning)",
                 danger: "var(--color-destructive)",
+                secondary: {
+                    DEFAULT: "#9333ea", // Purple for secondary actions
+                    foreground: "#FFFFFF",
+                },
                 surface: {
                     DEFAULT: "var(--surface-card)",
                     hover: "var(--surface-hover)",

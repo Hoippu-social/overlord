@@ -16,6 +16,12 @@ import {
 } from "@phosphor-icons/react";
 
 export const MusicWidget = () => {
+    // TODO: Implement WebSocket connection to sync with bot in real-time
+    // Per spec section 4: Music Console requires WebSocket for live playback sync
+    // - Connect to bot's WebSocket server
+    // - Receive: current track, queue, playback state, position
+    // - Send: play/pause, skip, seek, volume, queue changes
+
     return (
         <Card className="w-full bg-surface border border-divider h-full min-h-[400px]">
             <CardBody className="p-0 flex flex-col md:flex-row h-full">

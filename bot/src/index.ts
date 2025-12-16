@@ -1,5 +1,7 @@
 import { Client, GatewayIntentBits, Partials, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle } from 'discord.js';
 import dotenv from 'dotenv';
+import fs from 'fs';
+import path from 'path';
 import logger from './utils/logger';
 import { connectDB, prisma } from './utils/database';
 import { loadCommands } from './handlers/commandHandler';
@@ -42,19 +44,42 @@ client.on('error', (error) => {
 });
 
 // Graceful shutdown handlers
+const pidFile = path.resolve(process.cwd(), 'bot.pid');
+
+const cleanup = () => {
+    if (fs.existsSync(pidFile)) {
+        try {
+            fs.unlinkSync(pidFile);
+            logger.info('Removed PID file');
+        } catch (error) {
+            logger.error('Failed to remove PID file:', error);
+        }
+    }
+};
+
 process.on('SIGINT', async () => {
     logger.info('Received SIGINT, shutting down gracefully...');
+    cleanup();
     client.destroy();
     process.exit(0);
 });
 
 process.on('SIGTERM', async () => {
     logger.info('Received SIGTERM, shutting down gracefully...');
+    cleanup();
     client.destroy();
     process.exit(0);
 });
 
 async function main() {
+    // Write PID file
+    try {
+        fs.writeFileSync(pidFile, process.pid.toString());
+        logger.info(`PID file created at ${pidFile} (PID: ${process.pid})`);
+    } catch (error) {
+        logger.error('Failed to create PID file:', error);
+    }
+
     await connectDB();
 
     const token = process.env.DISCORD_TOKEN;

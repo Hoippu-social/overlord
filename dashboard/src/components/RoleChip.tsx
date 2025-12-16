@@ -9,8 +9,10 @@ interface RoleChipProps {
 }
 
 export const RoleChip: React.FC<RoleChipProps> = ({ name, color, icon, className }) => {
-    // If color is default (0), use a fallback gray
-    const roleColor = color === '#000000' || color === '0' ? '#B5BAC1' : color;
+    // If color is default (0 or #000000), use spec-compliant fallback colors
+    // Per UI spec: text/border = #a1a1aa (zinc-400), background = #52525b (zinc-600)
+    const isDefaultColor = color === '#000000' || color === '0' || !color;
+    const roleColor = isDefaultColor ? '#a1a1aa' : color;
 
     // Convert hex to RGB for background opacity
     const hexToRgb = (hex: string) => {
@@ -19,7 +21,7 @@ export const RoleChip: React.FC<RoleChipProps> = ({ name, color, icon, className
             r: parseInt(result[1], 16),
             g: parseInt(result[2], 16),
             b: parseInt(result[3], 16)
-        } : { r: 181, g: 186, b: 193 };
+        } : { r: 82, g: 82, b: 91 }; // zinc-600 fallback
     };
 
     const rgb = hexToRgb(roleColor);

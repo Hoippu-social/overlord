@@ -2,17 +2,19 @@
 
 import React from 'react';
 import { Card, CardBody, Button, Input } from "@nextui-org/react";
-import { LockKey, User } from "@phosphor-icons/react";
+import { LockKey } from "@phosphor-icons/react";
 import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
     const router = useRouter();
     const [password, setPassword] = React.useState('');
     const [loading, setLoading] = React.useState(false);
+    const [error, setError] = React.useState('');
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
+        setError('');
 
         try {
             const res = await fetch('/api/login', {
@@ -24,7 +26,7 @@ export default function LoginPage() {
             if (res.ok) {
                 router.push('/dashboard');
             } else {
-                alert('Invalid password');
+                setError('Invalid password. Please try again.');
             }
         } catch (error) {
             console.error(error);
@@ -49,8 +51,10 @@ export default function LoginPage() {
                             placeholder="Enter your password"
                             startContent={<LockKey className="text-default-400" />}
                             value={password}
-                            onValueChange={setPassword}
+                            onValueChange={(val) => { setPassword(val); setError(''); }}
                             variant="bordered"
+                            isInvalid={!!error}
+                            errorMessage={error}
                         />
 
                         <Button

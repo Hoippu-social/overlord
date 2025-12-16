@@ -7,7 +7,7 @@ export async function POST(request: NextRequest) {
 
         switch (action) {
             case 'toggle':
-                const currentStatus = botManager.getBotStatus();
+                const currentStatus = await botManager.getBotStatus();
                 if (currentStatus === 'running') {
                     await botManager.stopBot();
                 } else {

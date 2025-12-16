@@ -98,8 +98,11 @@ export default function HubPage({ params }: { params: Promise<{ guildId: string 
                     <Link key={mod.href} href={mod.href}>
                         <Card className="h-full bg-surface border border-divider hover:border-primary/50 transition-colors cursor-pointer group">
                             <CardBody className="p-6 flex flex-col gap-4">
-                                <div className={`p-3 w-fit rounded-xl bg-default-100 group-hover:bg-primary/10 group-hover:${mod.color} transition-colors`}>
-                                    <mod.icon size={32} weight="fill" className="text-default-500 group-hover:text-inherit transition-colors" />
+                                <div
+                                    className="p-3 w-fit rounded-xl bg-default-100 group-hover:bg-primary/10 transition-colors"
+                                    style={{ '--hover-color': mod.color.replace('text-', '') } as React.CSSProperties}
+                                >
+                                    <mod.icon size={32} weight="fill" className={`text-default-500 group-hover:${mod.color} transition-colors`} />
                                 </div>
                                 <div>
                                     <h3 className="text-lg font-bold group-hover:text-primary transition-colors">{mod.label}</h3>

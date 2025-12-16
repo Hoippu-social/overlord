@@ -6,10 +6,14 @@ export async function POST(request: Request) {
     const { password } = body;
 
     if (password === process.env.DASHBOARD_PASSWORD) {
-        // Set a simple session cookie
-        (await cookies()).set('session', 'authenticated', {
+        // Generate a simple session token with timestamp for uniqueness
+        const sessionToken = `session_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+
+        // Set session cookie with unique token
+        (await cookies()).set('session', sessionToken, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict',
             maxAge: 60 * 60 * 24 * 7, // 1 week
             path: '/',
         });
