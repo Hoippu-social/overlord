@@ -3,7 +3,7 @@ import { cookies } from 'next/headers';
 import { prisma } from '@/lib/prisma';
 
 export async function GET(
-    request: NextRequest,
+    _request: NextRequest,
     { params }: { params: Promise<{ guildId: string }> }
 ) {
     // Verify session
@@ -20,19 +20,20 @@ export async function GET(
             select: { channels: true }
         });
 
-        if (!guild || !guild.channels) {
-            // Mock data if no channels in DB
-            const mockChannels = [
-                { id: '1', name: 'General', type: 'voice', position: 0 },
-                { id: '2', name: 'Music', type: 'voice', position: 1 },
-                { id: '3', name: 'Gaming', type: 'voice', position: 2 },
-                { id: '4', name: 'AFK', type: 'voice', position: 3 },
-                { id: '5', name: 'Private', type: 'voice', position: 4 },
-            ];
-            return NextResponse.json(mockChannels);
+        if (!guild?.channels) {
+            return NextResponse.json([]);
         }
 
-        let channels = JSON.parse(guild.channels);
+        let channels: any[] = [];
+        try {
+            const parsed = JSON.parse(guild.channels);
+            if (Array.isArray(parsed)) {
+                channels = parsed;
+            }
+        } catch (error) {
+            console.error('Failed to parse channels JSON:', error);
+            return NextResponse.json({ error: 'Invalid channels payload' }, { status: 500 });
+        }
 
         // Create a map of categories for sorting
         // Type 4 is GuildCategory

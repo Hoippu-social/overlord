@@ -1,15 +1,18 @@
-import { spawn, exec, ChildProcess } from 'child_process';
+import { spawn, exec } from 'child_process';
 import path from 'path';
 import fs from 'fs';
 import pidusage from 'pidusage';
 import treeKill from 'tree-kill';
 import { promisify } from 'util';
+import os from 'os';
 
 const execAsync = promisify(exec);
 
 class BotProcessManager {
     private botPath: string;
     private lavalinkPath: string;
+    private lastPingCheck = 0;
+    private lastPingMs: number | null = null;
 
     constructor() {
         this.botPath = path.resolve(process.cwd(), '../bot');
@@ -54,6 +57,30 @@ class BotProcessManager {
             // Fail silently, maybe not running
         }
         return null;
+    }
+
+    private async measurePing(): Promise<number | null> {
+        const now = Date.now();
+        if (now - this.lastPingCheck < 30000 && this.lastPingMs !== null) {
+            return this.lastPingMs;
+        }
+
+        this.lastPingCheck = now;
+
+        try {
+            const { stdout } = await execAsync('ping -n 1 discord.com');
+            const match = stdout.match(/time[=<]?\s*(\d+)\s*ms/i);
+            if (match?.[1]) {
+                this.lastPingMs = parseInt(match[1], 10);
+            } else {
+                this.lastPingMs = null;
+            }
+        } catch (error) {
+            console.error('Ping check failed:', error);
+            this.lastPingMs = null;
+        }
+
+        return this.lastPingMs;
     }
 
     public async start() {
@@ -212,6 +239,8 @@ class BotProcessManager {
     public async getStats() {
         const status = await this.getStatus();
         const pids: number[] = [];
+        const totalMemoryMb = Math.round(os.totalmem() / (1024 * 1024));
+        const ping = await this.measurePing();
 
         if (status.botPid) pids.push(status.botPid);
         if (status.lavalinkPid) pids.push(status.lavalinkPid);
@@ -221,8 +250,9 @@ class BotProcessManager {
                 ...status,
                 cpu: 0,
                 memory: 0,
+                totalMemory: totalMemoryMb,
                 uptime: '0s',
-                ping: 0
+                ping
             };
         }
 
@@ -245,8 +275,9 @@ class BotProcessManager {
                 ...status,
                 cpu: Math.round(totalCpu * 10) / 10,
                 memory: Math.round(totalMemory / (1024 * 1024)),
+                totalMemory: totalMemoryMb,
                 uptime: this.formatUptime(maxUptime),
-                ping: 24
+                ping
             };
         } catch (error) {
             console.error('Error getting PID stats:', error);
@@ -254,8 +285,9 @@ class BotProcessManager {
                 ...status,
                 cpu: 0,
                 memory: 0,
+                totalMemory: totalMemoryMb,
                 uptime: '0s',
-                ping: 0
+                ping: null
             };
         }
     }

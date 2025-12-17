@@ -2,8 +2,18 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { prisma } from '@/lib/prisma';
 
+const normalizeColor = (color: any) => {
+    if (typeof color === 'number') {
+        return `#${color.toString(16).padStart(6, '0')}`;
+    }
+    if (typeof color === 'string') {
+        return color.startsWith('#') ? color : `#${color}`;
+    }
+    return '#000000';
+};
+
 export async function GET(
-    request: NextRequest,
+    _request: NextRequest,
     { params }: { params: Promise<{ guildId: string }> }
 ) {
     // Verify session
@@ -20,22 +30,30 @@ export async function GET(
             select: { roles: true }
         });
 
-        if (!guild || !guild.roles) {
-            const mockRoles = [
-                { id: '1', name: 'Admin', color: 16711680, position: 10, icon: null },
-                { id: '2', name: 'Moderator', color: 3447003, position: 9, icon: null },
-                { id: '3', name: 'DJ', color: 15105570, position: 8, icon: '🎧' },
-                { id: '4', name: 'Member', color: 9807270, position: 1, icon: null },
-                { id: '5', name: 'Friend', color: 10181046, position: 2, icon: '💜' },
-                { id: '6', name: 'Bot', color: 6323595, position: 0, icon: '🤖' },
-            ];
-            return NextResponse.json(mockRoles);
+        if (!guild?.roles) {
+            return NextResponse.json([]);
         }
 
-        let roles = JSON.parse(guild.roles);
-        roles.sort((a: any, b: any) => b.position - a.position);
+        let roles: any[] = [];
 
-        return NextResponse.json(roles);
+        try {
+            const parsed = JSON.parse(guild.roles);
+            if (Array.isArray(parsed)) {
+                roles = parsed;
+            }
+        } catch (error) {
+            console.error('Failed to parse roles JSON:', error);
+            return NextResponse.json({ error: 'Invalid roles payload' }, { status: 500 });
+        }
+
+        const normalizedRoles = roles
+            .map((role: any) => ({
+                ...role,
+                color: normalizeColor(role.color)
+            }))
+            .sort((a: any, b: any) => (parseInt(b.position) || 0) - (parseInt(a.position) || 0));
+
+        return NextResponse.json(normalizedRoles);
     } catch (error) {
         console.error('Error fetching roles:', error);
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

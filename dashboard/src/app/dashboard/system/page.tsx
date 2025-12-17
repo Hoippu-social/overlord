@@ -10,8 +10,9 @@ type BotStatus = 'ONLINE' | 'OFFLINE' | 'PARTIAL';
 interface SystemStats {
     cpu: number;
     memory: number;
+    totalMemory?: number | null;
     uptime: string;
-    ping: number;
+    ping: number | null;
     botStatus: BotStatus;
     modules: {
         discord: boolean;
@@ -24,8 +25,9 @@ export default function GlobalSystemPage() {
     const [stats, setStats] = useState<SystemStats>({
         cpu: 0,
         memory: 0,
+        totalMemory: null,
         uptime: '0s',
-        ping: 0,
+        ping: null,
         botStatus: 'OFFLINE',
         modules: {
             discord: false,
@@ -90,6 +92,16 @@ export default function GlobalSystemPage() {
             default: return 'default';
         }
     };
+
+    const getPingState = (ping: number | null) => {
+        if (ping === null || ping === undefined) return { label: 'No data', className: 'text-default-500' };
+        if (ping < 100) return { label: 'Excellent', className: 'text-success' };
+        if (ping < 200) return { label: 'Good', className: 'text-warning' };
+        return { label: 'High', className: 'text-danger' };
+    };
+
+    const memoryPercent = stats.totalMemory ? Math.min(100, Math.round((stats.memory / stats.totalMemory) * 100)) : 0;
+    const pingState = getPingState(stats.ping);
 
     return (
         <div className="min-h-screen bg-background p-8">
@@ -161,8 +173,11 @@ export default function GlobalSystemPage() {
                             </div>
                             <div className="flex items-end gap-2">
                                 <span className="text-3xl font-bold">{stats.memory} MB</span>
+                                {stats.totalMemory && (
+                                    <span className="text-default-400 text-sm mb-1">/ {stats.totalMemory} MB</span>
+                                )}
                             </div>
-                            <Progress value={(stats.memory / 4096) * 100} color="secondary" className="mt-3" size="sm" />
+                            <Progress value={memoryPercent} color="secondary" className="mt-3" size="sm" />
                         </CardBody>
                     </Card>
 
@@ -186,8 +201,10 @@ export default function GlobalSystemPage() {
                                 <span className="text-default-500 font-medium">Ping</span>
                             </div>
                             <div className="flex items-end gap-2">
-                                <span className="text-3xl font-bold">{stats.ping}ms</span>
-                                <span className="text-success text-sm mb-1">Excellent</span>
+                                <span className="text-3xl font-bold">
+                                    {stats.ping ?? '—'}{stats.ping !== null && stats.ping !== undefined ? 'ms' : ''}
+                                </span>
+                                <span className={`text-sm mb-1 ${pingState.className}`}>{pingState.label}</span>
                             </div>
                             <div className="text-xs text-default-400 mt-3">Gateway latency</div>
                         </CardBody>

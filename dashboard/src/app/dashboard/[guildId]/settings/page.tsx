@@ -5,13 +5,14 @@ import { Card, CardBody, Button, Chip, Progress, Divider } from "@nextui-org/rea
 import { Power, ArrowClockwise, StopCircle, Cpu, HardDrives, Pulse, Warning } from "@phosphor-icons/react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
-type BotStatus = 'ONLINE' | 'OFFLINE' | 'PARTLY';
+type BotStatus = 'ONLINE' | 'OFFLINE' | 'PARTIAL';
 
 interface SystemStats {
     cpu: number;
     memory: number;
+    totalMemory?: number | null;
     uptime: string;
-    ping: number;
+    ping: number | null;
     botStatus: BotStatus;
     modules: {
         discord: boolean;
@@ -38,8 +39,9 @@ export default function SettingsPage() {
     const [stats, setStats] = useState<SystemStats>({
         cpu: 0,
         memory: 0,
+        totalMemory: null,
         uptime: '0s',
-        ping: 0,
+        ping: null,
         botStatus: 'OFFLINE',
         modules: {
             discord: false,
@@ -80,10 +82,10 @@ export default function SettingsPage() {
         }
     };
 
-    const handleAction = async (action: 'toggle' | 'reboot' | 'hardstop') => {
+    const handleAction = async (action: 'start' | 'stop' | 'restart' | 'kill') => {
         setLoading(true);
         try {
-            await fetch('/api/system/control', {
+            await fetch('/api/system', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action })
@@ -100,7 +102,7 @@ export default function SettingsPage() {
         switch (stats.botStatus) {
             case 'ONLINE': return 'success';
             case 'OFFLINE': return 'danger';
-            case 'PARTLY': return 'warning';
+            case 'PARTIAL': return 'warning';
         }
     };
 
@@ -108,9 +110,20 @@ export default function SettingsPage() {
         switch (stats.botStatus) {
             case 'ONLINE': return <Pulse size={16} weight="fill" />;
             case 'OFFLINE': return <StopCircle size={16} weight="fill" />;
-            case 'PARTLY': return <Warning size={16} weight="fill" />;
+            case 'PARTIAL': return <Warning size={16} weight="fill" />;
         }
     };
+
+    const getPingState = (ping: number | null) => {
+        if (ping === null || ping === undefined) return { label: 'No data', className: 'text-default-500' };
+        if (ping < 100) return { label: 'Excellent', className: 'text-success' };
+        if (ping < 200) return { label: 'Good', className: 'text-warning' };
+        return { label: 'High', className: 'text-danger' };
+    };
+
+    const memoryPercent = stats.totalMemory ? Math.min(100, Math.round((stats.memory / stats.totalMemory) * 100)) : 0;
+    const isMemoryHigh = stats.totalMemory ? stats.memory > stats.totalMemory * 0.6 : stats.memory > 1024;
+    const pingState = getPingState(stats.ping);
 
     return (
         <div className="space-y-6">
@@ -139,7 +152,7 @@ export default function SettingsPage() {
                             color={stats.botStatus === 'OFFLINE' ? 'success' : 'danger'}
                             size="lg"
                             startContent={<Power size={20} />}
-                            onPress={() => handleAction('toggle')}
+                            onPress={() => handleAction(stats.botStatus === 'OFFLINE' ? 'start' : 'stop')}
                             isLoading={loading}
                             className="h-16 font-semibold text-lg shadow-lg"
                         >
@@ -150,7 +163,7 @@ export default function SettingsPage() {
                             variant="flat"
                             size="lg"
                             startContent={<ArrowClockwise size={20} />}
-                            onPress={() => handleAction('reboot')}
+                            onPress={() => handleAction('restart')}
                             isLoading={loading}
                             isDisabled={stats.botStatus === 'OFFLINE'}
                             className="h-16 font-semibold text-lg"
@@ -162,7 +175,7 @@ export default function SettingsPage() {
                             variant="bordered"
                             size="lg"
                             startContent={<StopCircle size={20} />}
-                            onPress={() => handleAction('hardstop')}
+                            onPress={() => handleAction('kill')}
                             isLoading={loading}
                             isDisabled={stats.botStatus === 'OFFLINE'}
                             className="h-16 font-semibold text-lg"
@@ -225,11 +238,14 @@ export default function SettingsPage() {
                         </div>
                         <div className="flex items-end gap-2">
                             <span className="text-3xl font-bold">{stats.memory} MB</span>
-                            <span className={`text-sm mb-1 font-medium ${stats.memory > 1024 ? 'text-danger' : 'text-success'}`}>
-                                {stats.memory > 1024 ? 'High' : 'Normal'}
+                            {stats.totalMemory && (
+                                <span className="text-default-400 text-sm mb-1">/ {stats.totalMemory} MB</span>
+                            )}
+                            <span className={`text-sm mb-1 font-medium ${isMemoryHigh ? 'text-danger' : 'text-success'}`}>
+                                {isMemoryHigh ? 'High' : 'Normal'}
                             </span>
                         </div>
-                        <Progress value={(stats.memory / 2048) * 100} color="secondary" className="mt-3" size="sm" />
+                        <Progress value={memoryPercent} color="secondary" className="mt-3" size="sm" />
                     </CardBody>
                 </Card>
 
@@ -253,9 +269,11 @@ export default function SettingsPage() {
                             <span className="text-default-500 font-medium">Ping</span>
                         </div>
                         <div className="flex items-end gap-2">
-                            <span className="text-3xl font-bold">{stats.ping}ms</span>
-                            <span className="text-success text-sm mb-1 font-medium">
-                                {stats.ping < 100 ? 'Excellent' : stats.ping < 200 ? 'Good' : 'Poor'}
+                            <span className="text-3xl font-bold">
+                                {stats.ping ?? '—'}{stats.ping !== null && stats.ping !== undefined ? 'ms' : ''}
+                            </span>
+                            <span className={`${pingState.className} text-sm mb-1 font-medium`}>
+                                {pingState.label}
                             </span>
                         </div>
                         <div className="text-xs text-default-400 mt-3">Gateway latency</div>
