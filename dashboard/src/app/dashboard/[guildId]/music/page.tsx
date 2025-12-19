@@ -82,10 +82,14 @@ export default function MusicSettingsPage({ params }: { params: Promise<{ guildI
             })
             .catch(err => console.error('Failed to load channels:', err));
 
-        // Load existing music config
-        fetch(`/api/guilds/${guildId}/music`)
-            .then(res => res.json())
-            .then(data => {
+        const loadConfig = async () => {
+            try {
+                const res = await fetch(`/api/guilds/${guildId}/music`);
+                if (!res.ok) {
+                    const text = await res.text().catch(() => '');
+                    throw new Error(text || `Music API returned ${res.status}`);
+                }
+                const data = await res.json();
                 if (data.config) {
                     const config = data.config;
                     if (config.channelMode) setChannelMode(config.channelMode);
@@ -101,10 +105,18 @@ export default function MusicSettingsPage({ params }: { params: Promise<{ guildI
                             setDjRoles(new Set(roles));
                         } catch (e) { /* ignore parse errors */ }
                     }
+                    if (typeof config.defaultVolume === 'number') {
+                        setDefaultVolume(config.defaultVolume);
+                    }
                 }
+            } catch (err) {
+                console.error('Failed to load music config:', err);
+            } finally {
                 setInitialLoaded(true);
-            })
-            .catch(err => console.error('Failed to load music config:', err));
+            }
+        };
+
+        loadConfig();
     }, [guildId]);
 
     // Track dirty state after initial load
@@ -126,6 +138,7 @@ export default function MusicSettingsPage({ params }: { params: Promise<{ guildI
                     allowedChannels: Array.from(selectedChannels),
                     djMode: djRoles.size > 0,
                     djRoles: Array.from(djRoles),
+                    defaultVolume,
                 }),
             });
             if (response.ok) {
@@ -188,7 +201,7 @@ export default function MusicSettingsPage({ params }: { params: Promise<{ guildI
                             }}
                             listboxProps={{
                                 itemClasses: {
-                                    base: "py-2 min-h-[48px]",
+                                    base: "py-2 px-2 min-h-[48px]",
                                 },
                             }}
                             renderValue={(items: SelectedItems<Role>) => {
@@ -224,7 +237,7 @@ export default function MusicSettingsPage({ params }: { params: Promise<{ guildI
 
                                 return (
                                     <SelectItem key={role.id} textValue={role.name} className="data-[hover=true]:bg-default/40">
-                                        <div className="flex items-center gap-3 py-1">
+                                        <div className="flex items-center gap-3 w-full px-1.5 py-1.5">
                                             {/* Explicit Checkbox */}
                                             <Checkbox isSelected={isSelected} color="secondary" disableAnimation />
 

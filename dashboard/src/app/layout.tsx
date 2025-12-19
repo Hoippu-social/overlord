@@ -8,6 +8,9 @@ const nunito = Nunito({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "Discord Bot Dashboard",
   description: "Advanced Discord Bot Management",
+  icons: {
+    icon: "/icon-default.svg",
+  },
 };
 
 export default function RootLayout({

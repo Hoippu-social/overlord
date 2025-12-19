@@ -29,9 +29,29 @@ model Guild {
   icon      String?
   channels  String?  // JSON string of channels
   roles     String?  // JSON string of roles
+  memberCount Int?
+  onlineCount Int?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  botSettings BotSettings?
   musicConfig MusicConfig?
+  nowPlaying MusicNowPlaying?
+  tempVoiceConfig TempVoiceConfig?
+  userVoiceSettings UserVoiceSettings[]
+}
+
+model BotSettings {
+  id                       Int      @id @default(autoincrement())
+  guildId                  String   @unique
+  guild                    Guild    @relation(fields: [guildId], references: [id])
+  prefixCommandsEnabled    Boolean  @default(true)
+  commandChannelMode       String   @default("BLACKLIST") // WHITELIST or BLACKLIST
+  allowedTextChannels      String?  // JSON string of channel IDs
+  adminRoles               String?  // JSON string of role IDs
+  restoreRolesOnRejoin     Boolean  @default(false)
+  restoreNicknameOnRejoin  Boolean  @default(false)
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
 }
 
 model MusicConfig {
@@ -42,6 +62,7 @@ model MusicConfig {
   allowedChannels String?  // JSON string of channel IDs
   djMode          Boolean  @default(false)
   djRoles         String?  // JSON string of role IDs
+  defaultVolume   Int      @default(50)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 }
@@ -53,4 +74,62 @@ model Warning {
   user      User     @relation(fields: [userId], references: [id])
   moderatorId String
   createdAt DateTime @default(now())
+}
+
+model MusicNowPlaying {
+  id          Int      @id @default(autoincrement())
+  guildId     String   @unique
+  guild       Guild    @relation(fields: [guildId], references: [id])
+  title       String
+  author      String?
+  uri         String?
+  artworkUrl  String?
+  durationMs  Int?
+  positionMs  Int?
+  volume      Int?
+  paused      Boolean  @default(false)
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
+}
+
+model TempVoiceConfig {
+  id                 Int      @id @default(autoincrement())
+  guildId            String   @unique
+  guild              Guild    @relation(fields: [guildId], references: [id])
+  hubChannelId       String
+  interfaceChannelId String?
+  categoryId         String?
+  nameTemplate       String   @default("Room {user}")
+  userLimit          Int?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  rooms              TempVoiceRoom[]
+}
+
+model TempVoiceRoom {
+  id           Int      @id @default(autoincrement())
+  channelId    String   @unique
+  ownerId      String
+  guildId      String
+  hubChannelId String
+  createdAt    DateTime @default(now())
+  config       TempVoiceConfig @relation(fields: [guildId], references: [guildId], onDelete: Cascade)
+
+  @@index([guildId])
+}
+
+model UserVoiceSettings {
+  id             Int      @id @default(autoincrement())
+  guildId        String
+  userId         String
+  preferredName  String?
+  preferredLimit Int?
+  locked         Boolean  @default(false)
+  blockedUsers   String?  // JSON string array of user IDs
+  allowedUsers   String?  // JSON string array of user IDs
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  guild          Guild    @relation(fields: [guildId], references: [id])
+
+  @@unique([guildId, userId])
 }

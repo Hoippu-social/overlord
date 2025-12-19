@@ -8,6 +8,8 @@ import { loadCommands } from './handlers/commandHandler';
 import { loadEvents } from './handlers/eventHandler';
 import { LavalinkManager } from 'lavalink-client';
 import { initializeLavalink } from './utils/LavalinkManager';
+import { reconcileTempVoiceRooms } from './utils/tempVoice';
+import { startDashboardApi } from './utils/dashboardApi';
 
 declare module 'discord.js' {
     interface Client {
@@ -23,6 +25,7 @@ const client = new Client({
         GatewayIntentBits.GuildVoiceStates,
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.GuildMembers,
+        GatewayIntentBits.GuildPresences,
     ],
     partials: [
         Partials.Channel,
@@ -461,13 +464,27 @@ client.once('ready', async () => {
         username: client.user!.username
     });
 
+    startDashboardApi(client);
+
     // Sync Guild Data
     logger.info('Syncing guild data...');
     for (const guild of client.guilds.cache.values()) {
         await syncGuildData(guild);
     }
     logger.info('Guild data synced!');
+
+    logger.info('Reconciling temp voice rooms...');
+    await reconcileTempVoiceRooms(client);
 });
+
+const hasPresenceIntent = client.options.intents.has(GatewayIntentBits.GuildPresences);
+
+const getOnlineCount = (guild: any) => {
+    if (!hasPresenceIntent) return null;
+    const presences = guild?.presences?.cache;
+    if (!presences) return null;
+    return presences.filter((presence: any) => presence?.status && presence.status !== 'offline' && presence.status !== 'invisible').size;
+};
 
 async function syncGuildData(guild: any) {
     try {
@@ -487,20 +504,27 @@ async function syncGuildData(guild: any) {
             position: r.position
         }));
 
+        const memberCount = typeof guild.memberCount === 'number' ? guild.memberCount : null;
+        const onlineCount = getOnlineCount(guild);
+
         await prisma.guild.upsert({
             where: { id: guild.id },
             update: {
                 name: guild.name,
                 icon: guild.icon,
                 channels: JSON.stringify(channels),
-                roles: JSON.stringify(roles)
+                roles: JSON.stringify(roles),
+                memberCount,
+                onlineCount
             },
             create: {
                 id: guild.id,
                 name: guild.name,
                 icon: guild.icon,
                 channels: JSON.stringify(channels),
-                roles: JSON.stringify(roles)
+                roles: JSON.stringify(roles),
+                memberCount,
+                onlineCount
             }
         });
 
@@ -518,6 +542,18 @@ async function syncGuildData(guild: any) {
     }
 }
 
+const guildSyncTimers = new Map<string, NodeJS.Timeout>();
+
+const scheduleGuildSync = (guild: any, delayMs = 15000) => {
+    if (!guild?.id) return;
+    if (guildSyncTimers.has(guild.id)) return;
+    const timer = setTimeout(() => {
+        guildSyncTimers.delete(guild.id);
+        syncGuildData(guild);
+    }, delayMs);
+    guildSyncTimers.set(guild.id, timer);
+};
+
 // Auto-sync events
 client.on('channelCreate', (channel) => {
     if ('guild' in channel) syncGuildData(channel.guild);
@@ -531,5 +567,10 @@ client.on('channelUpdate', (oldChannel, newChannel) => {
 client.on('roleCreate', (role) => syncGuildData(role.guild));
 client.on('roleDelete', (role) => syncGuildData(role.guild));
 client.on('roleUpdate', (oldRole, newRole) => syncGuildData(newRole.guild));
+client.on('guildMemberAdd', (member) => scheduleGuildSync(member.guild, 2000));
+client.on('guildMemberRemove', (member) => scheduleGuildSync(member.guild, 2000));
+client.on('presenceUpdate', (_oldPresence, newPresence) => {
+    if (newPresence?.guild) scheduleGuildSync(newPresence.guild);
+});
 
 main();

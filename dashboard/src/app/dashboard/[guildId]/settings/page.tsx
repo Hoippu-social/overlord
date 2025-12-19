@@ -69,14 +69,13 @@ export default function SettingsPage() {
 
             setCpuHistory(prev => {
                 const newHistory = [...prev, { time: now, value: data.cpu }];
-                return newHistory.slice(-20); // Keep last 20 points for smoother chart
+                return newHistory.slice(-20);
             });
 
             setMemHistory(prev => {
                 const newHistory = [...prev, { time: now, value: data.memory }];
                 return newHistory.slice(-20);
             });
-
         } catch (error) {
             console.error('Failed to fetch stats:', error);
         }
@@ -129,7 +128,7 @@ export default function SettingsPage() {
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold">Bot Settings & System Monitor</h1>
+                    <h1 className="text-3xl font-bold">Bot Control & System Monitor</h1>
                     <p className="text-default-500">Manage bot status and monitor system resources</p>
                 </div>
                 <Chip
@@ -143,7 +142,6 @@ export default function SettingsPage() {
                 </Chip>
             </div>
 
-            {/* Control Panel */}
             <Card className="bg-surface border border-divider">
                 <CardBody className="p-6">
                     <h3 className="text-xl font-bold mb-4">Bot Control</h3>
@@ -212,7 +210,6 @@ export default function SettingsPage() {
                 </CardBody>
             </Card>
 
-            {/* System Resources */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <Card className="bg-surface border border-divider">
                     <CardBody className="p-6">
@@ -270,7 +267,7 @@ export default function SettingsPage() {
                         </div>
                         <div className="flex items-end gap-2">
                             <span className="text-3xl font-bold">
-                                {stats.ping ?? '—'}{stats.ping !== null && stats.ping !== undefined ? 'ms' : ''}
+                                {stats.ping ?? 'n/a'}{stats.ping !== null && stats.ping !== undefined ? 'ms' : ''}
                             </span>
                             <span className={`${pingState.className} text-sm mb-1 font-medium`}>
                                 {pingState.label}
@@ -281,7 +278,6 @@ export default function SettingsPage() {
                 </Card>
             </div>
 
-            {/* Charts */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <Card className="bg-surface border border-divider p-6">
                     <h3 className="text-foreground font-bold mb-4 text-xl">CPU History</h3>
@@ -346,3 +342,4 @@ export default function SettingsPage() {
         </div>
     );
 }
+

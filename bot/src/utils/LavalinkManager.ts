@@ -2,6 +2,8 @@ import { LavalinkManager, Player } from 'lavalink-client';
 import { Client } from 'discord.js';
 import logger from './logger';
 import { MusicPlayerHandler } from './MusicPlayerHandler';
+import fs from 'fs';
+import path from 'path';
 
 // Extend Player to include our handler
 declare module 'lavalink-client' {
@@ -11,6 +13,16 @@ declare module 'lavalink-client' {
 }
 
 export function initializeLavalink(client: Client) {
+    const sessionFile = path.resolve(process.cwd(), 'lavalink.session');
+    const persistSessionId = (sessionId?: string | null) => {
+        if (!sessionId) return;
+        try {
+            fs.writeFileSync(sessionFile, sessionId, 'utf8');
+        } catch (error) {
+            logger.warn('[Lavalink] Failed to persist session id:', error);
+        }
+    };
+
     client.lavalink = new LavalinkManager({
         nodes: [
             {
@@ -33,6 +45,7 @@ export function initializeLavalink(client: Client) {
 
     client.lavalink.nodeManager.on('connect', (node) => {
         logger.info(`[Lavalink] Node ${node.id} connected`);
+        persistSessionId(node.sessionId);
     });
 
     client.lavalink.nodeManager.on('error', (node, error) => {
@@ -41,6 +54,18 @@ export function initializeLavalink(client: Client) {
 
     client.lavalink.nodeManager.on('disconnect', (node, reason) => {
         logger.warn(`[Lavalink] Node ${node.id} disconnected:`, reason);
+    });
+
+    client.lavalink.nodeManager.on('raw', (node, payload) => {
+        const sessionId = (payload as { sessionId?: string })?.sessionId;
+        if (sessionId) {
+            logger.info(`[Lavalink] Session id updated: ${sessionId}`);
+            persistSessionId(sessionId);
+        }
+    });
+
+    client.lavalink.nodeManager.on('resumed', (node, payload) => {
+        persistSessionId(payload?.sessionId);
     });
 
     // Player Events

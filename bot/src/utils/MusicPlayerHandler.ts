@@ -9,6 +9,7 @@ import {
 } from 'discord.js';
 import { Player, Track } from 'lavalink-client';
 import logger from './logger';
+import { prisma } from './database';
 
 export class MusicPlayerHandler {
     private message: Message | null = null;
@@ -42,6 +43,7 @@ export class MusicPlayerHandler {
 
         try {
             this.message = await channel.send({ embeds: [embed], components: rows });
+            await this.setNowPlaying(track);
             this.startUpdateInterval();
         } catch (error) {
             logger.error('Failed to send now playing message:', error);
@@ -60,6 +62,7 @@ export class MusicPlayerHandler {
 
         try {
             await this.message.edit({ embeds: [embed], components: rows });
+            await this.setNowPlaying(this.player.queue.current);
         } catch (error) {
             logger.error('Failed to update player message:', error);
             this.stopUpdateInterval();
@@ -111,6 +114,51 @@ export class MusicPlayerHandler {
                 await this.message.delete();
             } catch (e) { }
             this.message = null;
+        }
+        try {
+            await prisma.musicNowPlaying.deleteMany({ where: { guildId: this.player.guildId } });
+        } catch (e) {
+            logger.error('Failed to clear now playing state:', e);
+        }
+    }
+
+    async setNowPlaying(track: Track | null | undefined, patch?: Partial<{ volume: number; paused: boolean; positionMs: number }>) {
+        if (!track) {
+            await prisma.musicNowPlaying.deleteMany({ where: { guildId: this.player.guildId } });
+            return;
+        }
+        const durationMs = track.info.duration ?? null;
+        const positionMs = patch?.positionMs ?? this.player.position ?? null;
+        const volume = patch?.volume ?? this.player.volume ?? null;
+        const paused = patch?.paused ?? this.player.paused ?? false;
+
+        try {
+            await prisma.musicNowPlaying.upsert({
+                where: { guildId: this.player.guildId },
+                update: {
+                    title: track.info.title || 'Unknown',
+                    author: track.info.author || null,
+                    uri: track.info.uri || null,
+                    artworkUrl: track.info.artworkUrl || null,
+                    durationMs,
+                    positionMs,
+                    volume,
+                    paused,
+                },
+                create: {
+                    guildId: this.player.guildId,
+                    title: track.info.title || 'Unknown',
+                    author: track.info.author || null,
+                    uri: track.info.uri || null,
+                    artworkUrl: track.info.artworkUrl || null,
+                    durationMs,
+                    positionMs,
+                    volume,
+                    paused,
+                },
+            });
+        } catch (error) {
+            logger.error('Failed to persist now playing:', error);
         }
     }
 

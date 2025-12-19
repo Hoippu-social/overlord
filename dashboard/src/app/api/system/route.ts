@@ -51,13 +51,13 @@ export async function POST(req: Request) {
     try {
         switch (action) {
             case 'start':
-                await botManager.startBot();
+                await botManager.start();
                 break;
             case 'stop':
-                await botManager.stopBot();
+                await botManager.stop();
                 break;
             case 'restart':
-                await botManager.restartBot();
+                await botManager.restart();
                 break;
             case 'kill':
                 await botManager.forceKill();

@@ -2,12 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { prisma } from '@/lib/prisma';
 
-const normalizeColor = (color: any) => {
-    if (typeof color === 'number') return `#${color.toString(16).padStart(6, '0')}`;
-    if (typeof color === 'string') return color.startsWith('#') ? color : `#${color}`;
-    return '#000000';
-};
-
 const isVoiceChannel = (channel: any) =>
     channel?.type === 2 || channel?.type === 'voice' || channel?.type === 'GUILD_VOICE';
 
@@ -16,7 +10,7 @@ const isTextChannel = (channel: any) =>
 
 export async function GET(
     _request: NextRequest,
-    { params }: { params: { guildId: string } }
+    { params }: { params: Promise<{ guildId: string }> }
 ) {
     const session = (await cookies()).get('session');
     if (!session?.value) {
@@ -24,10 +18,24 @@ export async function GET(
     }
 
     try {
-        const { guildId } = params;
+        const { guildId } = await params;
+
+        if (!guildId) {
+            return NextResponse.json({ error: 'Guild id is missing in route params' }, { status: 400 });
+        }
         const guild = await prisma.guild.findUnique({
             where: { id: guildId },
-            select: { id: true, name: true, icon: true, prefix: true, channels: true, roles: true, updatedAt: true }
+            select: {
+                id: true,
+                name: true,
+                icon: true,
+                prefix: true,
+                channels: true,
+                roles: true,
+                memberCount: true,
+                onlineCount: true,
+                updatedAt: true
+            }
         });
 
         if (!guild) {
@@ -59,18 +67,10 @@ export async function GET(
             roles: roles.length,
             voiceChannels: channels.filter(isVoiceChannel).length,
             textChannels: channels.filter(isTextChannel).length,
-            totalChannels: channels.length
+            totalChannels: channels.length,
+            members: guild.memberCount ?? null,
+            onlineMembers: guild.onlineCount ?? null
         };
-
-        const topRoles = roles
-            .filter((role: any) => role.id !== guildId) // exclude @everyone
-            .sort((a: any, b: any) => (parseInt(b.position) || 0) - (parseInt(a.position) || 0))
-            .slice(0, 5)
-            .map((role: any) => ({
-                id: role.id,
-                name: role.name,
-                color: normalizeColor(role.color)
-            }));
 
         return NextResponse.json({
             guild: {
@@ -80,11 +80,10 @@ export async function GET(
                 prefix: guild.prefix
             },
             counts,
-            topRoles,
             lastSyncedAt: guild.updatedAt
         });
-    } catch (error) {
+    } catch (error: any) {
         console.error('Failed to fetch guild summary:', error);
-        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+        return NextResponse.json({ error: error?.message || 'Internal server error' }, { status: 500 });
     }
 }

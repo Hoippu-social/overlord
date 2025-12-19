@@ -7,9 +7,9 @@ const command: Command = {
         .setDescription('Sets the player volume')
         .addIntegerOption(option =>
             option.setName('level')
-                .setDescription('Volume level (0-100)')
+                .setDescription('Volume level (0-150)')
                 .setMinValue(0)
-                .setMaxValue(100)
+                .setMaxValue(150)
                 .setRequired(false)
         ) as any,
     execute: async (interaction) => {
@@ -17,37 +17,33 @@ const command: Command = {
         const voiceChannel = member.voice.channel;
 
         if (!voiceChannel) {
-            await interaction.reply({ content: '❌ Вы должны быть в голосовом канале!', ephemeral: true });
+            await interaction.reply({ content: 'You need to be in a voice channel!', ephemeral: true });
             return;
         }
 
         const player = interaction.client.lavalink.getPlayer(interaction.guildId!);
 
         if (!player) {
-            await interaction.reply({ content: '❌ Плеер не активен!', ephemeral: true });
+            await interaction.reply({ content: 'Player is not active.', ephemeral: true });
             return;
         }
 
         if (player.voiceChannelId !== voiceChannel.id) {
-            await interaction.reply({ content: '❌ Вы должны быть в том же канале, что и бот!', ephemeral: true });
+            await interaction.reply({ content: 'You must be in the same voice channel as the bot.', ephemeral: true });
             return;
         }
 
         const level = interaction.options.getInteger('level');
 
         if (level === null) {
-            // Show current volume
-            const volumeBar = '█'.repeat(Math.floor(player.volume / 10)) + '░'.repeat(10 - Math.floor(player.volume / 10));
-            await interaction.reply(`🔊 Текущая громкость: **${player.volume}%**\n\`[${volumeBar}]\``);
+            await interaction.reply({ content: `Current volume: **${player.volume}%**`, ephemeral: true });
             return;
         }
 
         await player.setVolume(level);
+        await player.musicHandler?.setNowPlaying(player.queue.current, { volume: level, positionMs: player.position, paused: player.paused });
 
-        const emoji = level === 0 ? '🔇' : level < 30 ? '🔈' : level < 70 ? '🔉' : '🔊';
-        const volumeBar = '█'.repeat(Math.floor(level / 10)) + '░'.repeat(10 - Math.floor(level / 10));
-
-        await interaction.reply(`${emoji} Громкость установлена на **${level}%**\n\`[${volumeBar}]\``);
+        await interaction.reply(`Volume set to **${level}%**`);
     },
 };
 

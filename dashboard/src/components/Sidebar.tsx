@@ -11,9 +11,11 @@ import {
     Coins,
     MusicNote,
     Ticket,
+    Buildings,
     Gear,
     CaretLeft,
-    List
+    List,
+    ChatsTeardrop
 } from "@phosphor-icons/react";
 import { cn } from "@nextui-org/react";
 
@@ -32,8 +34,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggle, guildId }
         { label: 'Audit Logs', href: `/dashboard/${guildId}/audit`, icon: Scroll },
         { label: 'Economy', href: `/dashboard/${guildId}/economy`, icon: Coins },
         { label: 'Music', href: `/dashboard/${guildId}/music`, icon: MusicNote },
+        { label: 'Temp Voice', href: `/dashboard/${guildId}/tempvoice`, icon: ChatsTeardrop },
         { label: 'Tickets', href: `/dashboard/${guildId}/tickets`, icon: Ticket },
-        { label: 'Settings', href: `/dashboard/${guildId}/settings`, icon: Gear },
+        { label: 'Bot settings', href: `/dashboard/${guildId}/settings`, icon: Gear },
+        { label: 'Server settings', href: `/dashboard/${guildId}/server-settings`, icon: Buildings },
     ];
 
     return (

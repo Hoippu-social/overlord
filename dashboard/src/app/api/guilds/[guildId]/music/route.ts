@@ -2,13 +2,12 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { prisma } from '@/lib/prisma';
 
-// Helper to verify session
 async function verifySession() {
     const session = (await cookies()).get('session');
     return session?.value ? true : false;
 }
 
-export async function GET(request: Request, { params }: { params: Promise<{ guildId: string }> }) {
+export async function GET(_request: Request, { params }: { params: Promise<{ guildId: string }> }) {
     if (!(await verifySession())) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -39,6 +38,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ gui
             allowedChannels: JSON.stringify(body.allowedChannels),
             djMode: body.djMode,
             djRoles: JSON.stringify(body.djRoles),
+            defaultVolume: Math.max(0, Math.min(150, parseInt(body.defaultVolume ?? 50, 10) || 50)),
         },
         create: {
             guildId,
@@ -46,6 +46,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ gui
             allowedChannels: JSON.stringify(body.allowedChannels),
             djMode: body.djMode,
             djRoles: JSON.stringify(body.djRoles),
+            defaultVolume: Math.max(0, Math.min(150, parseInt(body.defaultVolume ?? 50, 10) || 50)),
         },
     });
 

@@ -17,6 +17,7 @@
     "@types/pidusage": "^2.0.5",
     "clsx": "^2.1.1",
     "discord.js": "^14.25.1",
+    "dotenv": "^16.4.5",
     "framer-motion": "^12.23.24",
     "next": "16.0.4",
     "next-auth": "^4.24.13",

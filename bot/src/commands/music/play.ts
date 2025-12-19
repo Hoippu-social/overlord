@@ -1,6 +1,7 @@
 import { SlashCommandBuilder, GuildMember, ActionRowBuilder, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { Command } from '../../utils/types';
 import logger from '../../utils/logger';
+import { prisma } from '../../utils/database';
 
 const command: Command = {
     data: new SlashCommandBuilder()
@@ -26,6 +27,25 @@ const command: Command = {
 
             const player = interaction.client.lavalink.getPlayer(interaction.guildId!);
 
+            let targetVolume = 100;
+            try {
+                const cfg = await prisma.musicConfig.upsert({
+                    where: { guildId: interaction.guildId! },
+                    update: {},
+                    create: {
+                        guildId: interaction.guildId!,
+                        channelMode: 'BLACKLIST',
+                        allowedChannels: JSON.stringify([]),
+                        djMode: false,
+                        djRoles: JSON.stringify([]),
+                        defaultVolume: 50,
+                    },
+                });
+                targetVolume = cfg.defaultVolume ?? 100;
+            } catch (e) {
+                logger.error('Failed to load music config for volume, using default 100', e);
+            }
+
             if (player) {
                 if (player.voiceChannelId !== voiceChannel.id) {
                     await interaction.editReply('You need to be in the same voice channel as the bot!');
@@ -38,7 +58,7 @@ const command: Command = {
                     textChannelId: interaction.channelId,
                     selfDeaf: true,
                     selfMute: false,
-                    volume: 100,
+                    volume: targetVolume,
                 });
             }
 
