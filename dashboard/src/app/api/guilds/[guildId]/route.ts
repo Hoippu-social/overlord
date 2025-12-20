@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { prisma } from '@/lib/prisma';
+import { getAuthToken } from '@/lib/auth';
+import { canAccessGuild } from '@/lib/discordAccess';
 
 const isVoiceChannel = (channel: any) =>
     channel?.type === 2 || channel?.type === 'voice' || channel?.type === 'GUILD_VOICE';
@@ -9,16 +10,22 @@ const isTextChannel = (channel: any) =>
     channel?.type === 0 || channel?.type === 'text' || channel?.type === 'GUILD_TEXT';
 
 export async function GET(
-    _request: NextRequest,
+    request: NextRequest,
     { params }: { params: Promise<{ guildId: string }> }
 ) {
-    const session = (await cookies()).get('session');
-    if (!session?.value) {
+    const token = await getAuthToken(request);
+    const accessToken = typeof token?.accessToken === 'string' ? token.accessToken : null;
+    if (!accessToken) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     try {
         const { guildId } = await params;
+        const allowedGuilds = Array.isArray(token?.allowedGuilds) ? token.allowedGuilds : null;
+        const hasAccess = allowedGuilds ? allowedGuilds.includes(guildId) : await canAccessGuild(accessToken, guildId);
+        if (!hasAccess) {
+            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        }
 
         if (!guildId) {
             return NextResponse.json({ error: 'Guild id is missing in route params' }, { status: 400 });

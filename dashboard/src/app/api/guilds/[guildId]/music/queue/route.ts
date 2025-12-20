@@ -1,22 +1,25 @@
-import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
+import { NextRequest, NextResponse } from 'next/server';
+import { getAuthToken } from '@/lib/auth';
+import { canAccessGuild } from '@/lib/discordAccess';
 const BOT_API_PORT = process.env.DASHBOARD_API_PORT || '3002';
 const BOT_API_URL = process.env.DASHBOARD_API_URL || `http://127.0.0.1:${BOT_API_PORT}`;
 const BOT_API_KEY = process.env.DASHBOARD_API_KEY || '';
 
 export const dynamic = 'force-dynamic';
 
-async function verifySession() {
-    const session = (await cookies()).get('session');
-    return session?.value ? true : false;
-}
-
-export async function GET(_request: Request, { params }: { params: Promise<{ guildId: string }> }) {
-    if (!(await verifySession())) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ guildId: string }> }) {
+    const token = await getAuthToken(request);
+    const accessToken = typeof token?.accessToken === 'string' ? token.accessToken : null;
+    if (!accessToken) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { guildId } = await params;
+    const allowedGuilds = Array.isArray(token?.allowedGuilds) ? token.allowedGuilds : null;
+    const hasAccess = allowedGuilds ? allowedGuilds.includes(guildId) : await canAccessGuild(accessToken, guildId);
+    if (!hasAccess) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
 
     try {
         const res = await fetch(`${BOT_API_URL}/api/queue?guildId=${encodeURIComponent(guildId)}`, {
@@ -39,12 +42,19 @@ export async function GET(_request: Request, { params }: { params: Promise<{ gui
     }
 }
 
-export async function POST(request: Request, { params }: { params: Promise<{ guildId: string }> }) {
-    if (!(await verifySession())) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ guildId: string }> }) {
+    const token = await getAuthToken(request);
+    const accessToken = typeof token?.accessToken === 'string' ? token.accessToken : null;
+    if (!accessToken) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { guildId } = await params;
+    const allowedGuilds = Array.isArray(token?.allowedGuilds) ? token.allowedGuilds : null;
+    const hasAccess = allowedGuilds ? allowedGuilds.includes(guildId) : await canAccessGuild(accessToken, guildId);
+    if (!hasAccess) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
     const body = await request.json().catch(() => ({}));
     const encodedTrack = typeof body.encodedTrack === 'string' ? body.encodedTrack : '';
     const action = typeof body.action === 'string' ? body.action : '';

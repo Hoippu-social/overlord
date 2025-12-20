@@ -1,21 +1,24 @@
-import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
+import { NextRequest, NextResponse } from 'next/server';
 import { getPlayerFromLavalink } from '@/lib/lavalink';
 import { prisma } from '@/lib/prisma';
+import { getAuthToken } from '@/lib/auth';
+import { canAccessGuild } from '@/lib/discordAccess';
 
 export const dynamic = 'force-dynamic';
 
-async function verifySession() {
-    const session = (await cookies()).get('session');
-    return session?.value ? true : false;
-}
-
-export async function GET(_req: Request, { params }: { params: Promise<{ guildId: string }> }) {
-    if (!(await verifySession())) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ guildId: string }> }) {
+    const token = await getAuthToken(request);
+    const accessToken = typeof token?.accessToken === 'string' ? token.accessToken : null;
+    if (!accessToken) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { guildId } = await params;
+    const allowedGuilds = Array.isArray(token?.allowedGuilds) ? token.allowedGuilds : null;
+    const hasAccess = allowedGuilds ? allowedGuilds.includes(guildId) : await canAccessGuild(accessToken, guildId);
+    if (!hasAccess) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
 
     try {
         const player = await getPlayerFromLavalink(guildId);
