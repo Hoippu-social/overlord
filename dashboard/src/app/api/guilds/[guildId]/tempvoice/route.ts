@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { prisma } from '@/lib/prisma';
 import dotenv from 'dotenv';
 import path from 'path';
+import { getAuthToken } from '@/lib/auth';
+import { canAccessGuild } from '@/lib/discordAccess';
 
 const DISCORD_API = 'https://discord.com/api/v10';
 
@@ -53,13 +54,6 @@ const parseChannels = (channelsJson?: string | null) => {
 
     return { categories, voice, text };
 };
-
-async function requireSession() {
-    const session = (await cookies()).get('session');
-    if (!session?.value) {
-        throw new Response('Unauthorized', { status: 401 });
-    }
-}
 
 function getToken() {
     if (process.env.DISCORD_TOKEN) return process.env.DISCORD_TOKEN;
@@ -172,10 +166,19 @@ async function deleteRooms(token: string, guildId: string) {
     await prisma.tempVoiceRoom.deleteMany({ where: { guildId } });
 }
 
-export async function GET(_request: NextRequest, { params }: { params: Promise<{ guildId: string }> }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ guildId: string }> }) {
     try {
-        await requireSession();
+        const token = await getAuthToken(request);
+        const accessToken = typeof token?.accessToken === 'string' ? token.accessToken : null;
+        if (!accessToken) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
         const { guildId } = await params;
+        const allowedGuilds = Array.isArray(token?.allowedGuilds) ? token.allowedGuilds : null;
+        const hasAccess = allowedGuilds ? allowedGuilds.includes(guildId) : await canAccessGuild(accessToken, guildId);
+        if (!hasAccess) {
+            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        }
 
         const config = await prisma.tempVoiceConfig.findUnique({ where: { guildId } });
         const roomsCount = await prisma.tempVoiceRoom.count({ where: { guildId } });
@@ -191,8 +194,17 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ guildId: string }> }) {
     try {
-        await requireSession();
+        const token = await getAuthToken(request);
+        const accessToken = typeof token?.accessToken === 'string' ? token.accessToken : null;
+        if (!accessToken) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
         const { guildId } = await params;
+        const allowedGuilds = Array.isArray(token?.allowedGuilds) ? token.allowedGuilds : null;
+        const hasAccess = allowedGuilds ? allowedGuilds.includes(guildId) : await canAccessGuild(accessToken, guildId);
+        if (!hasAccess) {
+            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        }
         const body = await request.json();
         const mode: 'create' | 'existing' = body.mode === 'existing' ? 'existing' : 'create';
         const nameTemplate: string = (body.nameTemplate || 'Room {user}').trim();
@@ -297,8 +309,17 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ guildId: string }> }) {
     try {
-        await requireSession();
+        const token = await getAuthToken(request);
+        const accessToken = typeof token?.accessToken === 'string' ? token.accessToken : null;
+        if (!accessToken) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
         const { guildId } = await params;
+        const allowedGuilds = Array.isArray(token?.allowedGuilds) ? token.allowedGuilds : null;
+        const hasAccess = allowedGuilds ? allowedGuilds.includes(guildId) : await canAccessGuild(accessToken, guildId);
+        if (!hasAccess) {
+            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        }
         const body = await request.json().catch(() => ({}));
         if (!body.confirm) {
             return NextResponse.json({ error: 'Нужно подтверждение удаления' }, { status: 400 });

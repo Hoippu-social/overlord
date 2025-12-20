@@ -7,6 +7,7 @@ import { Card, CardBody, CardFooter, Image, Button, Spinner, Dropdown, DropdownT
 import { motion } from "framer-motion";
 import { SignOut, Moon, Sun, List, CaretRight } from "@phosphor-icons/react";
 import { useTheme } from "next-themes";
+import { signOut } from 'next-auth/react';
 
 interface Guild {
     id: string;
@@ -40,8 +41,7 @@ export default function Dashboard() {
     }, [router]);
 
     const handleLogout = async () => {
-        await fetch('/api/logout', { method: 'POST' });
-        router.push('/login');
+        await signOut({ callbackUrl: '/login' });
     };
 
     const toggleTheme = () => {

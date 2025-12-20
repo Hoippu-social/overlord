@@ -1,38 +1,20 @@
 'use client';
 
 import React from 'react';
-import { Card, CardBody, Button, Input } from "@nextui-org/react";
-import { LockKey } from "@phosphor-icons/react";
-import { useRouter } from 'next/navigation';
+import { Card, CardBody, Button } from "@nextui-org/react";
+import { DiscordLogo } from "@phosphor-icons/react";
+import { signIn } from 'next-auth/react';
+import { useSearchParams } from 'next/navigation';
 
 export default function LoginPage() {
-    const router = useRouter();
-    const [password, setPassword] = React.useState('');
     const [loading, setLoading] = React.useState(false);
-    const [error, setError] = React.useState('');
+    const searchParams = useSearchParams();
+    const errorParam = searchParams.get('error');
+    const errorMessage = errorParam ? 'Discord login failed. Please try again.' : '';
 
-    const handleLogin = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const handleDiscordLogin = async () => {
         setLoading(true);
-        setError('');
-
-        try {
-            const res = await fetch('/api/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ password }),
-            });
-
-            if (res.ok) {
-                router.push('/dashboard');
-            } else {
-                setError('Invalid password. Please try again.');
-            }
-        } catch (error) {
-            console.error(error);
-        } finally {
-            setLoading(false);
-        }
+        await signIn('discord', { callbackUrl: '/dashboard' });
     };
 
     return (
@@ -41,32 +23,23 @@ export default function LoginPage() {
                 <CardBody className="p-8 space-y-6">
                     <div className="text-center space-y-2">
                         <h1 className="text-2xl font-bold">Welcome Back</h1>
-                        <p className="text-default-500">Enter your password to access the dashboard</p>
+                        <p className="text-default-500">Sign in with your Discord account to continue</p>
                     </div>
 
-                    <form onSubmit={handleLogin} className="space-y-4">
-                        <Input
-                            type="password"
-                            label="Password"
-                            placeholder="Enter your password"
-                            startContent={<LockKey className="text-default-400" />}
-                            value={password}
-                            onValueChange={(val) => { setPassword(val); setError(''); }}
-                            variant="bordered"
-                            isInvalid={!!error}
-                            errorMessage={error}
-                        />
+                    {errorMessage && (
+                        <div className="text-sm text-danger text-center">{errorMessage}</div>
+                    )}
 
-                        <Button
-                            type="submit"
-                            color="primary"
-                            fullWidth
-                            isLoading={loading}
-                            className="font-semibold"
-                        >
-                            Login
-                        </Button>
-                    </form>
+                    <Button
+                        color="primary"
+                        fullWidth
+                        isLoading={loading}
+                        className="font-semibold"
+                        startContent={!loading ? <DiscordLogo size={20} weight="fill" /> : null}
+                        onPress={handleDiscordLogin}
+                    >
+                        Continue with Discord
+                    </Button>
                 </CardBody>
             </Card>
         </div>

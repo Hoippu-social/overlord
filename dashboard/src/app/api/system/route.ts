@@ -1,8 +1,13 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import botManager from '@/lib/botProcess';
 import { prisma } from '@/lib/prisma';
+import { getAuthToken } from '@/lib/auth';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+    if (!(await getAuthToken(request))) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     try {
         const stats = await botManager.getStats();
 
@@ -45,8 +50,12 @@ export async function GET() {
     }
 }
 
-export async function POST(req: Request) {
-    const { action } = await req.json();
+export async function POST(request: NextRequest) {
+    if (!(await getAuthToken(request))) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { action } = await request.json();
 
     try {
         switch (action) {
