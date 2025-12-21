@@ -57,7 +57,7 @@ function buildQueueState(player: any) {
     };
 }
 
-export function startDashboardApi(client: Client) {
+export function startDashboardApi(client: Client): http.Server {
     const server = http.createServer(async (req, res) => {
         try {
             if (!isLocalRequest(req)) {
@@ -77,14 +77,58 @@ export function startDashboardApi(client: Client) {
 
             const url = new URL(req.url || '/', 'http://127.0.0.1');
 
-            if (url.pathname !== '/api/queue') {
-                res.writeHead(404);
-                res.end('Not Found');
+            if (url.pathname === '/api/shutdown') {
+                if (req.method !== 'POST') {
+                    res.writeHead(405);
+                    res.end('Method Not Allowed');
+                    return;
+                }
+
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ ok: true, message: 'Shutting down bot' }));
+
+                // Defer to let response flush, then reuse SIGINT handler for graceful stop
+                setTimeout(() => {
+                    logger.info('[DashboardAPI] Shutdown requested via API');
+                    process.emit('SIGINT');
+                }, 50);
                 return;
             }
 
-            if (req.method === 'GET') {
-                const guildId = url.searchParams.get('guildId') || '';
+            if (url.pathname === '/api/queue') {
+                if (req.method === 'GET') {
+                    const guildId = url.searchParams.get('guildId') || '';
+                    if (!guildId) {
+                        res.writeHead(400);
+                        res.end('guildId is required');
+                        return;
+                    }
+
+                    const player = client.lavalink.getPlayer(guildId);
+                    if (!player) {
+                        res.writeHead(200, { 'Content-Type': 'application/json' });
+                        res.end(JSON.stringify({ ok: true, queue: { current: null, tracks: [] } }));
+                        return;
+                    }
+
+                    const queue = buildQueueState(player);
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ ok: true, queue }));
+                    return;
+                }
+
+                if (req.method !== 'POST') {
+                    res.writeHead(405);
+                    res.end('Method Not Allowed');
+                    return;
+                }
+
+                const raw = await readBody(req);
+                const body = raw ? JSON.parse(raw) : {};
+                const guildId = typeof body.guildId === 'string' ? body.guildId : '';
+                const encodedTrack = typeof body.encodedTrack === 'string' ? body.encodedTrack : '';
+                const action = typeof body.action === 'string' ? body.action : '';
+
                 if (!guildId) {
                     res.writeHead(400);
                     res.end('guildId is required');
@@ -93,129 +137,104 @@ export function startDashboardApi(client: Client) {
 
                 const player = client.lavalink.getPlayer(guildId);
                 if (!player) {
+                    res.writeHead(404);
+                    res.end('Player not found');
+                    return;
+                }
+
+                if (!player.connected && player.voiceChannelId) {
+                    await player.connect();
+                }
+
+                if (encodedTrack) {
+                    const requester = client.user || undefined;
+                    const track = await player.node.decode.singleTrack(encodedTrack, requester);
+                    await player.queue.add(track);
+                    if (!player.playing) await player.play();
+                    logger.info(`[DashboardAPI] Queued track for guild ${guildId}: ${track.info?.title || 'Unknown'}`);
+                    const queue = buildQueueState(player);
                     res.writeHead(200, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ ok: true, queue: { current: null, tracks: [] } }));
+                    res.end(JSON.stringify({ ok: true, queued: serializeTrack(track), queue }));
                     return;
                 }
 
-                const queue = buildQueueState(player);
-                res.writeHead(200, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ ok: true, queue }));
-                return;
-            }
-
-            if (req.method !== 'POST') {
-                res.writeHead(405);
-                res.end('Method Not Allowed');
-                return;
-            }
-
-            const raw = await readBody(req);
-            const body = raw ? JSON.parse(raw) : {};
-            const guildId = typeof body.guildId === 'string' ? body.guildId : '';
-            const encodedTrack = typeof body.encodedTrack === 'string' ? body.encodedTrack : '';
-            const action = typeof body.action === 'string' ? body.action : '';
-
-            if (!guildId) {
-                res.writeHead(400);
-                res.end('guildId is required');
-                return;
-            }
-
-            const player = client.lavalink.getPlayer(guildId);
-            if (!player) {
-                res.writeHead(404);
-                res.end('Player not found');
-                return;
-            }
-
-            if (!player.connected && player.voiceChannelId) {
-                await player.connect();
-            }
-
-            if (encodedTrack) {
-                const requester = client.user || undefined;
-                const track = await player.node.decode.singleTrack(encodedTrack, requester);
-                await player.queue.add(track);
-                if (!player.playing) await player.play();
-                logger.info(`[DashboardAPI] Queued track for guild ${guildId}: ${track.info?.title || 'Unknown'}`);
-                const queue = buildQueueState(player);
-                res.writeHead(200, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ ok: true, queued: serializeTrack(track), queue }));
-                return;
-            }
-
-            if (!action) {
-                res.writeHead(400);
-                res.end('encodedTrack or action is required');
-                return;
-            }
-
-            if (action === 'clear') {
-                player.queue.tracks.length = 0;
-                await player.queue.utils.save();
-                const queue = buildQueueState(player);
-                res.writeHead(200, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ ok: true, queue }));
-                return;
-            }
-
-            if (action === 'shuffle') {
-                await player.queue.shuffle();
-                const queue = buildQueueState(player);
-                res.writeHead(200, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ ok: true, queue }));
-                return;
-            }
-
-            if (action === 'remove') {
-                const index = Number(body.index);
-                if (!Number.isInteger(index)) {
+                if (!action) {
                     res.writeHead(400);
-                    res.end('index is required');
+                    res.end('encodedTrack or action is required');
                     return;
                 }
-                await player.queue.splice(index, 1);
-                const queue = buildQueueState(player);
-                res.writeHead(200, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ ok: true, queue }));
-                return;
-            }
 
-            if (action === 'move') {
-                const from = Number(body.from);
-                const to = Number(body.to);
-                if (!Number.isInteger(from) || !Number.isInteger(to)) {
-                    res.writeHead(400);
-                    res.end('from and to are required');
-                    return;
-                }
-                const trackCount = player.queue.tracks.length;
-                if (from < 0 || from >= trackCount) {
-                    res.writeHead(400);
-                    res.end('from is out of range');
-                    return;
-                }
-                if (from === to) {
+                if (action === 'clear') {
+                    player.queue.tracks.length = 0;
+                    await player.queue.utils.save();
+                    const queue = buildQueueState(player);
                     res.writeHead(200, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ ok: true, queue: buildQueueState(player) }));
+                    res.end(JSON.stringify({ ok: true, queue }));
                     return;
                 }
-                const track = await player.queue.splice(from, 1);
-                const maxIndex = trackCount;
-                const safeTo = Math.max(0, Math.min(to, maxIndex));
-                const target = from < safeTo ? Math.max(0, safeTo - 1) : safeTo;
-                if (track) {
-                    await player.queue.splice(target, 0, track);
+
+                if (action === 'shuffle') {
+                    await player.queue.shuffle();
+                    const queue = buildQueueState(player);
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ ok: true, queue }));
+                    return;
                 }
-                const queue = buildQueueState(player);
-                res.writeHead(200, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ ok: true, queue }));
+
+                if (action === 'remove') {
+                    const index = Number(body.index);
+                    if (!Number.isInteger(index)) {
+                        res.writeHead(400);
+                        res.end('index is required');
+                        return;
+                    }
+                    await player.queue.splice(index, 1);
+                    const queue = buildQueueState(player);
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ ok: true, queue }));
+                    return;
+                }
+
+                if (action === 'move') {
+                    const from = Number(body.from);
+                    const to = Number(body.to);
+                    if (!Number.isInteger(from) || !Number.isInteger(to)) {
+                        res.writeHead(400);
+                        res.end('from and to are required');
+                        return;
+                    }
+                    const trackCount = player.queue.tracks.length;
+                    if (from < 0 || from >= trackCount) {
+                        res.writeHead(400);
+                        res.end('from is out of range');
+                        return;
+                    }
+                    if (from === to) {
+                        res.writeHead(200, { 'Content-Type': 'application/json' });
+                        res.end(JSON.stringify({ ok: true, queue: buildQueueState(player) }));
+                        return;
+                    }
+                    const track = await player.queue.splice(from, 1);
+                    const maxIndex = trackCount;
+                    const safeTo = Math.max(0, Math.min(to, maxIndex));
+                    const target = from < safeTo ? Math.max(0, safeTo - 1) : safeTo;
+                    if (track) {
+                        await player.queue.splice(target, 0, track);
+                    }
+                    const queue = buildQueueState(player);
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ ok: true, queue }));
+                    return;
+                }
+
+                res.writeHead(400);
+                res.end('Unknown action');
                 return;
             }
 
-            res.writeHead(400);
-            res.end('Unknown action');
+            res.writeHead(404);
+            res.end('Not Found');
+            return;
         } catch (error) {
             logger.error('[DashboardAPI] Queue error:', error);
             res.writeHead(500);
@@ -226,4 +245,6 @@ export function startDashboardApi(client: Client) {
     server.listen(PORT, '127.0.0.1', () => {
         logger.info(`[DashboardAPI] Listening on http://127.0.0.1:${PORT}`);
     });
+
+    return server;
 }

@@ -1,4 +1,5 @@
 import { SlashCommandBuilder, GuildMember } from 'discord.js';
+import { getGuildLocale, t } from '../../utils/i18n';
 import { Command } from '../../utils/types';
 
 const command: Command = {
@@ -11,30 +12,30 @@ const command: Command = {
                 .setRequired(true)
         ) as any,
     execute: async (interaction) => {
+        const locale = await getGuildLocale(interaction.guildId);
         const member = interaction.member as GuildMember;
         const voiceChannel = member.voice.channel;
 
         if (!voiceChannel) {
-            await interaction.reply({ content: '❌ Вы должны быть в голосовом канале!', ephemeral: true });
+            await interaction.reply({ content: t(locale, 'general.notVoice'), ephemeral: true });
             return;
         }
 
         const player = interaction.client.lavalink.getPlayer(interaction.guildId!);
 
         if (!player || !player.queue.current) {
-            await interaction.reply({ content: '❌ Сейчас ничего не играет!', ephemeral: true });
+            await interaction.reply({ content: t(locale, 'general.nothingPlaying'), ephemeral: true });
             return;
         }
 
         if (player.voiceChannelId !== voiceChannel.id) {
-            await interaction.reply({ content: '❌ Вы должны быть в том же канале, что и бот!', ephemeral: true });
+            await interaction.reply({ content: t(locale, 'general.notSameVoice'), ephemeral: true });
             return;
         }
 
         const positionInput = interaction.options.getString('position', true);
         let positionMs: number;
 
-        // Parse position (supports formats: "1:30", "90", "1m30s")
         if (positionInput.includes(':')) {
             const parts = positionInput.split(':');
             const minutes = parseInt(parts[0]) || 0;
@@ -51,7 +52,7 @@ const command: Command = {
         }
 
         if (isNaN(positionMs) || positionMs < 0) {
-            await interaction.reply({ content: '❌ Неверный формат времени! Используйте: `1:30`, `90` или `1m30s`', ephemeral: true });
+            await interaction.reply({ content: t(locale, 'music.seek.invalid'), ephemeral: true });
             return;
         }
 
@@ -59,18 +60,17 @@ const command: Command = {
         const duration = track.info.duration || 0;
 
         if (positionMs > duration) {
-            await interaction.reply({ content: '❌ Указанная позиция превышает длительность трека!', ephemeral: true });
+            await interaction.reply({ content: t(locale, 'music.seek.tooFar'), ephemeral: true });
             return;
         }
 
         await player.seek(positionMs);
 
-        // Format position for display
         const minutes = Math.floor(positionMs / 60000);
         const seconds = Math.floor((positionMs % 60000) / 1000);
         const formattedPosition = `${minutes}:${seconds.toString().padStart(2, '0')}`;
 
-        await interaction.reply(`⏩ Перемотано на **${formattedPosition}**`);
+        await interaction.reply(t(locale, 'music.seek.done', { position: formattedPosition }));
     },
 };
 

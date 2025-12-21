@@ -102,7 +102,6 @@ export class LavalinkExtractor extends BaseExtractor {
             // We would need to use a library that integrates Lavalink as a Player node.
 
             // Let's try to use 'youtube-ext' instead? It's in package.json.
-            // User: "Давай перестанем играться... настроим Lavalink".
 
             // OK, to use Lavalink with discord-player v7 properly, we need to use it as a "Voice Node".
             // But discord-player v7 removed built-in Lavalink support.

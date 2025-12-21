@@ -8,6 +8,7 @@ import {
     EmbedBuilder,
 } from 'discord.js';
 import { prisma } from '../../utils/database';
+import { getGuildLocale, t } from '../../utils/i18n';
 import logger from '../../utils/logger';
 import { cacheTempVoiceConfig, clearTempVoiceConfigCache } from '../../utils/tempVoice';
 import { Command } from '../../utils/types';
@@ -20,48 +21,50 @@ const DEFAULT_TEMPLATE = 'Room {user}';
 const command: Command = {
     data: new SlashCommandBuilder()
         .setName('setupv')
-        .setDescription('Создать хаб, категорию и панель управления для временных комнат')
+        .setDescription('Create hub, category, and control panel for temp rooms')
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels)
         .setDMPermission(false)
         .addStringOption((opt) =>
             opt
                 .setName('category')
-                .setDescription('Название категории')
+                .setDescription('Category name for temp rooms')
                 .setMaxLength(80)
         )
         .addStringOption((opt) =>
             opt
                 .setName('hub')
-                .setDescription('Название голосового хаба')
+                .setDescription('Voice hub channel name')
                 .setMaxLength(80)
         )
         .addStringOption((opt) =>
             opt
                 .setName('interface')
-                .setDescription('Название текстового канала с панелью управления')
+                .setDescription('Text channel name for control panel')
                 .setMaxLength(80)
         )
         .addStringOption((opt) =>
             opt
                 .setName('template')
-                .setDescription('Шаблон имени комнаты, используйте {user} для имени создателя')
+                .setDescription('Room name template, use {user} for the owner name')
                 .setMaxLength(90)
         )
         .addIntegerOption((opt) =>
             opt
                 .setName('limit')
-                .setDescription('Лимит пользователей создаваемых комнат (0 — без лимита)')
+                .setDescription('User limit for created rooms (0 = unlimited)')
                 .setMinValue(0)
                 .setMaxValue(99)
         ) as any,
     async execute(interaction) {
+        const locale = await getGuildLocale(interaction.guildId);
+
         if (!interaction.guildId || !interaction.guild) {
-            await interaction.reply({ content: 'Команда доступна только на сервере.', ephemeral: true });
+            await interaction.reply({ content: t(locale, 'setupv.guildOnly'), ephemeral: true });
             return;
         }
 
         if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageChannels)) {
-            await interaction.reply({ content: 'Нужно право Manage Channels.', ephemeral: true });
+            await interaction.reply({ content: t(locale, 'setupv.notManager'), ephemeral: true });
             return;
         }
 
@@ -112,37 +115,23 @@ const command: Command = {
             });
 
             const embed = new EmbedBuilder()
-                .setTitle('Управление приватными комнатами')
-                .setDescription(
-                    [
-                        `Зайдите в голосовой канал 🔊 ${hub.toString()}, чтобы получить личную комнату.`,
-                        'Используйте кнопки ниже для управления своей комнатой:',
-                        '👑 — назначить нового создателя',
-                        '🧑‍🤝‍🧑 — выдать доступ в комнату',
-                        '🚫 — ограничить доступ в комнату',
-                        '🔢 — задать лимит участников',
-                        '🔒 — закрыть/открыть комнату',
-                        '📝 — изменить название комнаты',
-                        '👁️ — скрыть/показать комнату',
-                        '👞 — выгнать участника из комнаты',
-                        '🎙️ — ограничить/выдать право говорить',
-                    ].join('\n')
-                )
+                .setTitle(t(locale, 'setupv.embed.title'))
+                .setDescription(t(locale, 'setupv.embed.desc'))
                 .setColor(0x9b8cff);
 
             const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
-                new ButtonBuilder().setCustomId('tv_claim').setEmoji('👑').setStyle(ButtonStyle.Secondary),
-                new ButtonBuilder().setCustomId('tv_permit').setEmoji('🧑‍🤝‍🧑').setStyle(ButtonStyle.Secondary),
-                new ButtonBuilder().setCustomId('tv_block').setEmoji('🚫').setStyle(ButtonStyle.Secondary),
-                new ButtonBuilder().setCustomId('tv_limit').setEmoji('🔢').setStyle(ButtonStyle.Secondary),
-                new ButtonBuilder().setCustomId('tv_lock').setEmoji('🔒').setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder().setCustomId('tv_claim').setEmoji('??').setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder().setCustomId('tv_permit').setEmoji('?').setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder().setCustomId('tv_block').setEmoji('??').setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder().setCustomId('tv_limit').setEmoji('??').setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder().setCustomId('tv_lock').setEmoji('??').setStyle(ButtonStyle.Secondary),
             );
 
             const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
-                new ButtonBuilder().setCustomId('tv_rename').setEmoji('📝').setStyle(ButtonStyle.Secondary),
-                new ButtonBuilder().setCustomId('tv_hide').setEmoji('👁️').setStyle(ButtonStyle.Secondary),
-                new ButtonBuilder().setCustomId('tv_kick').setEmoji('👞').setStyle(ButtonStyle.Secondary),
-                new ButtonBuilder().setCustomId('tv_speak').setEmoji('🎙️').setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder().setCustomId('tv_rename').setEmoji('??').setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder().setCustomId('tv_hide').setEmoji('??').setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder().setCustomId('tv_kick').setEmoji('??').setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder().setCustomId('tv_speak').setEmoji('???').setStyle(ButtonStyle.Secondary),
             );
 
             await iface.send({ embeds: [embed], components: [row1, row2] });
@@ -169,19 +158,20 @@ const command: Command = {
             clearTempVoiceConfigCache(interaction.guildId);
             cacheTempVoiceConfig(config);
 
+            const limitValue = limit ?? t(locale, 'general.unlimited');
+
             await interaction.editReply({
-                content: [
-                    'Настройка завершена:',
-                    `Категория: ${category.toString()}`,
-                    `Хаб: ${hub.toString()}`,
-                    `Интерфейс: ${iface.toString()}`,
-                    `Шаблон имени: ${template}`,
-                    `Лимит: ${limit ?? 'без лимита'}`,
-                ].join('\n'),
+                content: t(locale, 'setupv.summary', {
+                    category: category.toString(),
+                    hub: hub.toString(),
+                    panel: iface.toString(),
+                    template,
+                    limit: String(limitValue),
+                }),
             });
         } catch (error) {
             logger.error(`[TempVoice] setupv failed: ${error}`);
-            await interaction.editReply({ content: 'Не удалось завершить настройку. Проверьте права бота.' });
+            await interaction.editReply({ content: t(locale, 'setupv.error') });
         }
     },
 };

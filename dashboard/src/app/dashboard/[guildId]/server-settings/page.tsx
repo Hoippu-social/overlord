@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Card, CardBody, Button, Input, Switch, Select, SelectItem, SelectedItems, ButtonGroup, Checkbox, Chip } from "@nextui-org/react";
-import { Keyboard, CheckCircle, Prohibit, ShieldCheck, UserCircle } from "@phosphor-icons/react";
+import { Card, CardBody, Button, Input, Switch, Select, SelectItem, SelectedItems, ButtonGroup, Checkbox, Chip, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from "@nextui-org/react";
+import { Keyboard, CheckCircle, Prohibit, ShieldCheck, UserCircle, Translate } from "@phosphor-icons/react";
+import { DEFAULT_LOCALE, LocaleCode, normalizeLocale, useGuildLocale } from "@/lib/i18n";
 
 interface Role {
     id: string;
@@ -75,8 +76,113 @@ const normalizeChannelMode = (value: unknown) => {
     return lowered === 'whitelist' ? 'whitelist' : 'blacklist';
 };
 
+const strings = {
+    en: {
+        pageTitle: 'Server settings',
+        pageSubtitle: 'Configure guild-level options for this server.',
+        errorLoadStatus: 'Failed to load settings data (status: {status}).',
+        errorLoad: 'Failed to load server settings.',
+        errorSaveStatus: 'Server settings API returned {status}.',
+        errorSave: 'Failed to save server settings.',
+        sectionPrefixTitle: 'Command Prefix',
+        sectionPrefixDesc: 'Set the prefix for text commands',
+        switchPrefixLabel: 'Prefix commands',
+        prefixLabel: 'Prefix',
+        prefixExample: 'Example: {prefix}help',
+        prefixEnabled: 'Prefix commands are enabled for this server.',
+        prefixDisabled: 'Prefix commands are disabled for this server.',
+        sectionChannelsTitle: 'Command Channels',
+        sectionChannelsDescNone: 'No channel restrictions are active.',
+        sectionChannelsDescWhitelist: 'Commands are allowed only in selected channels.',
+        sectionChannelsDescBlacklist: 'Commands are blocked in selected channels.',
+        whitelist: 'Whitelist',
+        blacklist: 'Blacklist',
+        selectTextChannelsLabel: 'Select text channels',
+        selectTextChannelsPlaceholder: 'Choose text channels',
+        sectionAdminsTitle: 'Bot Administrators',
+        sectionAdminsDesc: 'Server owners always have access.',
+        selectAdminRolesLabel: 'Select admin roles',
+        selectAdminRolesPlaceholder: 'Choose roles',
+        sectionRejoinTitle: 'Rejoin Recovery',
+        sectionRejoinDesc: 'Restore roles and nicknames when members rejoin.',
+        restoreRolesTitle: 'Restore roles',
+        restoreRolesDesc: 'Reapply saved roles on rejoin.',
+        restoreNicknameTitle: 'Restore nickname',
+        restoreNicknameDesc: 'Reapply the previous nickname on rejoin.',
+        languageTitle: 'Bot language',
+        languageDesc: 'Choose the bot language. Dashboard language is configured separately.',
+        languageLabel: 'Bot language',
+        languageNote: 'Affects bot replies only; dashboard language stays separate.',
+        languageDashboardTitle: 'Dashboard language',
+        languageDashboardDesc: 'Choose interface language for the dashboard.',
+        languageDashboardLabel: 'Dashboard language',
+        languageSyncPromptTitle: 'Switch dashboard language?',
+        languageSyncPromptDesc: 'Bot language changed to {locale}. Apply it to the dashboard too?',
+        languageSyncApply: 'Yes, switch dashboard',
+        languageSyncSkip: 'Keep dashboard language',
+        saveSettings: 'Save Settings',
+        saving: 'Saving...',
+        resetDefaults: 'Reset Defaults',
+    },
+    ru: {
+        pageTitle: 'Настройки сервера',
+        pageSubtitle: 'Настройка параметров сервера.',
+        errorLoadStatus: 'Не удалось загрузить данные настроек (статус: {status}).',
+        errorLoad: 'Не удалось загрузить настройки сервера.',
+        errorSaveStatus: 'API настроек сервера вернуло {status}.',
+        errorSave: 'Не удалось сохранить настройки сервера.',
+        sectionPrefixTitle: 'Префикс команд',
+        sectionPrefixDesc: 'Укажите префикс для текстовых команд',
+        switchPrefixLabel: 'Префикс-команды',
+        prefixLabel: 'Префикс',
+        prefixExample: 'Пример: {prefix}help',
+        prefixEnabled: 'Префикс-команды включены для этого сервера.',
+        prefixDisabled: 'Префикс-команды отключены для этого сервера.',
+        sectionChannelsTitle: 'Каналы для команд',
+        sectionChannelsDescNone: 'Ограничений по каналам нет.',
+        sectionChannelsDescWhitelist: 'Команды разрешены только в выбранных каналах.',
+        sectionChannelsDescBlacklist: 'Команды запрещены в выбранных каналах.',
+        whitelist: 'Белый список',
+        blacklist: 'Чёрный список',
+        selectTextChannelsLabel: 'Выберите текстовые каналы',
+        selectTextChannelsPlaceholder: 'Выберите каналы',
+        sectionAdminsTitle: 'Администраторы бота',
+        sectionAdminsDesc: 'Владельцы сервера всегда имеют доступ.',
+        selectAdminRolesLabel: 'Выберите роли админов',
+        selectAdminRolesPlaceholder: 'Выберите роли',
+        sectionRejoinTitle: 'Восстановление при возврате',
+        sectionRejoinDesc: 'Возвращайте роли и ник при повторном входе.',
+        restoreRolesTitle: 'Восстановить роли',
+        restoreRolesDesc: 'Повторно назначать сохранённые роли при входе.',
+        restoreNicknameTitle: 'Восстановить ник',
+        restoreNicknameDesc: 'Возвращать предыдущий ник при входе.',
+        languageTitle: 'Язык бота',
+        languageDesc: 'Выберите язык бота. Язык панели настраивается отдельно.',
+        languageLabel: 'Язык бота',
+        languageNote: 'Только для ответов бота; язык панели задаётся отдельно.',
+        languageDashboardTitle: 'Язык панели',
+        languageDashboardDesc: 'Выберите язык интерфейса панели.',
+        languageDashboardLabel: 'Язык панели',
+        languageSyncPromptTitle: 'Переключить язык панели?',
+        languageSyncPromptDesc: 'Язык бота изменён на {locale}. Применить его к панели тоже?',
+        languageSyncApply: 'Да, переключить панель',
+        languageSyncSkip: 'Оставить язык панели',
+        saveSettings: 'Сохранить настройки',
+        saving: 'Сохранение...',
+        resetDefaults: 'Сбросить по умолчанию',
+    },
+} as const;
+
+const formatText = (template: string, vars?: Record<string, string | number>) => {
+    if (!vars) return template;
+    return template.replace(/\{(\\w+)\}/g, (_, key) => String(vars[key] ?? ''));
+};
+
 export default function ServerSettingsPage({ params }: { params: Promise<{ guildId: string }> }) {
     const { guildId } = React.use(params);
+    const { locale, setLocale } = useGuildLocale(guildId);
+    const [selectedLocale, setSelectedLocale] = useState<LocaleCode>(DEFAULT_LOCALE);
+    const [syncPromptLocale, setSyncPromptLocale] = useState<LocaleCode | null>(null);
     const [roles, setRoles] = useState<Role[]>([]);
     const [textChannels, setTextChannels] = useState<Channel[]>([]);
     const [prefix, setPrefix] = useState('!');
@@ -92,6 +198,10 @@ export default function ServerSettingsPage({ params }: { params: Promise<{ guild
     const [isSaving, setIsSaving] = useState(false);
     const [isDirty, setIsDirty] = useState(false);
     const [initialLoaded, setInitialLoaded] = useState(false);
+
+    const text = strings[locale];
+    const t = (key: keyof typeof strings.en, vars?: Record<string, string | number>) =>
+        formatText(text[key], vars);
 
     const getDefaultAdminRoles = (items: Role[]) =>
         items
@@ -119,7 +229,7 @@ export default function ServerSettingsPage({ params }: { params: Promise<{ guild
 
                 if (!rolesRes.ok || !channelsRes.ok || !settingsRes.ok) {
                     const status = [rolesRes, channelsRes, settingsRes].map((res) => res.status).join(', ');
-                    setSettingsError(`Failed to load settings data (status: ${status}).`);
+                    setSettingsError(t('errorLoadStatus', { status }));
                 }
                 setSettingsWarning(settingsData?.warning || null);
 
@@ -131,6 +241,7 @@ export default function ServerSettingsPage({ params }: { params: Promise<{ guild
 
                 const config = settingsData?.config;
                 const guildPrefix = settingsData?.guild?.prefix ?? '!';
+                const configLocale = normalizeLocale(config?.locale ?? DEFAULT_LOCALE);
 
                 setPrefix(guildPrefix);
                 setPrefixCommandsEnabled(config?.prefixCommandsEnabled ?? true);
@@ -138,6 +249,7 @@ export default function ServerSettingsPage({ params }: { params: Promise<{ guild
                 setSelectedTextChannels(new Set(parseJsonArray(config?.allowedTextChannels)));
                 setRestoreRolesOnRejoin(Boolean(config?.restoreRolesOnRejoin));
                 setRestoreNicknameOnRejoin(Boolean(config?.restoreNicknameOnRejoin));
+                setSelectedLocale(configLocale);
 
                 const hasAdminRoles = config?.adminRoles !== null && config?.adminRoles !== undefined;
                 const adminRolesFromConfig = hasAdminRoles ? parseJsonArray(config?.adminRoles) : null;
@@ -145,7 +257,7 @@ export default function ServerSettingsPage({ params }: { params: Promise<{ guild
                 setAdminRoles(new Set(adminRolesFromConfig ?? defaultAdminRoles));
             } catch (error) {
                 console.error('Failed to load server settings:', error);
-                setSettingsError('Failed to load server settings.');
+                setSettingsError(t('errorLoad'));
             } finally {
                 setSettingsLoading(false);
                 setInitialLoaded(true);
@@ -160,7 +272,7 @@ export default function ServerSettingsPage({ params }: { params: Promise<{ guild
         if (initialLoaded) {
             setIsDirty(true);
         }
-    }, [prefix, prefixCommandsEnabled, channelMode, selectedTextChannels, adminRoles, restoreRolesOnRejoin, restoreNicknameOnRejoin]);
+    }, [prefix, prefixCommandsEnabled, channelMode, selectedTextChannels, adminRoles, restoreRolesOnRejoin, restoreNicknameOnRejoin, selectedLocale]);
 
     const handleSaveSettings = async () => {
         if (!guildId) return;
@@ -182,19 +294,23 @@ export default function ServerSettingsPage({ params }: { params: Promise<{ guild
                     allowedTextChannels: Array.from(selectedTextChannels),
                     adminRoles: Array.from(adminRoles),
                     restoreRolesOnRejoin,
-                    restoreNicknameOnRejoin
+                    restoreNicknameOnRejoin,
+                    locale: selectedLocale,
                 })
             });
 
             if (!response.ok) {
                 const text = await response.text().catch(() => '');
-                throw new Error(text || `Server settings API returned ${response.status}`);
+                throw new Error(text || t('errorSaveStatus', { status: response.status }));
             }
 
+            if (selectedLocale !== locale) {
+                setSyncPromptLocale(selectedLocale);
+            }
             setIsDirty(false);
         } catch (error) {
             console.error('Failed to save server settings:', error);
-            setSettingsError('Failed to save server settings.');
+            setSettingsError(t('errorSave'));
         } finally {
             setIsSaving(false);
         }
@@ -208,13 +324,14 @@ export default function ServerSettingsPage({ params }: { params: Promise<{ guild
         setAdminRoles(new Set(getDefaultAdminRoles(roles)));
         setRestoreRolesOnRejoin(false);
         setRestoreNicknameOnRejoin(false);
+        setSelectedLocale(DEFAULT_LOCALE);
     };
 
     return (
         <div className="space-y-6">
             <div>
-                <h1 className="text-3xl font-bold">Server settings</h1>
-                <p className="text-default-500">Configure guild-level options for this server.</p>
+                <h1 className="text-3xl font-bold">{text.pageTitle}</h1>
+                <p className="text-default-500">{text.pageSubtitle}</p>
             </div>
 
             {settingsError && (
@@ -228,7 +345,6 @@ export default function ServerSettingsPage({ params }: { params: Promise<{ guild
                     <CardBody className="text-warning text-sm">{settingsWarning}</CardBody>
                 </Card>
             )}
-
             <Card className="bg-surface border border-divider">
                 <CardBody className="p-6 space-y-4">
                     <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -237,8 +353,8 @@ export default function ServerSettingsPage({ params }: { params: Promise<{ guild
                                 <Keyboard size={24} weight="fill" />
                             </div>
                             <div>
-                                <h3 className="text-xl font-bold">Command Prefix</h3>
-                                <p className="text-default-500 text-sm">Set the prefix for text commands</p>
+                                <h3 className="text-xl font-bold">{text.sectionPrefixTitle}</h3>
+                                <p className="text-default-500 text-sm">{text.sectionPrefixDesc}</p>
                             </div>
                         </div>
                         <Switch
@@ -248,26 +364,26 @@ export default function ServerSettingsPage({ params }: { params: Promise<{ guild
                             size="lg"
                             isDisabled={settingsLoading}
                         >
-                            Prefix commands
+                            {text.switchPrefixLabel}
                         </Switch>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <Input
-                            label="Prefix"
+                            label={text.prefixLabel}
                             placeholder="!"
                             value={prefix}
                             onValueChange={setPrefix}
                             maxLength={5}
                             variant="bordered"
                             isDisabled={settingsLoading}
-                            description={`Example: ${(prefix.trim() || '!')}help`}
+                            description={t('prefixExample', { prefix: prefix.trim() || '!' })}
                         />
                         <div className="flex items-center">
                             <p className="text-sm text-default-500">
                                 {prefixCommandsEnabled
-                                    ? 'Prefix commands are enabled for this server.'
-                                    : 'Prefix commands are disabled for this server.'}
+                                    ? text.prefixEnabled
+                                    : text.prefixDisabled}
                             </p>
                         </div>
                     </div>
@@ -282,13 +398,13 @@ export default function ServerSettingsPage({ params }: { params: Promise<{ guild
                                 {channelMode === 'whitelist' ? <CheckCircle size={24} /> : <Prohibit size={24} />}
                             </div>
                             <div>
-                                <h3 className="text-xl font-bold">Command Channels</h3>
+                                <h3 className="text-xl font-bold">{text.sectionChannelsTitle}</h3>
                                 <p className="text-default-500 text-sm">
                                     {selectedTextChannels.size === 0
-                                        ? 'No channel restrictions are active.'
+                                        ? text.sectionChannelsDescNone
                                         : channelMode === 'whitelist'
-                                            ? 'Commands are allowed only in selected channels.'
-                                            : 'Commands are blocked in selected channels.'}
+                                            ? text.sectionChannelsDescWhitelist
+                                            : text.sectionChannelsDescBlacklist}
                                 </p>
                             </div>
                         </div>
@@ -299,7 +415,7 @@ export default function ServerSettingsPage({ params }: { params: Promise<{ guild
                                 onPress={() => setChannelMode('whitelist')}
                                 isDisabled={settingsLoading}
                             >
-                                Whitelist
+                                {text.whitelist}
                             </Button>
                             <Button
                                 color={channelMode === 'blacklist' ? 'danger' : 'default'}
@@ -307,18 +423,18 @@ export default function ServerSettingsPage({ params }: { params: Promise<{ guild
                                 onPress={() => setChannelMode('blacklist')}
                                 isDisabled={settingsLoading}
                             >
-                                Blacklist
+                                {text.blacklist}
                             </Button>
                         </ButtonGroup>
                     </div>
 
                     <Select
                         items={textChannels}
-                        label="Select text channels"
+                        label={text.selectTextChannelsLabel}
                         variant="bordered"
                         isMultiline={true}
                         selectionMode="multiple"
-                        placeholder="Choose text channels"
+                        placeholder={text.selectTextChannelsPlaceholder}
                         selectedKeys={selectedTextChannels}
                         onSelectionChange={(keys) => setSelectedTextChannels(keys as Set<string>)}
                         color="secondary"
@@ -342,22 +458,77 @@ export default function ServerSettingsPage({ params }: { params: Promise<{ guild
             <Card className="bg-surface border border-divider">
                 <CardBody className="p-6 space-y-4">
                     <div className="flex items-center gap-3">
+                        <div className="p-2 bg-primary/10 rounded-lg text-primary">
+                            <Translate size={24} weight="fill" />
+                        </div>
+                        <div>
+                            <h3 className="text-xl font-bold">{text.languageTitle}</h3>
+                            <p className="text-default-500 text-sm">{text.languageDesc}</p>
+                        </div>
+                    </div>
+
+                    <Select
+                        label={text.languageLabel}
+                        variant="bordered"
+                        selectedKeys={new Set([selectedLocale])}
+                        onSelectionChange={(keys) => {
+                            const [value] = Array.from(keys) as string[];
+                            if (value === 'ru' || value === 'en') {
+                                setSelectedLocale(value);
+                            }
+                        }}
+                        isDisabled={settingsLoading}
+                        renderValue={(items) => {
+                            return items.map((item) => (
+                                <div key={item.key} className="flex items-center gap-2">
+                                    <img
+                                        src={item.key === 'ru' ? "/icons/free_russia_flag.png" : "/icons/uk_flag.png"}
+                                        className="w-4 h-4 rounded-sm object-contain"
+                                        alt=""
+                                    />
+                                    <span>{item.data?.textValue || (item.key === 'ru' ? 'Русский' : 'English')}</span>
+                                </div>
+                            ));
+                        }}
+                    >
+                        <SelectItem
+                            key="ru"
+                            textValue="Русский"
+                            startContent={<img src="/icons/free_russia_flag.png" className="w-5 h-5 rounded-sm object-contain" alt="RU" />}
+                        >
+                            Русский
+                        </SelectItem>
+                        <SelectItem
+                            key="en"
+                            textValue="English"
+                            startContent={<img src="/icons/uk_flag.png" className="w-5 h-5 rounded-sm object-contain" alt="EN" />}
+                        >
+                            English
+                        </SelectItem>
+                    </Select>
+                    <p className="text-xs text-default-500">{text.languageNote}</p>
+                </CardBody>
+            </Card>
+
+            <Card className="bg-surface border border-divider">
+                <CardBody className="p-6 space-y-4">
+                    <div className="flex items-center gap-3">
                         <div className="p-2 bg-success/10 rounded-lg text-success">
                             <ShieldCheck size={24} weight="fill" />
                         </div>
                         <div>
-                            <h3 className="text-xl font-bold">Bot Administrators</h3>
-                            <p className="text-default-500 text-sm">Server owners always have access.</p>
+                            <h3 className="text-xl font-bold">{text.sectionAdminsTitle}</h3>
+                            <p className="text-default-500 text-sm">{text.sectionAdminsDesc}</p>
                         </div>
                     </div>
 
                     <Select
                         items={roles}
-                        label="Select admin roles"
+                        label={text.selectAdminRolesLabel}
                         variant="bordered"
                         isMultiline={true}
                         selectionMode="multiple"
-                        placeholder="Choose roles"
+                        placeholder={text.selectAdminRolesPlaceholder}
                         selectedKeys={adminRoles}
                         onSelectionChange={(keys) => setAdminRoles(keys as Set<string>)}
                         color="secondary"
@@ -432,16 +603,16 @@ export default function ServerSettingsPage({ params }: { params: Promise<{ guild
                             <UserCircle size={24} weight="fill" />
                         </div>
                         <div>
-                            <h3 className="text-xl font-bold">Rejoin Recovery</h3>
-                            <p className="text-default-500 text-sm">Restore roles and nicknames when members rejoin.</p>
+                            <h3 className="text-xl font-bold">{text.sectionRejoinTitle}</h3>
+                            <p className="text-default-500 text-sm">{text.sectionRejoinDesc}</p>
                         </div>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="flex items-center justify-between p-4 rounded-xl bg-default-50 border border-default-100">
                             <div>
-                                <p className="font-semibold">Restore roles</p>
-                                <p className="text-xs text-default-500">Reapply saved roles on rejoin.</p>
+                                <p className="font-semibold">{text.restoreRolesTitle}</p>
+                                <p className="text-xs text-default-500">{text.restoreRolesDesc}</p>
                             </div>
                             <Switch
                                 isSelected={restoreRolesOnRejoin}
@@ -452,8 +623,8 @@ export default function ServerSettingsPage({ params }: { params: Promise<{ guild
                         </div>
                         <div className="flex items-center justify-between p-4 rounded-xl bg-default-50 border border-default-100">
                             <div>
-                                <p className="font-semibold">Restore nickname</p>
-                                <p className="text-xs text-default-500">Reapply the previous nickname on rejoin.</p>
+                                <p className="font-semibold">{text.restoreNicknameTitle}</p>
+                                <p className="text-xs text-default-500">{text.restoreNicknameDesc}</p>
                             </div>
                             <Switch
                                 isSelected={restoreNicknameOnRejoin}
@@ -475,7 +646,7 @@ export default function ServerSettingsPage({ params }: { params: Promise<{ guild
                     isLoading={isSaving}
                     isDisabled={!isDirty || settingsLoading}
                 >
-                    {isSaving ? 'Saving...' : 'Save Settings'}
+                    {isSaving ? text.saving : text.saveSettings}
                 </Button>
                 <Button
                     variant="flat"
@@ -484,9 +655,42 @@ export default function ServerSettingsPage({ params }: { params: Promise<{ guild
                     onPress={handleResetSettings}
                     isDisabled={settingsLoading}
                 >
-                    Reset Defaults
+                    {text.resetDefaults}
                 </Button>
             </div>
+
+            <Modal isOpen={!!syncPromptLocale} onClose={() => setSyncPromptLocale(null)} backdrop="blur">
+                <ModalContent>
+                    {(onClose) => {
+                        const promptLocaleLabel = syncPromptLocale === 'ru' ? 'Русский' : 'English';
+                        return (
+                            <>
+                                <ModalHeader className="flex flex-col gap-1">{text.languageSyncPromptTitle}</ModalHeader>
+                                <ModalBody>
+                                    <p>{t('languageSyncPromptDesc', { locale: promptLocaleLabel })}</p>
+                                </ModalBody>
+                                <ModalFooter>
+                                    <Button color="default" variant="flat" onPress={onClose}>
+                                        {text.languageSyncSkip}
+                                    </Button>
+                                    <Button
+                                        color="primary"
+                                        onPress={() => {
+                                            if (syncPromptLocale) {
+                                                setLocale(syncPromptLocale);
+                                            }
+                                            onClose();
+                                            setSyncPromptLocale(null);
+                                        }}
+                                    >
+                                        {text.languageSyncApply}
+                                    </Button>
+                                </ModalFooter>
+                            </>
+                        );
+                    }}
+                </ModalContent>
+            </Modal>
         </div>
     );
 }

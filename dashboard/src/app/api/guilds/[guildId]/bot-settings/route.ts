@@ -25,6 +25,11 @@ const normalizeStringArray = (value: unknown) => {
     return [];
 };
 
+const normalizeLocale = (value: unknown) => {
+    if (value === 'en' || value === 'ru') return value;
+    return null;
+};
+
 const getBotSettingsClient = () =>
     (prisma as unknown as { botSettings?: BotSettingsClient }).botSettings;
 
@@ -109,6 +114,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const prefixInput = typeof body.prefix === 'string' ? body.prefix.trim() : '';
     const prefix = prefixInput.length > 0 ? prefixInput.slice(0, 5) : null;
     const prefixCommandsEnabled = body.prefixCommandsEnabled === false ? false : true;
+    const locale = normalizeLocale(body.locale);
 
     if (prefix) {
         await prisma.guild.upsert({
@@ -119,16 +125,22 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
 
     try {
+        const updatePayload: Record<string, unknown> = {
+            prefixCommandsEnabled,
+            commandChannelMode: normalizeChannelMode(body.commandChannelMode),
+            allowedTextChannels: JSON.stringify(normalizeStringArray(body.allowedTextChannels)),
+            adminRoles: JSON.stringify(normalizeStringArray(body.adminRoles)),
+            restoreRolesOnRejoin: Boolean(body.restoreRolesOnRejoin),
+            restoreNicknameOnRejoin: Boolean(body.restoreNicknameOnRejoin)
+        };
+
+        if (locale) {
+            updatePayload.locale = locale;
+        }
+
         const config = await botSettingsClient.upsert({
             where: { guildId },
-            update: {
-                prefixCommandsEnabled,
-                commandChannelMode: normalizeChannelMode(body.commandChannelMode),
-                allowedTextChannels: JSON.stringify(normalizeStringArray(body.allowedTextChannels)),
-                adminRoles: JSON.stringify(normalizeStringArray(body.adminRoles)),
-                restoreRolesOnRejoin: Boolean(body.restoreRolesOnRejoin),
-                restoreNicknameOnRejoin: Boolean(body.restoreNicknameOnRejoin)
-            },
+            update: updatePayload,
             create: {
                 guildId,
                 prefixCommandsEnabled,
@@ -136,7 +148,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
                 allowedTextChannels: JSON.stringify(normalizeStringArray(body.allowedTextChannels)),
                 adminRoles: JSON.stringify(normalizeStringArray(body.adminRoles)),
                 restoreRolesOnRejoin: Boolean(body.restoreRolesOnRejoin),
-                restoreNicknameOnRejoin: Boolean(body.restoreNicknameOnRejoin)
+                restoreNicknameOnRejoin: Boolean(body.restoreNicknameOnRejoin),
+                locale: locale ?? 'ru',
             }
         });
 

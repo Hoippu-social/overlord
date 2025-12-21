@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Button, Tooltip, ScrollShadow } from "@nextui-org/react";
+import { Button, ButtonGroup, Tooltip, ScrollShadow, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem } from "@nextui-org/react";
 import {
     SquaresFour,
     ShieldCheck,
@@ -15,9 +15,11 @@ import {
     Gear,
     CaretLeft,
     List,
-    ChatsTeardrop
+    ChatsTeardrop,
+    Translate
 } from "@phosphor-icons/react";
 import { cn } from "@nextui-org/react";
+import { useGuildLocale } from "@/lib/i18n";
 
 interface SidebarProps {
     collapsed: boolean;
@@ -25,19 +27,53 @@ interface SidebarProps {
     guildId: string;
 }
 
+const strings = {
+    en: {
+        title: 'Dashboard',
+        hub: 'Hub',
+        moderation: 'Moderation',
+        auditLogs: 'Audit Logs',
+        economy: 'Economy',
+        music: 'Music',
+        tempVoice: 'Temp Voice',
+        tickets: 'Tickets',
+        botSettings: 'Bot settings',
+        serverSettings: 'Server settings',
+    },
+    ru: {
+        title: 'Панель управления',
+        hub: 'Главная',
+        moderation: 'Модерация',
+        auditLogs: 'Журнал аудита',
+        economy: 'Экономика',
+        music: 'Музыка',
+        tempVoice: 'Временные комнаты',
+        tickets: 'Тикеты',
+        botSettings: 'Настройки бота',
+        serverSettings: 'Настройки сервера',
+    },
+} as const;
+
+const localeOptions = [
+    { key: 'ru', label: 'RU' },
+    { key: 'en', label: 'EN' },
+] as const;
+
 export const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggle, guildId }) => {
     const pathname = usePathname();
+    const { locale, setLocale } = useGuildLocale(guildId);
+    const text = strings[locale];
 
     const navItems = [
-        { label: 'Hub', href: `/dashboard/${guildId}`, icon: SquaresFour },
-        { label: 'Moderation', href: `/dashboard/${guildId}/moderation`, icon: ShieldCheck },
-        { label: 'Audit Logs', href: `/dashboard/${guildId}/audit`, icon: Scroll },
-        { label: 'Economy', href: `/dashboard/${guildId}/economy`, icon: Coins },
-        { label: 'Music', href: `/dashboard/${guildId}/music`, icon: MusicNote },
-        { label: 'Temp Voice', href: `/dashboard/${guildId}/tempvoice`, icon: ChatsTeardrop },
-        { label: 'Tickets', href: `/dashboard/${guildId}/tickets`, icon: Ticket },
-        { label: 'Bot settings', href: `/dashboard/${guildId}/settings`, icon: Gear },
-        { label: 'Server settings', href: `/dashboard/${guildId}/server-settings`, icon: Buildings },
+        { label: text.hub, href: `/dashboard/${guildId}`, icon: SquaresFour },
+        { label: text.moderation, href: `/dashboard/${guildId}/moderation`, icon: ShieldCheck },
+        { label: text.auditLogs, href: `/dashboard/${guildId}/audit`, icon: Scroll },
+        { label: text.economy, href: `/dashboard/${guildId}/economy`, icon: Coins },
+        { label: text.music, href: `/dashboard/${guildId}/music`, icon: MusicNote },
+        { label: text.tempVoice, href: `/dashboard/${guildId}/tempvoice`, icon: ChatsTeardrop },
+        { label: text.tickets, href: `/dashboard/${guildId}/tickets`, icon: Ticket },
+        { label: text.botSettings, href: `/dashboard/${guildId}/settings`, icon: Gear },
+        { label: text.serverSettings, href: `/dashboard/${guildId}/server-settings`, icon: Buildings },
     ];
 
     return (
@@ -51,7 +87,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggle, guildId }
             <div className="h-16 flex items-center justify-between px-4 border-b border-divider">
                 {!collapsed && (
                     <span className="text-xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent truncate">
-                        Dashboard
+                        {text.title}
                     </span>
                 )}
                 <Button
@@ -103,7 +139,73 @@ export const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggle, guildId }
                 })}
             </ScrollShadow>
 
-            {/* Footer / User Profile could go here */}
+            <div className={cn("border-t border-divider", collapsed ? "p-3 flex items-center" : "p-4")}>
+                {collapsed ? (
+                    <Dropdown placement="top-start">
+                        <DropdownTrigger>
+                            <Button isIconOnly variant="light" aria-label="Language">
+                                <Translate size={20} />
+                            </Button>
+                        </DropdownTrigger>
+                        <DropdownMenu
+                            aria-label="Language"
+                            selectionMode="single"
+                            selectedKeys={new Set([locale])}
+                            onSelectionChange={(keys) => {
+                                const [value] = Array.from(keys) as string[];
+                                if (value === 'ru' || value === 'en') {
+                                    setLocale(value);
+                                }
+                            }}
+                        >
+                            {localeOptions.map((option) => (
+                                <DropdownItem
+                                    key={option.key}
+                                    startContent={
+                                        <img
+                                            src={option.key === 'ru' ? "/icons/free_russia_flag.png" : "/icons/uk_flag.png"}
+                                            className="w-4 h-4 rounded-sm object-contain"
+                                            alt=""
+                                        />
+                                    }
+                                >
+                                    {option.label}
+                                </DropdownItem>
+                            ))}
+                        </DropdownMenu>
+                    </Dropdown>
+                ) : (
+                    <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2 text-xs font-semibold text-default-500 uppercase tracking-wide">
+                            <Translate size={16} />
+                            <span>Language</span>
+                        </div>
+                        <ButtonGroup size="sm" variant="bordered">
+                            {localeOptions.map((option) => {
+                                const isActive = option.key === locale;
+                                return (
+                                    <Button
+                                        key={option.key}
+                                        size="sm"
+                                        color={isActive ? "primary" : "default"}
+                                        variant={isActive ? "solid" : "bordered"}
+                                        onPress={() => setLocale(option.key)}
+                                        startContent={
+                                            <img
+                                                src={option.key === 'ru' ? "/icons/free_russia_flag.png" : "/icons/uk_flag.png"}
+                                                className="w-4 h-4 rounded-sm object-contain"
+                                                alt=""
+                                            />
+                                        }
+                                    >
+                                        {option.label}
+                                    </Button>
+                                );
+                            })}
+                        </ButtonGroup>
+                    </div>
+                )}
+            </div>
         </aside>
     );
 };

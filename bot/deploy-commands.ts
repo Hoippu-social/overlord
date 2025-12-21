@@ -49,6 +49,10 @@ async function register() {
             const commandModule = await import(filePath);
             const command = commandModule.default;
             if ('data' in command && 'execute' in command) {
+                if (command.hidden) {
+                    console.log(`Skipping hidden command: ${command.data.name}`);
+                    continue;
+                }
                 commandsData.push(command.data.toJSON());
                 console.log(`Loaded command: ${command.data.name}`);
             } else {

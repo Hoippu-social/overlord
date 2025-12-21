@@ -1,5 +1,6 @@
 import { SlashCommandBuilder, GuildMember, ActionRowBuilder, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { Command } from '../../utils/types';
+import { getGuildLocale, t, LocaleCode } from '../../utils/i18n';
 import logger from '../../utils/logger';
 import { prisma } from '../../utils/database';
 
@@ -13,12 +14,14 @@ const command: Command = {
                 .setRequired(true)
         ) as any,
     execute: async (interaction) => {
+        let locale: LocaleCode = 'ru';
         try {
+            locale = await getGuildLocale(interaction.guildId);
             const member = interaction.member as GuildMember;
             const voiceChannel = member.voice.channel;
 
             if (!voiceChannel) {
-                await interaction.reply({ content: 'You need to be in a voice channel!', ephemeral: true });
+                await interaction.reply({ content: t(locale, 'general.notVoice'), ephemeral: true });
                 return;
             }
 
@@ -48,7 +51,7 @@ const command: Command = {
 
             if (player) {
                 if (player.voiceChannelId !== voiceChannel.id) {
-                    await interaction.editReply('You need to be in the same voice channel as the bot!');
+                    await interaction.editReply(t(locale, 'music.play.sameChannel'));
                     return;
                 }
             } else {
@@ -64,7 +67,7 @@ const command: Command = {
 
             const newPlayer = interaction.client.lavalink.getPlayer(interaction.guildId!);
             if (!newPlayer) {
-                await interaction.editReply('Failed to create player.');
+                await interaction.editReply(t(locale, 'music.play.failedCreate'));
                 return;
             }
 
@@ -78,7 +81,7 @@ const command: Command = {
                 const result = await newPlayer.search({ query: 'ytsearch:' + query }, interaction.user);
 
                 if (result.loadType === 'empty' || !result.tracks.length) {
-                    await interaction.editReply('No results found!');
+                    await interaction.editReply(t(locale, 'search.noResults'));
                     return;
                 }
 
@@ -87,28 +90,25 @@ const command: Command = {
 
                 const platformSelect = new StringSelectMenuBuilder()
                     .setCustomId(`search_platform_${interaction.user.id}`)
-                    .setPlaceholder('Площадка: YouTube')
+                    .setPlaceholder(t(locale, 'search.platformPlaceholder', { platform: 'YouTube' }))
                     .addOptions(
                         new StringSelectMenuOptionBuilder()
                             .setLabel('YouTube')
-                            .setDescription('Поиск видео на YouTube')
-                            .setValue('ytsearch:')
-                            .setEmoji('🔴'),
+                            .setDescription(t(locale, 'search.platformDesc.youtube'))
+                            .setValue('ytsearch:'),
                         new StringSelectMenuOptionBuilder()
                             .setLabel('Spotify')
-                            .setDescription('Поиск треков на Spotify')
-                            .setValue('spsearch:')
-                            .setEmoji('🟢'),
+                            .setDescription(t(locale, 'search.platformDesc.spotify'))
+                            .setValue('spsearch:'),
                         new StringSelectMenuOptionBuilder()
                             .setLabel('SoundCloud')
-                            .setDescription('Поиск на SoundCloud')
-                            .setValue('scsearch:')
-                            .setEmoji('🟠')
+                            .setDescription(t(locale, 'search.platformDesc.soundcloud'))
+                            .setValue('scsearch:'),
                     );
 
                 const trackSelect = new StringSelectMenuBuilder()
                     .setCustomId(`search_track_${interaction.user.id}`)
-                    .setPlaceholder('Выберите трек')
+                    .setPlaceholder(t(locale, 'search.trackPlaceholder'))
                     .addOptions(
                         tracks.map((track, index) => {
                             const duration = track.info.duration ? `[${Math.floor(track.info.duration / 60000)}:${Math.floor((track.info.duration % 60000) / 1000).toString().padStart(2, '0')}]` : '';
@@ -121,12 +121,12 @@ const command: Command = {
 
                 const changeButton = new ButtonBuilder()
                     .setCustomId(`search_change_${interaction.user.id}`)
-                    .setLabel('Изменить трек')
+                    .setLabel(t(locale, 'search.changeLabel'))
                     .setStyle(ButtonStyle.Secondary);
 
                 const cancelButton = new ButtonBuilder()
                     .setCustomId(`search_cancel_${interaction.user.id}`)
-                    .setLabel('Отмена')
+                    .setLabel(t(locale, 'search.cancelLabel'))
                     .setStyle(ButtonStyle.Danger);
 
                 const row1 = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(platformSelect);
@@ -134,7 +134,7 @@ const command: Command = {
                 const row3 = new ActionRowBuilder<ButtonBuilder>().addComponents(changeButton, cancelButton);
 
                 await interaction.editReply({
-                    content: `🎵 Результаты поиска для: **${query}**`,
+                    content: t(locale, 'search.title', { query }),
                     components: [row1, row2, row3]
                 });
 
@@ -149,12 +149,12 @@ const command: Command = {
             const result = await newPlayer.search({ query: query }, interaction.user);
 
             if (result.loadType === 'empty') {
-                await interaction.editReply('No results found!');
+                await interaction.editReply(t(locale, 'search.noResults'));
                 return;
             }
 
             if (result.loadType === 'error') {
-                await interaction.editReply('An error occurred while loading the track.');
+                await interaction.editReply(t(locale, 'music.play.errorLoading'));
                 return;
             }
 
@@ -168,8 +168,8 @@ const command: Command = {
 
                 if (!newPlayer.playing) await newPlayer.play();
 
-                const playlistName = result.pluginInfo?.identifier || result.tracks[0]?.info.title || 'Unknown Playlist';
-                await interaction.editReply(`Playlist **${playlistName}** added! (${result.tracks.length} tracks)`);
+                const playlistName = result.pluginInfo?.identifier || result.tracks[0]?.info.title || t(locale, 'music.play.unknownPlaylist');
+                await interaction.editReply(t(locale, 'music.play.playlistAdded', { name: playlistName, count: result.tracks.length }));
             } else {
                 // Single track or search result
                 const track = result.tracks[0];
@@ -178,15 +178,15 @@ const command: Command = {
 
                 if (!newPlayer.playing) await newPlayer.play();
 
-                await interaction.editReply(`**${track.info.title}** enqueued!`);
+                await interaction.editReply(t(locale, 'music.play.trackEnqueued', { title: track.info.title }));
             }
 
         } catch (error) {
             logger.error('Error executing play command:', error);
             if (interaction.deferred) {
-                await interaction.editReply('An error occurred while trying to play music.');
+                await interaction.editReply(t(locale, 'music.play.errorGeneric'));
             } else {
-                await interaction.reply({ content: 'An error occurred while trying to play music.', ephemeral: true });
+                await interaction.reply({ content: t(locale, 'music.play.errorGeneric'), ephemeral: true });
             }
         }
     },

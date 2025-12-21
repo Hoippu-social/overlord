@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardBody, Button, Switch, Slider, Select, SelectItem, Input, Chip, SelectedItems, ButtonGroup, Checkbox } from "@nextui-org/react";
 import { MusicNote, SpeakerHigh, Clock, Users, List, Prohibit, CheckCircle } from "@phosphor-icons/react";
+import { useGuildLocale } from "@/lib/i18n";
 
 interface Role {
     id: string;
@@ -18,6 +19,61 @@ interface Channel {
     type: string;
     position: number;
 }
+
+const strings = {
+    en: {
+        pageTitle: 'Music Settings',
+        pageSubtitle: 'Configure playback behavior and permissions',
+        djTitle: 'DJ Roles',
+        djDesc: 'Users with these roles can control the music player without voting',
+        djSelectLabel: 'Select DJ Roles',
+        djSelectPlaceholder: 'Choose roles',
+        channelsTitle: 'Voice Channels',
+        channelsNone: 'Function disabled (no channels selected)',
+        channelsWhitelist: 'Only allow bot in selected channels',
+        channelsBlacklist: 'Block bot from selected channels',
+        whitelist: 'Whitelist',
+        blacklist: 'Blacklist',
+        channelsSelectLabel: 'Select Channels',
+        channelsSelectPlaceholder: 'Choose voice channels',
+        volumeTitle: 'Default Volume',
+        volumeDesc: 'Set the initial volume for the bot when joining',
+        maxDurationTitle: 'Max Track Duration',
+        maxDurationDesc: 'Limit the length of songs that can be queued',
+        maxDurationLabel: 'Max Duration',
+        maxDurationPlaceholder: '30',
+        maxDurationUnit: 'min',
+        saveChanges: 'Save Changes',
+        saving: 'Saving...',
+        resetDefaults: 'Reset Defaults',
+    },
+    ru: {
+        pageTitle: 'Настройки музыки',
+        pageSubtitle: 'Настройте поведение плеера и права доступа',
+        djTitle: 'DJ роли',
+        djDesc: 'Пользователи с этими ролями управляют музыкой без голосования',
+        djSelectLabel: 'Выберите DJ роли',
+        djSelectPlaceholder: 'Выберите роли',
+        channelsTitle: 'Голосовые каналы',
+        channelsNone: 'Ограничения отключены (каналы не выбраны)',
+        channelsWhitelist: 'Разрешить бота только в выбранных каналах',
+        channelsBlacklist: 'Запретить бота в выбранных каналах',
+        whitelist: 'Белый список',
+        blacklist: 'Чёрный список',
+        channelsSelectLabel: 'Выберите каналы',
+        channelsSelectPlaceholder: 'Выберите голосовые каналы',
+        volumeTitle: 'Громкость по умолчанию',
+        volumeDesc: 'Начальная громкость при подключении',
+        maxDurationTitle: 'Максимальная длительность',
+        maxDurationDesc: 'Ограничьте длительность треков в очереди',
+        maxDurationLabel: 'Макс. длительность',
+        maxDurationPlaceholder: '30',
+        maxDurationUnit: 'мин',
+        saveChanges: 'Сохранить изменения',
+        saving: 'Сохранение...',
+        resetDefaults: 'Сбросить по умолчанию',
+    },
+} as const;
 
 // Helper to convert hex to rgba
 const hexToRgba = (hex: string, alpha: number) => {
@@ -47,6 +103,8 @@ const getTextColor = (hex: string) => {
 
 export default function MusicSettingsPage({ params }: { params: Promise<{ guildId: string }> }) {
     const { guildId } = React.use(params);
+    const { locale } = useGuildLocale(guildId);
+    const text = strings[locale];
     const [roles, setRoles] = useState<Role[]>([]);
     const [channels, setChannels] = useState<Channel[]>([]);
 
@@ -166,8 +224,8 @@ export default function MusicSettingsPage({ params }: { params: Promise<{ guildI
     return (
         <div className="space-y-6">
             <div>
-                <h1 className="text-3xl font-bold">Music Settings</h1>
-                <p className="text-default-500">Configure playback behavior and permissions</p>
+                <h1 className="text-3xl font-bold">{text.pageTitle}</h1>
+                <p className="text-default-500">{text.pageSubtitle}</p>
             </div>
 
             <div className="flex flex-col gap-6 w-full">
@@ -177,19 +235,19 @@ export default function MusicSettingsPage({ params }: { params: Promise<{ guildI
                         <div className="flex items-center gap-3">
                             <div className="p-2 bg-primary/10 rounded-lg text-primary"><Users size={24} /></div>
                             <div>
-                                <h3 className="text-xl font-bold">DJ Roles</h3>
-                                <p className="text-default-500 text-sm">Users with these roles can control the music player without voting</p>
+                                <h3 className="text-xl font-bold">{text.djTitle}</h3>
+                                <p className="text-default-500 text-sm">{text.djDesc}</p>
                             </div>
                         </div>
 
                         <Select
                             id="dj-roles-select"
                             items={roles}
-                            label="Select DJ Roles"
+                            label={text.djSelectLabel}
                             variant="bordered"
                             isMultiline={true}
                             selectionMode="multiple"
-                            placeholder="Choose roles"
+                            placeholder={text.djSelectPlaceholder}
                             selectedKeys={djRoles}
                             onSelectionChange={(keys) => setDjRoles(keys as Set<string>)}
                             color="secondary"
@@ -269,13 +327,13 @@ export default function MusicSettingsPage({ params }: { params: Promise<{ guildI
                                     {channelMode === 'whitelist' ? <CheckCircle size={24} /> : <Prohibit size={24} />}
                                 </div>
                                 <div>
-                                    <h3 className="text-xl font-bold">Voice Channels</h3>
+                                    <h3 className="text-xl font-bold">{text.channelsTitle}</h3>
                                     <p className="text-default-500 text-sm">
                                         {selectedChannels.size === 0
-                                            ? "Function disabled (no channels selected)"
+                                            ? text.channelsNone
                                             : channelMode === 'whitelist'
-                                                ? "Only allow bot in selected channels"
-                                                : "Block bot from selected channels"}
+                                                ? text.channelsWhitelist
+                                                : text.channelsBlacklist}
                                     </p>
                                 </div>
                             </div>
@@ -286,14 +344,14 @@ export default function MusicSettingsPage({ params }: { params: Promise<{ guildI
                                     variant={channelMode === 'whitelist' ? 'solid' : 'bordered'}
                                     onPress={() => setChannelMode('whitelist')}
                                 >
-                                    Whitelist
+                                    {text.whitelist}
                                 </Button>
                                 <Button
                                     color={channelMode === 'blacklist' ? 'danger' : 'default'}
                                     variant={channelMode === 'blacklist' ? 'solid' : 'bordered'}
                                     onPress={() => setChannelMode('blacklist')}
                                 >
-                                    Blacklist
+                                    {text.blacklist}
                                 </Button>
                             </ButtonGroup>
                         </div>
@@ -301,11 +359,11 @@ export default function MusicSettingsPage({ params }: { params: Promise<{ guildI
                         <Select
                             id="channel-select"
                             items={channels}
-                            label="Select Channels"
+                            label={text.channelsSelectLabel}
                             variant="bordered"
                             isMultiline={true}
                             selectionMode="multiple"
-                            placeholder="Choose voice channels"
+                            placeholder={text.channelsSelectPlaceholder}
                             selectedKeys={selectedChannels}
                             onSelectionChange={(keys) => setSelectedChannels(keys as Set<string>)}
                             color="secondary"
@@ -331,8 +389,8 @@ export default function MusicSettingsPage({ params }: { params: Promise<{ guildI
                         <div className="flex items-center gap-3">
                             <div className="p-2 bg-success/10 rounded-lg text-success"><SpeakerHigh size={24} /></div>
                             <div>
-                                <h3 className="text-xl font-bold">Default Volume</h3>
-                                <p className="text-default-500 text-sm">Set the initial volume for the bot when joining</p>
+                                <h3 className="text-xl font-bold">{text.volumeTitle}</h3>
+                                <p className="text-default-500 text-sm">{text.volumeDesc}</p>
                             </div>
                         </div>
 
@@ -362,8 +420,8 @@ export default function MusicSettingsPage({ params }: { params: Promise<{ guildI
                         <div className="flex items-center gap-3">
                             <div className="p-2 bg-warning/10 rounded-lg text-warning"><Clock size={24} /></div>
                             <div className="flex-1">
-                                <h3 className="text-xl font-bold">Max Track Duration</h3>
-                                <p className="text-default-500 text-sm">Limit the length of songs that can be queued</p>
+                                <h3 className="text-xl font-bold">{text.maxDurationTitle}</h3>
+                                <p className="text-default-500 text-sm">{text.maxDurationDesc}</p>
                             </div>
                             <Switch
                                 id="max-duration-switch"
@@ -378,13 +436,13 @@ export default function MusicSettingsPage({ params }: { params: Promise<{ guildI
                             <div className="pt-2">
                                 <Input
                                     type="number"
-                                    label="Max Duration"
-                                    placeholder="30"
+                                    label={text.maxDurationLabel}
+                                    placeholder={text.maxDurationPlaceholder}
                                     value={maxDuration.toString()}
                                     onValueChange={(value) => setMaxDuration(parseInt(value) || 0)}
                                     endContent={
                                         <div className="pointer-events-none flex items-center">
-                                            <span className="text-default-400 text-small">min</span>
+                                            <span className="text-default-400 text-small">{text.maxDurationUnit}</span>
                                         </div>
                                     }
                                     variant="bordered"
@@ -404,7 +462,7 @@ export default function MusicSettingsPage({ params }: { params: Promise<{ guildI
                         isLoading={isSaving}
                         isDisabled={!isDirty}
                     >
-                        {isSaving ? 'Saving...' : 'Save Changes'}
+                        {isSaving ? text.saving : text.saveChanges}
                     </Button>
                     <Button
                         variant="flat"
@@ -412,7 +470,7 @@ export default function MusicSettingsPage({ params }: { params: Promise<{ guildI
                         className="font-semibold"
                         onPress={handleReset}
                     >
-                        Reset Defaults
+                        {text.resetDefaults}
                     </Button>
                 </div>
             </div>

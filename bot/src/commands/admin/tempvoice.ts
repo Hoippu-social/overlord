@@ -1,5 +1,6 @@
 import { ChannelType, ChatInputCommandInteraction, PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
 import { prisma } from '../../utils/database';
+import { getGuildLocale, t, LocaleCode } from '../../utils/i18n';
 import logger from '../../utils/logger';
 import { cacheTempVoiceConfig, clearTempVoiceConfigCache, getTempVoiceConfig, removeGuildTempRooms } from '../../utils/tempVoice';
 import { Command } from '../../utils/types';
@@ -55,13 +56,15 @@ const command: Command = {
         ) as any,
 
     async execute(interaction) {
+        const locale = await getGuildLocale(interaction.guildId);
+
         if (!interaction.guildId || !interaction.guild) {
-            await interaction.reply({ content: 'This command can only be used inside a server.', ephemeral: true });
+            await interaction.reply({ content: t(locale, 'general.guildOnly'), ephemeral: true });
             return;
         }
 
         if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageChannels)) {
-            await interaction.reply({ content: 'You need the Manage Channels permission to configure temp rooms.', ephemeral: true });
+            await interaction.reply({ content: t(locale, 'tempvoice.notManager'), ephemeral: true });
             return;
         }
 
@@ -69,24 +72,24 @@ const command: Command = {
 
         switch (subcommand) {
             case 'setup':
-                await handleSetup(interaction);
+                await handleSetup(interaction, locale);
                 break;
             case 'status':
-                await handleStatus(interaction);
+                await handleStatus(interaction, locale);
                 break;
             case 'disable':
-                await handleDisable(interaction);
+                await handleDisable(interaction, locale);
                 break;
             default:
-                await interaction.reply({ content: 'Unknown subcommand.', ephemeral: true });
+                await interaction.reply({ content: t(locale, 'tempvoice.unknownSubcommand'), ephemeral: true });
                 break;
         }
     },
 };
 
-async function handleSetup(interaction: ChatInputCommandInteraction) {
+async function handleSetup(interaction: ChatInputCommandInteraction, locale: LocaleCode) {
     if (!interaction.guildId || !interaction.guild) {
-        await interaction.reply({ content: 'This command can only be used inside a server.', ephemeral: true });
+        await interaction.reply({ content: t(locale, 'general.guildOnly'), ephemeral: true });
         return;
     }
 
@@ -102,7 +105,7 @@ async function handleSetup(interaction: ChatInputCommandInteraction) {
     }
 
     if (hubChannel?.type !== ChannelType.GuildVoice) {
-        await interaction.reply({ content: 'Hub must be a voice channel.', ephemeral: true });
+        await interaction.reply({ content: t(locale, 'tempvoice.hubMustBeVoice'), ephemeral: true });
         return;
     }
 
@@ -132,25 +135,27 @@ async function handleSetup(interaction: ChatInputCommandInteraction) {
 
         cacheTempVoiceConfig(config);
 
+        const categoryValue = category ? `<#${category.id}>` : t(locale, 'general.notSet');
+        const limitValue = limit ?? t(locale, 'general.unlimited');
+
         await interaction.reply({
-            content: [
-                'Temporary rooms enabled.',
-                `Hub: <#${hubChannel.id}>`,
-                category ? `Category: <#${category.id}>` : 'Category: not set',
-                `Name template: ${nameTemplate}`,
-                `User limit: ${limit ?? 'no limit'}`,
-            ].join('\n'),
+            content: t(locale, 'tempvoice.enabled', {
+                hub: hubChannel.id,
+                category: categoryValue,
+                template: nameTemplate,
+                limit: String(limitValue),
+            }),
             ephemeral: true,
         });
     } catch (error) {
         logger.error(`[TempVoice] Failed to save configuration: ${error}`);
-        await interaction.reply({ content: 'Failed to save configuration, please try again later.', ephemeral: true });
+        await interaction.reply({ content: t(locale, 'tempvoice.failedSave'), ephemeral: true });
     }
 }
 
-async function handleStatus(interaction: ChatInputCommandInteraction) {
+async function handleStatus(interaction: ChatInputCommandInteraction, locale: LocaleCode) {
     if (!interaction.guildId) {
-        await interaction.reply({ content: 'This command can only be used inside a server.', ephemeral: true });
+        await interaction.reply({ content: t(locale, 'general.guildOnly'), ephemeral: true });
         return;
     }
 
@@ -158,28 +163,31 @@ async function handleStatus(interaction: ChatInputCommandInteraction) {
         const config = await getTempVoiceConfig(interaction.guildId);
 
         if (!config) {
-            await interaction.reply({ content: 'Temp rooms are not configured yet.', ephemeral: true });
+            await interaction.reply({ content: t(locale, 'tempvoice.statusMissing'), ephemeral: true });
             return;
         }
 
+        const categoryValue = config.categoryId ? `<#${config.categoryId}>` : t(locale, 'general.notSet');
+        const limitValue = config.userLimit ?? t(locale, 'general.unlimited');
+
         await interaction.reply({
-            content: [
-                `Hub: <#${config.hubChannelId}>`,
-                `Category: ${config.categoryId ? `<#${config.categoryId}>` : 'not set'}`,
-                `Name template: ${config.nameTemplate}`,
-                `User limit: ${config.userLimit ?? 'no limit'}`,
-            ].join('\n'),
+            content: t(locale, 'tempvoice.status', {
+                hub: config.hubChannelId,
+                category: categoryValue,
+                template: config.nameTemplate,
+                limit: String(limitValue),
+            }),
             ephemeral: true,
         });
     } catch (error) {
         logger.error(`[TempVoice] Failed to load configuration: ${error}`);
-        await interaction.reply({ content: 'Failed to load configuration.', ephemeral: true });
+        await interaction.reply({ content: t(locale, 'tempvoice.failedLoad'), ephemeral: true });
     }
 }
 
-async function handleDisable(interaction: ChatInputCommandInteraction) {
+async function handleDisable(interaction: ChatInputCommandInteraction, locale: LocaleCode) {
     if (!interaction.guildId) {
-        await interaction.reply({ content: 'This command can only be used inside a server.', ephemeral: true });
+        await interaction.reply({ content: t(locale, 'general.guildOnly'), ephemeral: true });
         return;
     }
 
@@ -187,7 +195,7 @@ async function handleDisable(interaction: ChatInputCommandInteraction) {
         const config = await getTempVoiceConfig(interaction.guildId);
 
         if (!config) {
-            await interaction.reply({ content: 'Temp rooms are already disabled.', ephemeral: true });
+            await interaction.reply({ content: t(locale, 'tempvoice.disable.missing'), ephemeral: true });
             return;
         }
 
@@ -195,10 +203,10 @@ async function handleDisable(interaction: ChatInputCommandInteraction) {
         await prisma.tempVoiceConfig.delete({ where: { guildId: interaction.guildId } });
         clearTempVoiceConfigCache(interaction.guildId);
 
-        await interaction.reply({ content: 'Temp rooms disabled and active rooms removed.', ephemeral: true });
+        await interaction.reply({ content: t(locale, 'tempvoice.disable.done'), ephemeral: true });
     } catch (error) {
         logger.error(`[TempVoice] Failed to disable temp rooms: ${error}`);
-        await interaction.reply({ content: 'Failed to disable temp rooms.', ephemeral: true });
+        await interaction.reply({ content: t(locale, 'tempvoice.disable.failed'), ephemeral: true });
     }
 }
 

@@ -1,4 +1,5 @@
 import { SlashCommandBuilder, GuildMember } from 'discord.js';
+import { getGuildLocale, t } from '../../utils/i18n';
 import { Command } from '../../utils/types';
 
 const command: Command = {
@@ -13,37 +14,38 @@ const command: Command = {
                 .setRequired(false)
         ) as any,
     execute: async (interaction) => {
+        const locale = await getGuildLocale(interaction.guildId);
         const member = interaction.member as GuildMember;
         const voiceChannel = member.voice.channel;
 
         if (!voiceChannel) {
-            await interaction.reply({ content: 'You need to be in a voice channel!', ephemeral: true });
+            await interaction.reply({ content: t(locale, 'general.notVoice'), ephemeral: true });
             return;
         }
 
         const player = interaction.client.lavalink.getPlayer(interaction.guildId!);
 
         if (!player) {
-            await interaction.reply({ content: 'Player is not active.', ephemeral: true });
+            await interaction.reply({ content: t(locale, 'general.playerMissing'), ephemeral: true });
             return;
         }
 
         if (player.voiceChannelId !== voiceChannel.id) {
-            await interaction.reply({ content: 'You must be in the same voice channel as the bot.', ephemeral: true });
+            await interaction.reply({ content: t(locale, 'general.notSameVoice'), ephemeral: true });
             return;
         }
 
         const level = interaction.options.getInteger('level');
 
         if (level === null) {
-            await interaction.reply({ content: `Current volume: **${player.volume}%**`, ephemeral: true });
+            await interaction.reply({ content: t(locale, 'music.volume.current', { value: player.volume }), ephemeral: true });
             return;
         }
 
         await player.setVolume(level);
         await player.musicHandler?.setNowPlaying(player.queue.current, { volume: level, positionMs: player.position, paused: player.paused });
 
-        await interaction.reply(`Volume set to **${level}%**`);
+        await interaction.reply(t(locale, 'music.volume.set', { value: level }));
     },
 };
 

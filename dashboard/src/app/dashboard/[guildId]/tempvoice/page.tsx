@@ -26,6 +26,7 @@ import {
     TextT,
     UsersThree,
 } from '@phosphor-icons/react';
+import { useGuildLocale } from '@/lib/i18n';
 
 type Mode = 'create' | 'existing';
 
@@ -56,6 +57,117 @@ type TempVoiceResponse = {
 
 const limitPresets = [0, 4, 8, 12, 25, 50];
 
+const strings = {
+    en: {
+        title: 'Temporary Voice',
+        subtitle: 'Configure temporary voice rooms and the control panel for /setupv.',
+        refresh: 'Refresh',
+        sendPanel: 'Send panel',
+        statusConfigured: 'Configured',
+        statusNotConfigured: 'Not configured',
+        channelsTitle: 'Channels & Panel',
+        channelsDesc: 'Create new channels automatically or select existing ones for the temp-voice system.',
+        modeCreate: 'Create new',
+        modeExisting: 'Use existing',
+        labelCategory: 'Category',
+        labelHub: 'Hub (voice)',
+        labelInterface: 'Panel (text)',
+        placeholderCategoryName: 'Temporary Voice',
+        placeholderHubName: 'Join to Create',
+        placeholderInterfaceName: 'temp-voice-control',
+        selectCategory: 'Select a category',
+        selectHub: 'Select a voice channel',
+        selectInterface: 'Select a text channel',
+        statusTitle: 'Status',
+        statusDesc: 'Current temp-voice configuration summary.',
+        statusRooms: 'Active rooms',
+        notSet: 'Not set',
+        nameTemplateLabel: 'Name template',
+        userLimitLabel: 'User limit',
+        roomsTitle: 'Room settings',
+        roomsDesc: 'Set the room name template and member limit for created rooms.',
+        nameTemplateField: 'Room name template',
+        nameTemplatePlaceholder: 'Example: Room {user}',
+        userLimitField: 'User limit',
+        userLimitPlaceholder: '0 = no limit',
+        userLimitHint: '0 means no limit.',
+        save: 'Save settings',
+        delete: 'Delete system',
+        deleteTooltip: 'Deletes the category, channels, and panel created by the system.',
+        dangerTitle: 'Delete system',
+        dangerDesc: 'This will remove the temp-voice setup, channels, and panel. Type DELETE to confirm.',
+        confirmLabel: 'Type to confirm',
+        confirmPlaceholder: 'DELETE',
+        confirmButton: 'Confirm delete',
+        errorLoad: 'Failed to load temp-voice settings.',
+        errorSave: 'Failed to save settings.',
+        errorSendPanel: 'Failed to send control panel.',
+        errorDelete: 'Failed to delete temp-voice settings.',
+        errorMissingChannels: 'Select the category, hub, and panel channels.',
+        errorMissingPanel: 'Select the category, hub, and panel channels before sending.',
+        errorConfirmDelete: 'Type DELETE to confirm deletion.',
+        defaultCategoryName: 'Temporary Voice',
+        defaultHubName: 'Join to Create',
+        defaultInterfaceName: 'temp-voice-control',
+        defaultNameTemplate: 'Room {user}',
+        noLimit: 'No limit',
+    },
+    ru: {
+        title: 'Временные комнаты',
+        subtitle: 'Настройка временных голосовых комнат и панели управления /setupv.',
+        refresh: 'Обновить',
+        sendPanel: 'Отправить панель',
+        statusConfigured: 'Настроено',
+        statusNotConfigured: 'Не настроено',
+        channelsTitle: 'Каналы и панель',
+        channelsDesc: 'Создайте новые каналы автоматически или выберите существующие для системы временных комнат.',
+        modeCreate: 'Создать',
+        modeExisting: 'Использовать существующие',
+        labelCategory: 'Категория',
+        labelHub: 'Хаб (voice)',
+        labelInterface: 'Панель (text)',
+        placeholderCategoryName: 'Временные комнаты',
+        placeholderHubName: 'Войти, чтобы создать',
+        placeholderInterfaceName: 'temp-voice-control',
+        selectCategory: 'Выберите категорию',
+        selectHub: 'Выберите голосовой канал',
+        selectInterface: 'Выберите текстовый канал',
+        statusTitle: 'Состояние',
+        statusDesc: 'Сводка настроек системы временных комнат.',
+        statusRooms: 'Активных комнат',
+        notSet: 'Не задано',
+        nameTemplateLabel: 'Шаблон названия',
+        userLimitLabel: 'Лимит пользователей',
+        roomsTitle: 'Параметры комнат',
+        roomsDesc: 'Настройте шаблон названия и лимит участников для создаваемых комнат.',
+        nameTemplateField: 'Шаблон названия комнаты',
+        nameTemplatePlaceholder: 'Например: комната {user}',
+        userLimitField: 'Лимит пользователей',
+        userLimitPlaceholder: '0 = без лимита',
+        userLimitHint: '0 означает без лимита.',
+        save: 'Сохранить',
+        delete: 'Удалить систему',
+        deleteTooltip: 'Удалит категорию, каналы и панель, созданные системой.',
+        dangerTitle: 'Удалить систему',
+        dangerDesc: 'Это удалит настройки, каналы и панель. Для подтверждения введите DELETE.',
+        confirmLabel: 'Подтверждение',
+        confirmPlaceholder: 'DELETE',
+        confirmButton: 'Подтвердить удаление',
+        errorLoad: 'Не удалось загрузить настройки временных комнат.',
+        errorSave: 'Не удалось сохранить настройки.',
+        errorSendPanel: 'Не удалось отправить панель управления.',
+        errorDelete: 'Не удалось удалить настройки временных комнат.',
+        errorMissingChannels: 'Выберите категорию, хаб и канал панели.',
+        errorMissingPanel: 'Выберите категорию, хаб и канал панели перед отправкой.',
+        errorConfirmDelete: 'Введите DELETE для подтверждения удаления.',
+        defaultCategoryName: 'Временные комнаты',
+        defaultHubName: 'Войти, чтобы создать',
+        defaultInterfaceName: 'temp-voice-control',
+        defaultNameTemplate: 'Комната {user}',
+        noLimit: 'Без лимита',
+    },
+} as const;
+
 const ChannelItem = ({ item }: { item: ChannelOption }) => (
     <div className="flex items-center gap-2 w-full px-2 py-1.5">
         <span className="text-base truncate">{item.name || item.id}</span>
@@ -64,6 +176,15 @@ const ChannelItem = ({ item }: { item: ChannelOption }) => (
 
 export default function TempVoicePage({ params }: { params: Promise<{ guildId: string }> }) {
     const { guildId } = React.use(params);
+    const { locale } = useGuildLocale(guildId);
+    const text = strings[locale];
+
+    const defaults = useMemo(() => ({
+        categoryName: text.defaultCategoryName,
+        hubName: text.defaultHubName,
+        interfaceName: text.defaultInterfaceName,
+        nameTemplate: text.defaultNameTemplate,
+    }), [text]);
 
     const [mode, setMode] = useState<Mode>('create');
     const [channels, setChannels] = useState<{ categories: ChannelOption[]; voice: ChannelOption[]; text: ChannelOption[] }>({
@@ -72,13 +193,13 @@ export default function TempVoicePage({ params }: { params: Promise<{ guildId: s
         text: [],
     });
     const [form, setForm] = useState({
-        categoryName: 'Temporary Voice',
-        hubName: 'Join to Create',
-        interfaceName: 'temp-voice-control',
+        categoryName: '',
+        hubName: '',
+        interfaceName: '',
         categoryId: '',
         hubChannelId: '',
         interfaceChannelId: '',
-        nameTemplate: 'Room {user}',
+        nameTemplate: '',
         userLimit: '',
     });
     const [config, setConfig] = useState<TempVoiceConfig | null>(null);
@@ -89,6 +210,16 @@ export default function TempVoicePage({ params }: { params: Promise<{ guildId: s
     const [deleting, setDeleting] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [deleteConfirm, setDeleteConfirm] = useState('');
+
+    useEffect(() => {
+        setForm((prev) => ({
+            ...prev,
+            categoryName: prev.categoryName || defaults.categoryName,
+            hubName: prev.hubName || defaults.hubName,
+            interfaceName: prev.interfaceName || defaults.interfaceName,
+            nameTemplate: prev.nameTemplate || defaults.nameTemplate,
+        }));
+    }, [defaults]);
 
     const channelNameById = useMemo(() => {
         const map = new Map<string, string>();
@@ -110,7 +241,7 @@ export default function TempVoicePage({ params }: { params: Promise<{ guildId: s
             categoryId: cfg.categoryId || '',
             hubChannelId: cfg.hubChannelId || '',
             interfaceChannelId: cfg.interfaceChannelId || '',
-            nameTemplate: cfg.nameTemplate || 'Room {user}',
+            nameTemplate: cfg.nameTemplate || defaults.nameTemplate,
             userLimit: cfg.userLimit === null || cfg.userLimit === undefined ? '' : String(cfg.userLimit),
         }));
     };
@@ -123,7 +254,7 @@ export default function TempVoicePage({ params }: { params: Promise<{ guildId: s
             const res = await fetch(`/api/guilds/${guildId}/tempvoice`);
             const data: TempVoiceResponse = await res.json();
             if (!res.ok) {
-                throw new Error(data.error || 'Не удалось загрузить конфигурацию');
+                throw new Error(text.errorLoad);
             }
             setConfig(data.config || null);
             setRoomsCount(data.roomsCount || 0);
@@ -136,8 +267,8 @@ export default function TempVoicePage({ params }: { params: Promise<{ guildId: s
                 setMode('existing');
                 applyConfigToForm(data.config);
             }
-        } catch (err: any) {
-            setError(err?.message || 'Неизвестная ошибка');
+        } catch (err: unknown) {
+            setError(text.errorLoad);
         } finally {
             setLoading(false);
         }
@@ -152,19 +283,21 @@ export default function TempVoicePage({ params }: { params: Promise<{ guildId: s
         setSaving(true);
         setError(null);
         try {
-            const payload: any = {
+            const payload: Record<string, unknown> = {
                 mode,
-                nameTemplate: form.nameTemplate.trim() || 'Room {user}',
+                nameTemplate: form.nameTemplate.trim() || defaults.nameTemplate,
                 userLimit: form.userLimit === '' ? null : Number(form.userLimit),
             };
 
             if (mode === 'create') {
-                payload.categoryName = form.categoryName.trim() || 'Temporary Voice';
-                payload.hubName = form.hubName.trim() || 'Join to Create';
-                payload.interfaceName = form.interfaceName.trim() || 'temp-voice-control';
+                payload.categoryName = form.categoryName.trim() || defaults.categoryName;
+                payload.hubName = form.hubName.trim() || defaults.hubName;
+                payload.interfaceName = form.interfaceName.trim() || defaults.interfaceName;
             } else {
                 if (!form.categoryId || !form.hubChannelId || !form.interfaceChannelId) {
-                    throw new Error('Выберите существующие каналы');
+                    setError(text.errorMissingChannels);
+                    setSaving(false);
+                    return;
                 }
                 payload.categoryId = form.categoryId;
                 payload.hubChannelId = form.hubChannelId;
@@ -178,14 +311,14 @@ export default function TempVoicePage({ params }: { params: Promise<{ guildId: s
             });
             const data = await res.json();
             if (!res.ok) {
-                throw new Error(data?.error || 'Не удалось сохранить настройки');
+                throw new Error(text.errorSave);
             }
 
             setConfig(data.config || null);
             applyConfigToForm(data.config || null);
             await fetchData();
-        } catch (err: any) {
-            setError(err?.message || 'Неизвестная ошибка сохранения');
+        } catch (err: unknown) {
+            setError(text.errorSave);
         } finally {
             setSaving(false);
         }
@@ -200,7 +333,7 @@ export default function TempVoicePage({ params }: { params: Promise<{ guildId: s
             const hubChannelId = form.hubChannelId || config?.hubChannelId || '';
             const interfaceChannelId = form.interfaceChannelId || config?.interfaceChannelId || '';
             if (!categoryId || !hubChannelId || !interfaceChannelId) {
-                throw new Error('Выберите категорию, хаб и интерфейсный текстовый канал');
+                throw new Error(text.errorMissingPanel);
             }
 
             const res = await fetch(`/api/guilds/${guildId}/tempvoice`, {
@@ -211,7 +344,7 @@ export default function TempVoicePage({ params }: { params: Promise<{ guildId: s
                     categoryId,
                     hubChannelId,
                     interfaceChannelId,
-                    nameTemplate: form.nameTemplate.trim() || 'Room {user}',
+                    nameTemplate: form.nameTemplate.trim() || defaults.nameTemplate,
                     userLimit: form.userLimit === '' ? null : Number(form.userLimit),
                     sendPanel: true,
                 }),
@@ -219,15 +352,15 @@ export default function TempVoicePage({ params }: { params: Promise<{ guildId: s
 
             const data = await res.json().catch(() => ({}));
             if (!res.ok) {
-                throw new Error(data?.error || 'Не удалось отправить панель управления');
+                throw new Error(text.errorSendPanel);
             }
 
             if (data.config) {
                 setConfig(data.config);
                 applyConfigToForm(data.config);
             }
-        } catch (err: any) {
-            setError(err?.message || 'Не удалось отправить панель управления');
+        } catch (err: unknown) {
+            setError(text.errorSendPanel);
         } finally {
             setSendingPanel(false);
         }
@@ -236,7 +369,7 @@ export default function TempVoicePage({ params }: { params: Promise<{ guildId: s
     const handleDelete = async () => {
         if (!guildId) return;
         if (deleteConfirm.trim().toUpperCase() !== 'DELETE') {
-            setError('Введите DELETE для подтверждения удаления');
+            setError(text.errorConfirmDelete);
             return;
         }
         setDeleting(true);
@@ -249,7 +382,7 @@ export default function TempVoicePage({ params }: { params: Promise<{ guildId: s
             });
             const data = await res.json();
             if (!res.ok) {
-                throw new Error(data?.error || 'Не удалось удалить конфигурацию');
+                throw new Error(text.errorDelete);
             }
             setConfig(null);
             setDeleteConfirm('');
@@ -260,21 +393,21 @@ export default function TempVoicePage({ params }: { params: Promise<{ guildId: s
                 interfaceChannelId: '',
             }));
             await fetchData();
-        } catch (err: any) {
-            setError(err?.message || 'Неизвестная ошибка удаления');
+        } catch (err: unknown) {
+            setError(text.errorDelete);
         } finally {
             setDeleting(false);
         }
     };
 
-    const limitLabel = (limit: number) => (limit === 0 ? 'Без лимита' : `${limit}`);
+    const limitLabel = (limit: number) => (limit === 0 ? text.noLimit : `${limit}`);
 
     return (
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold">Приватные комнаты</h1>
-                    <p className="text-default-500">Настройка хаба, категорий и панелей без команды /setupv</p>
+                    <h1 className="text-3xl font-bold">{text.title}</h1>
+                    <p className="text-default-500">{text.subtitle}</p>
                 </div>
                 <div className="flex gap-2">
                     <Button
@@ -283,7 +416,7 @@ export default function TempVoicePage({ params }: { params: Promise<{ guildId: s
                         onPress={fetchData}
                         isDisabled={loading}
                     >
-                        Обновить
+                        {text.refresh}
                     </Button>
                     <Button
                         variant="flat"
@@ -291,10 +424,10 @@ export default function TempVoicePage({ params }: { params: Promise<{ guildId: s
                         isLoading={sendingPanel}
                         isDisabled={loading || sendingPanel}
                     >
-                        Отправить панель
+                        {text.sendPanel}
                     </Button>
                     <Chip color={config ? 'success' : 'warning'} variant="flat" startContent={<Sparkle size={16} />}>
-                        {config ? 'Настроено' : 'Нет конфигурации'}
+                        {config ? text.statusConfigured : text.statusNotConfigured}
                     </Chip>
                 </div>
             </div>
@@ -313,8 +446,8 @@ export default function TempVoicePage({ params }: { params: Promise<{ guildId: s
                                 <Buildings size={24} weight="fill" />
                             </div>
                             <div className="flex-1">
-                                <h3 className="text-xl font-bold">Структура и панели</h3>
-                                <p className="text-default-500 text-sm">Создайте новую структуру или привяжите уже существующие каналы</p>
+                                <h3 className="text-xl font-bold">{text.channelsTitle}</h3>
+                                <p className="text-default-500 text-sm">{text.channelsDesc}</p>
                             </div>
                             <ButtonGroup radius="sm">
                                 <Button
@@ -322,14 +455,14 @@ export default function TempVoicePage({ params }: { params: Promise<{ guildId: s
                                     variant={mode === 'create' ? 'solid' : 'flat'}
                                     onPress={() => setMode('create')}
                                 >
-                                    Новая структура
+                                    {text.modeCreate}
                                 </Button>
                                 <Button
                                     color={mode === 'existing' ? 'primary' : 'default'}
                                     variant={mode === 'existing' ? 'solid' : 'flat'}
                                     onPress={() => setMode('existing')}
                                 >
-                                    Использовать существующие
+                                    {text.modeExisting}
                                 </Button>
                             </ButtonGroup>
                         </div>
@@ -339,22 +472,22 @@ export default function TempVoicePage({ params }: { params: Promise<{ guildId: s
                         {mode === 'create' ? (
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <Input
-                                    label="Категория"
-                                    placeholder="Temporary Voice"
+                                    label={text.labelCategory}
+                                    placeholder={text.placeholderCategoryName}
                                     value={form.categoryName}
                                     onChange={(e) => setForm({ ...form, categoryName: e.target.value })}
                                     variant="bordered"
                                 />
                                 <Input
-                                    label="Хаб (voice)"
-                                    placeholder="Join to Create"
+                                    label={text.labelHub}
+                                    placeholder={text.placeholderHubName}
                                     value={form.hubName}
                                     onChange={(e) => setForm({ ...form, hubName: e.target.value })}
                                     variant="bordered"
                                 />
                                 <Input
-                                    label="Интерфейс (text)"
-                                    placeholder="temp-voice-control"
+                                    label={text.labelInterface}
+                                    placeholder={text.placeholderInterfaceName}
                                     value={form.interfaceName}
                                     onChange={(e) => setForm({ ...form, interfaceName: e.target.value })}
                                     variant="bordered"
@@ -363,9 +496,9 @@ export default function TempVoicePage({ params }: { params: Promise<{ guildId: s
                         ) : (
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <Select
-                                    label="Категория"
+                                    label={text.labelCategory}
                                     variant="bordered"
-                                    placeholder="Выберите категорию"
+                                    placeholder={text.selectCategory}
                                     selectedKeys={form.categoryId ? [form.categoryId] : []}
                                     onSelectionChange={(keys) => {
                                         const value = Array.from(keys)[0] as string | undefined;
@@ -390,9 +523,9 @@ export default function TempVoicePage({ params }: { params: Promise<{ guildId: s
                                     )}
                                 </Select>
                                 <Select
-                                    label="Хаб (voice)"
+                                    label={text.labelHub}
                                     variant="bordered"
-                                    placeholder="Выберите голосовой канал"
+                                    placeholder={text.selectHub}
                                     selectedKeys={form.hubChannelId ? [form.hubChannelId] : []}
                                     onSelectionChange={(keys) => {
                                         const value = Array.from(keys)[0] as string | undefined;
@@ -417,9 +550,9 @@ export default function TempVoicePage({ params }: { params: Promise<{ guildId: s
                                     )}
                                 </Select>
                                 <Select
-                                    label="Интерфейс (text)"
+                                    label={text.labelInterface}
                                     variant="bordered"
-                                    placeholder="Выберите текстовый канал"
+                                    placeholder={text.selectInterface}
                                     selectedKeys={form.interfaceChannelId ? [form.interfaceChannelId] : []}
                                     onSelectionChange={(keys) => {
                                         const value = Array.from(keys)[0] as string | undefined;
@@ -456,8 +589,8 @@ export default function TempVoicePage({ params }: { params: Promise<{ guildId: s
                                     <ChatsTeardrop size={24} weight="fill" />
                                 </div>
                                 <div>
-                                    <h3 className="text-xl font-bold">Состояние</h3>
-                                    <p className="text-default-500 text-sm">Быстрый статус текущей конфигурации</p>
+                                    <h3 className="text-xl font-bold">{text.statusTitle}</h3>
+                                    <p className="text-default-500 text-sm">{text.statusDesc}</p>
                                 </div>
                             </div>
                             {loading && <Spinner size="sm" color="secondary" />}
@@ -465,30 +598,30 @@ export default function TempVoicePage({ params }: { params: Promise<{ guildId: s
 
                         <div className="grid grid-cols-2 gap-3">
                             <StatusChip
-                                label="Категория"
-                                value={resolveChannelName(config?.categoryId) || '—'}
+                                label={text.labelCategory}
+                                value={resolveChannelName(config?.categoryId) || text.notSet}
                                 hint={config?.categoryId && !resolveChannelName(config?.categoryId) ? `ID: ${config.categoryId}` : undefined}
                             />
                             <StatusChip
-                                label="Хаб"
-                                value={resolveChannelName(config?.hubChannelId) || '—'}
+                                label={text.labelHub}
+                                value={resolveChannelName(config?.hubChannelId) || text.notSet}
                                 hint={config?.hubChannelId && !resolveChannelName(config?.hubChannelId) ? `ID: ${config.hubChannelId}` : undefined}
                             />
                             <StatusChip
-                                label="Интерфейс"
-                                value={resolveChannelName(config?.interfaceChannelId) || '—'}
+                                label={text.labelInterface}
+                                value={resolveChannelName(config?.interfaceChannelId) || text.notSet}
                                 hint={config?.interfaceChannelId && !resolveChannelName(config?.interfaceChannelId) ? `ID: ${config.interfaceChannelId}` : undefined}
                             />
-                            <StatusChip label="Активных комнат" value={roomsCount.toString()} />
+                            <StatusChip label={text.statusRooms} value={roomsCount.toString()} />
                         </div>
 
                         <Divider />
 
                         <div className="space-y-2">
-                            <p className="text-sm text-default-500">Шаблон имени</p>
-                            <Chip color="secondary" variant="flat">{config?.nameTemplate || 'Room {user}'}</Chip>
-                            <p className="text-sm text-default-500">Лимит</p>
-                            <Chip color="secondary" variant="flat">{config?.userLimit ?? 'Без лимита'}</Chip>
+                            <p className="text-sm text-default-500">{text.nameTemplateLabel}</p>
+                            <Chip color="secondary" variant="flat">{config?.nameTemplate || defaults.nameTemplate}</Chip>
+                            <p className="text-sm text-default-500">{text.userLimitLabel}</p>
+                            <Chip color="secondary" variant="flat">{config?.userLimit ?? text.noLimit}</Chip>
                         </div>
                     </CardBody>
                 </Card>
@@ -501,17 +634,17 @@ export default function TempVoicePage({ params }: { params: Promise<{ guildId: s
                             <UsersFour size={24} weight="fill" />
                         </div>
                         <div className="flex-1">
-                            <h3 className="text-xl font-bold">Правила комнат</h3>
-                            <p className="text-default-500 text-sm">Шаблон имени и лимит пользователей по умолчанию</p>
+                            <h3 className="text-xl font-bold">{text.roomsTitle}</h3>
+                            <p className="text-default-500 text-sm">{text.roomsDesc}</p>
                         </div>
                     </div>
 
                     <div className="space-y-5">
                         <div className="space-y-2">
-                            <FieldLabel icon={<TextT size={18} />} text="Шаблон имени комнаты" />
+                            <FieldLabel icon={<TextT size={18} />} text={text.nameTemplateField} />
                             <Textarea
                                 minRows={2}
-                                placeholder="Используйте {user} для имени владельца"
+                                placeholder={text.nameTemplatePlaceholder}
                                 value={form.nameTemplate}
                                 onChange={(e) => setForm({ ...form, nameTemplate: e.target.value })}
                                 variant="bordered"
@@ -519,10 +652,10 @@ export default function TempVoicePage({ params }: { params: Promise<{ guildId: s
                         </div>
 
                         <div className="space-y-3 w-full">
-                            <FieldLabel icon={<UsersThree size={18} />} text="Лимит участников" />
+                            <FieldLabel icon={<UsersThree size={18} />} text={text.userLimitField} />
                             <Input
                                 type="number"
-                                placeholder="0 = без лимита"
+                                placeholder={text.userLimitPlaceholder}
                                 value={form.userLimit}
                                 onChange={(e) => setForm({ ...form, userLimit: e.target.value })}
                                 variant="bordered"
@@ -546,7 +679,7 @@ export default function TempVoicePage({ params }: { params: Promise<{ guildId: s
                                     );
                                 })}
                             </div>
-                            <p className="text-xs text-default-500">0 означает отсутствие ограничения</p>
+                            <p className="text-xs text-default-500">{text.userLimitHint}</p>
                         </div>
                     </div>
 
@@ -554,9 +687,9 @@ export default function TempVoicePage({ params }: { params: Promise<{ guildId: s
 
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                         <Button color="primary" onPress={handleSave} isLoading={saving} isDisabled={loading || saving}>
-                            Сохранить
+                            {text.save}
                         </Button>
-                        <Tooltip content="Удалит категорию, хаб, панель и активные комнаты">
+                        <Tooltip content={text.deleteTooltip}>
                             <Button
                                 color="danger"
                                 variant="flat"
@@ -565,7 +698,7 @@ export default function TempVoicePage({ params }: { params: Promise<{ guildId: s
                                 isDisabled={deleting || loading}
                                 startContent={<TrashSimple size={18} />}
                             >
-                                Удалить всё
+                                {text.delete}
                             </Button>
                         </Tooltip>
                     </div>
@@ -579,15 +712,15 @@ export default function TempVoicePage({ params }: { params: Promise<{ guildId: s
                             <ShieldCheck size={24} weight="fill" />
                         </div>
                         <div className="flex-1">
-                            <h3 className="text-xl font-bold text-danger">Удаление конфигурации</h3>
-                            <p className="text-default-500 text-sm">Удалит все созданные комнаты и каналы. Подтвердите, введя DELETE.</p>
+                            <h3 className="text-xl font-bold text-danger">{text.dangerTitle}</h3>
+                            <p className="text-default-500 text-sm">{text.dangerDesc}</p>
                         </div>
                     </div>
 
                     <div className="flex flex-col md:flex-row gap-3 items-end">
                         <Input
-                            label="Подтверждение"
-                            placeholder="DELETE"
+                            label={text.confirmLabel}
+                            placeholder={text.confirmPlaceholder}
                             value={deleteConfirm}
                             onChange={(e) => setDeleteConfirm(e.target.value)}
                             variant="bordered"
@@ -601,7 +734,7 @@ export default function TempVoicePage({ params }: { params: Promise<{ guildId: s
                             isDisabled={deleting || loading}
                             startContent={<TrashSimple size={18} />}
                         >
-                            Подтвердить удаление
+                            {text.confirmButton}
                         </Button>
                     </div>
                 </CardBody>

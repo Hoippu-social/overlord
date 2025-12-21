@@ -37,8 +37,12 @@ export async function loadCommands(client: Client) {
 
         if ('data' in command && 'execute' in command) {
             commands.set(command.data.name, command);
-            commandsData.push(command.data.toJSON());
-            logger.info(`Loaded command: ${command.data.name}`);
+            if (command.hidden) {
+                logger.info(`Loaded hidden command (not registered): ${command.data.name}`);
+            } else {
+                commandsData.push(command.data.toJSON());
+                logger.info(`Loaded command: ${command.data.name}`);
+            }
         } else {
             logger.warn(`The command at ${filePath} is missing a required "data" or "execute" property.`);
         }

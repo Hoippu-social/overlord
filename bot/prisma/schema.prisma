@@ -44,6 +44,7 @@ model BotSettings {
   id                       Int      @id @default(autoincrement())
   guildId                  String   @unique
   guild                    Guild    @relation(fields: [guildId], references: [id])
+  locale                   String   @default("ru")
   prefixCommandsEnabled    Boolean  @default(true)
   commandChannelMode       String   @default("BLACKLIST") // WHITELIST or BLACKLIST
   allowedTextChannels      String?  // JSON string of channel IDs

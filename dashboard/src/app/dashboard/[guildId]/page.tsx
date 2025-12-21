@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Card, CardBody, CardHeader, Chip, Spinner } from "@nextui-org/react";
+import { Card, CardBody, CardHeader, Chip, Spinner, Button, ButtonGroup } from "@nextui-org/react";
 import { MusicWidget } from '@/components/MusicWidget';
 import {
     ShieldCheck,
@@ -16,8 +16,10 @@ import {
     UserCircle,
     Pulse,
     CaretRight,
+    Translate,
 } from "@phosphor-icons/react";
 import Link from 'next/link';
+import { useGuildLocale } from '@/lib/i18n';
 
 type BotStatus = 'ONLINE' | 'OFFLINE' | 'PARTIAL';
 type NowPlaying = {
@@ -64,6 +66,91 @@ interface SystemStats {
     };
 }
 
+const strings = {
+    en: {
+        loading: 'Loading dashboard...',
+        guildUnavailable: 'Guild data is not available yet. Make sure the bot has synced at least once.',
+        details: 'Details: {details}',
+        errorLoad: 'Failed to load dashboard data. Check console/network logs.',
+        notSynced: 'Not synced yet',
+        onlineHintAvailable: 'Currently online',
+        onlineHintMissing: 'Enable presence intent to show online users',
+        pageTitle: 'Dashboard Hub',
+        liveData: 'Live data for {server}',
+        prefixLabel: 'Prefix: {prefix}',
+        prefixNotSet: 'not set',
+        users: 'Users',
+        totalMembers: 'Total members',
+        online: 'Online',
+        syncStatus: 'Sync & Status',
+        lastSynced: 'Last synced',
+        uptime: 'Uptime',
+        ping: 'Ping',
+        na: 'n/a',
+        modulesTitle: 'Modules',
+        statusOnline: 'online',
+        statusOffline: 'offline',
+        statusPartial: 'partial',
+        statusUnknown: 'unknown',
+        modules: {
+            moderation: { label: 'Moderation', desc: 'Auto-mod, warnings, and bans' },
+            audit: { label: 'Audit Logs', desc: 'Track server events' },
+            economy: { label: 'Economy', desc: 'Currency, shop, and items' },
+            music: { label: 'Music', desc: 'Playback settings and queue tools' },
+            tempVoice: { label: 'Temp Voice', desc: 'Auto voice rooms and templates' },
+            tickets: { label: 'Tickets', desc: 'Support system management' },
+            botSettings: { label: 'Bot settings', desc: 'Bot control and system status' },
+            serverSettings: { label: 'Server settings', desc: 'Prefix, roles, and channels' },
+        },
+    },
+    ru: {
+        loading: 'Загрузка панели...',
+        guildUnavailable: 'Данные сервера пока недоступны. Убедитесь, что бот синхронизировал данные.',
+        details: 'Детали: {details}',
+        errorLoad: 'Не удалось загрузить данные панели. Проверьте консоль/сеть.',
+        notSynced: 'Пока не синхронизировано',
+        onlineHintAvailable: 'Сейчас онлайн',
+        onlineHintMissing: 'Включите intent присутствия, чтобы видеть онлайн',
+        pageTitle: 'Главная',
+        liveData: 'Данные для {server}',
+        prefixLabel: 'Префикс: {prefix}',
+        prefixNotSet: 'не задан',
+        users: 'Пользователи',
+        totalMembers: 'Всего участников',
+        online: 'Онлайн',
+        syncStatus: 'Синхронизация и статус',
+        lastSynced: 'Последняя синхронизация',
+        uptime: 'Аптайм',
+        ping: 'Пинг',
+        na: 'н/д',
+        modulesTitle: 'Модули',
+        statusOnline: 'в сети',
+        statusOffline: 'офлайн',
+        statusPartial: 'частично',
+        statusUnknown: 'неизвестно',
+        modules: {
+            moderation: { label: 'Модерация', desc: 'Автомод, предупреждения и баны' },
+            audit: { label: 'Аудит', desc: 'События сервера' },
+            economy: { label: 'Экономика', desc: 'Валюта, магазин, предметы' },
+            music: { label: 'Музыка', desc: 'Настройки плеера и очереди' },
+            tempVoice: { label: 'Временные комнаты', desc: 'Авто-комнаты и шаблоны' },
+            tickets: { label: 'Тикеты', desc: 'Управление тикетами' },
+            botSettings: { label: 'Настройки бота', desc: 'Управление ботом и статус' },
+            serverSettings: { label: 'Настройки сервера', desc: 'Префикс, роли, каналы' },
+        },
+    },
+} as const;
+
+const localeOptions = [
+    { key: 'ru', label: 'RU' },
+    { key: 'en', label: 'EN' },
+] as const;
+
+const formatText = (template: string, vars?: Record<string, string | number>) => {
+    if (!vars) return template;
+    return template.replace(/\{(\w+)\}/g, (_, key) => String(vars[key] ?? ''));
+};
+
 const getStatusColor = (status?: BotStatus) => {
     switch (status) {
         case 'ONLINE': return 'success';
@@ -73,14 +160,10 @@ const getStatusColor = (status?: BotStatus) => {
     }
 };
 
-const formatDate = (value?: string) => {
-    if (!value) return 'Not synced yet';
-    const date = new Date(value);
-    return `${date.toLocaleDateString()} ${date.toLocaleTimeString()}`;
-};
-
 export default function HubPage({ params }: { params: Promise<{ guildId: string }> }) {
     const { guildId } = React.use(params);
+    const { locale, setLocale } = useGuildLocale(guildId);
+    const text = strings[locale];
     const [summary, setSummary] = useState<GuildSummary | null>(null);
     const [systemStats, setSystemStats] = useState<SystemStats | null>(null);
     const [loading, setLoading] = useState(true);
@@ -88,14 +171,14 @@ export default function HubPage({ params }: { params: Promise<{ guildId: string 
     const [nowPlaying, setNowPlaying] = useState<NowPlaying | null>(null);
 
     const modules = [
-        { label: 'Moderation', href: `/dashboard/${guildId}/moderation`, icon: ShieldCheck, desc: 'Auto-mod, warnings, and bans' },
-        { label: 'Audit Logs', href: `/dashboard/${guildId}/audit`, icon: Scroll, desc: 'Track server events' },
-        { label: 'Economy', href: `/dashboard/${guildId}/economy`, icon: Coins, desc: 'Currency, shop, and items' },
-        { label: 'Music', href: `/dashboard/${guildId}/music`, icon: MusicNote, desc: 'Playback settings and queue tools' },
-        { label: 'Temp Voice', href: `/dashboard/${guildId}/tempvoice`, icon: ChatsTeardrop, desc: 'Auto voice rooms and templates' },
-        { label: 'Tickets', href: `/dashboard/${guildId}/tickets`, icon: Ticket, desc: 'Support system management' },
-        { label: 'Bot settings', href: `/dashboard/${guildId}/settings`, icon: Gear, desc: 'Bot control and system status' },
-        { label: 'Server settings', href: `/dashboard/${guildId}/server-settings`, icon: Buildings, desc: 'Prefix, roles, and channels' },
+        { label: text.modules.moderation.label, href: `/dashboard/${guildId}/moderation`, icon: ShieldCheck, desc: text.modules.moderation.desc },
+        { label: text.modules.audit.label, href: `/dashboard/${guildId}/audit`, icon: Scroll, desc: text.modules.audit.desc },
+        { label: text.modules.economy.label, href: `/dashboard/${guildId}/economy`, icon: Coins, desc: text.modules.economy.desc },
+        { label: text.modules.music.label, href: `/dashboard/${guildId}/music`, icon: MusicNote, desc: text.modules.music.desc },
+        { label: text.modules.tempVoice.label, href: `/dashboard/${guildId}/tempvoice`, icon: ChatsTeardrop, desc: text.modules.tempVoice.desc },
+        { label: text.modules.tickets.label, href: `/dashboard/${guildId}/tickets`, icon: Ticket, desc: text.modules.tickets.desc },
+        { label: text.modules.botSettings.label, href: `/dashboard/${guildId}/settings`, icon: Gear, desc: text.modules.botSettings.desc },
+        { label: text.modules.serverSettings.label, href: `/dashboard/${guildId}/server-settings`, icon: Buildings, desc: text.modules.serverSettings.desc },
     ];
 
     useEffect(() => {
@@ -114,7 +197,8 @@ export default function HubPage({ params }: { params: Promise<{ guildId: string 
                     setSummary(summaryData);
                 } else {
                     const body = await summaryRes.json().catch(() => ({}));
-                    setError(`Guild API returned ${summaryRes.status}: ${body.error || 'no message'}`);
+                    const details = `${summaryRes.status}: ${body.error || text.na}`;
+                    setError(formatText(text.details, { details }));
                 }
 
                 if (systemRes.ok) {
@@ -128,7 +212,7 @@ export default function HubPage({ params }: { params: Promise<{ guildId: string 
                 }
             } catch (error) {
                 console.error('Failed to load dashboard data:', error);
-                setError('Failed to load dashboard data. Check console/network logs.');
+                setError(text.errorLoad);
             } finally {
                 setLoading(false);
             }
@@ -147,7 +231,7 @@ export default function HubPage({ params }: { params: Promise<{ guildId: string 
     if (loading) {
         return (
             <div className="flex items-center justify-center min-h-screen">
-                <Spinner color="primary" label="Loading dashboard..." />
+                <Spinner color="primary" label={text.loading} />
             </div>
         );
     }
@@ -157,8 +241,8 @@ export default function HubPage({ params }: { params: Promise<{ guildId: string 
             <div className="flex items-center justify-center min-h-screen">
                 <Card className="bg-surface border border-divider p-8">
                     <p className="text-default-500">
-                        Guild data is not available yet. Make sure the bot has synced at least once.
-                        {error && <><br /><span className="text-danger">Details: {error}</span></>}
+                        {text.guildUnavailable}
+                        {error && <><br /><span className="text-danger">{formatText(text.details, { details: error })}</span></>}
                     </p>
                 </Card>
             </div>
@@ -168,30 +252,70 @@ export default function HubPage({ params }: { params: Promise<{ guildId: string 
     const totalMembers = summary?.counts.members ?? null;
     const onlineMembers = summary?.counts.onlineMembers ?? null;
     const formatCount = (value: number | null | undefined) =>
-        typeof value === 'number' ? value.toLocaleString() : 'n/a';
+        typeof value === 'number' ? value.toLocaleString(locale === 'ru' ? 'ru-RU' : 'en-US') : text.na;
     const onlineHint = typeof onlineMembers === 'number'
-        ? 'Currently online'
-        : 'Enable presence intent to show online users';
+        ? text.onlineHintAvailable
+        : text.onlineHintMissing;
+    const formatDate = (value?: string) => {
+        if (!value) return text.notSynced;
+        const date = new Date(value);
+        const localeTag = locale === 'ru' ? 'ru-RU' : 'en-US';
+        return `${date.toLocaleDateString(localeTag)} ${date.toLocaleTimeString(localeTag)}`;
+    };
 
     return (
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold">Dashboard Hub</h1>
-                    <p className="text-default-500">Live data for {summary?.guild.name ?? 'your server'}</p>
-                    <p className="text-default-400 text-sm">Prefix: {summary?.guild.prefix ?? 'not set'}</p>
+                    <h1 className="text-3xl font-bold">{text.pageTitle}</h1>
+                    <p className="text-default-500">{formatText(text.liveData, { server: summary?.guild.name ?? text.na })}</p>
+                    <p className="text-default-400 text-sm">{formatText(text.prefixLabel, { prefix: summary?.guild.prefix ?? text.prefixNotSet })}</p>
                 </div>
-                <Link href={`/dashboard/${guildId}/settings`} className="inline-flex">
-                    <Chip
-                        color={getStatusColor(systemStats?.botStatus)}
-                        variant="flat"
-                        startContent={<Pulse size={16} weight="fill" />}
-                        size="lg"
-                        className="capitalize cursor-pointer hover:opacity-90"
-                    >
-                        {systemStats?.botStatus?.toLowerCase() ?? 'unknown'}
-                    </Chip>
-                </Link>
+
+                <div className="flex items-center gap-4">
+                    <ButtonGroup size="lg" variant="flat" className="bg-surface-hover/50 rounded-xl p-1 border border-divider">
+                        {localeOptions.map((option) => {
+                            const isActive = option.key === locale;
+                            return (
+                                <Button
+                                    key={option.key}
+                                    size="sm"
+                                    color={isActive ? "primary" : "default"}
+                                    variant={isActive ? "solid" : "light"}
+                                    className={`min-w-unit-8 h-8 px-3 rounded-lg font-medium transition-all ${isActive ? 'shadow-md' : 'hover:bg-default/40'}`}
+                                    onPress={() => setLocale(option.key)}
+                                    startContent={
+                                        <img
+                                            src={option.key === 'ru' ? "/icons/free_russia_flag.png" : "/icons/uk_flag.png"}
+                                            className="w-4 h-4 rounded-sm object-contain"
+                                            alt=""
+                                        />
+                                    }
+                                >
+                                    {option.label}
+                                </Button>
+                            );
+                        })}
+                    </ButtonGroup>
+
+                    <Link href={`/dashboard/${guildId}/settings`} className="inline-flex">
+                        <Chip
+                            color={getStatusColor(systemStats?.botStatus)}
+                            variant="flat"
+                            startContent={<Pulse size={16} weight="fill" />}
+                            size="lg"
+                            className="capitalize cursor-pointer hover:opacity-90"
+                        >
+                            {systemStats?.botStatus
+                                ? systemStats.botStatus === 'ONLINE'
+                                    ? text.statusOnline
+                                    : systemStats.botStatus === 'OFFLINE'
+                                        ? text.statusOffline
+                                        : text.statusPartial
+                                : text.statusUnknown}
+                        </Chip>
+                    </Link>
+                </div>
             </div>
 
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-stretch">
@@ -206,9 +330,9 @@ export default function HubPage({ params }: { params: Promise<{ guildId: string 
                                 <UsersThree size={32} weight="fill" />
                             </div>
                             <div className="flex-1">
-                                <p className="text-default-500 text-sm">Users</p>
+                                <p className="text-default-500 text-sm">{text.users}</p>
                                 <h3 className="text-2xl font-bold">{formatCount(totalMembers)}</h3>
-                                <p className="text-default-400 text-xs mt-1">Total members</p>
+                                <p className="text-default-400 text-xs mt-1">{text.totalMembers}</p>
                             </div>
                         </CardBody>
                     </Card>
@@ -219,7 +343,7 @@ export default function HubPage({ params }: { params: Promise<{ guildId: string 
                                 <UserCircle size={32} weight="fill" />
                             </div>
                             <div>
-                                <p className="text-default-500 text-sm">Online</p>
+                                <p className="text-default-500 text-sm">{text.online}</p>
                                 <h3 className="text-2xl font-bold">{formatCount(onlineMembers)}</h3>
                                 <p className="text-default-400 text-xs mt-1">{onlineHint}</p>
                             </div>
@@ -228,21 +352,21 @@ export default function HubPage({ params }: { params: Promise<{ guildId: string 
 
                     <Card className="bg-surface border border-divider flex-1">
                         <CardHeader className="pb-0 pt-4 px-4 flex-col items-start">
-                            <h4 className="font-bold text-large">Sync & Status</h4>
+                            <h4 className="font-bold text-large">{text.syncStatus}</h4>
                         </CardHeader>
                         <CardBody className="px-4 py-2 space-y-2">
                             <div className="flex items-center justify-between text-sm">
-                                <span className="text-default-500">Last synced</span>
+                                <span className="text-default-500">{text.lastSynced}</span>
                                 <span className="text-foreground font-semibold">{formatDate(summary?.lastSyncedAt)}</span>
                             </div>
                             <div className="flex items-center justify-between text-sm">
-                                <span className="text-default-500">Uptime</span>
-                                <span className="text-foreground font-semibold">{systemStats?.uptime ?? 'n/a'}</span>
+                                <span className="text-default-500">{text.uptime}</span>
+                                <span className="text-foreground font-semibold">{systemStats?.uptime ?? text.na}</span>
                             </div>
                             <div className="flex items-center justify-between text-sm">
-                                <span className="text-default-500">Ping</span>
+                                <span className="text-default-500">{text.ping}</span>
                                 <span className="text-foreground font-semibold">
-                                    {systemStats?.ping ?? 'n/a'}{systemStats?.ping !== null && systemStats?.ping !== undefined ? 'ms' : ''}
+                                    {systemStats?.ping ?? text.na}{systemStats?.ping !== null && systemStats?.ping !== undefined ? 'ms' : ''}
                                 </span>
                             </div>
                         </CardBody>
@@ -250,7 +374,7 @@ export default function HubPage({ params }: { params: Promise<{ guildId: string 
                 </div>
             </div>
 
-            <h2 className="text-xl font-bold mt-8 mb-4">Modules</h2>
+            <h2 className="text-xl font-bold mt-8 mb-4">{text.modulesTitle}</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {modules.map((mod) => (
                     <Link key={mod.href} href={mod.href}>

@@ -26,6 +26,7 @@ import {
     List,
     MusicNote
 } from "@phosphor-icons/react";
+import { useGuildLocale } from "@/lib/i18n";
 
 type NowPlaying = {
     title: string;
@@ -70,7 +71,101 @@ type QueueState = {
     repeatMode?: string | null;
 };
 
+const strings = {
+    en: {
+        nothingPlaying: 'Nothing Playing',
+        joinVoice: 'Join a voice channel to start',
+        paused: 'Paused',
+        playing: 'Playing',
+        volumeShort: 'Vol {value}%',
+        progressLabel: 'Progress',
+        volumeLabel: 'Volume',
+        optionsLabel: 'Music options',
+        queueTab: 'Queue',
+        queueTitle: 'Queue',
+        queueTracks: '{count} tracks',
+        refresh: 'Refresh',
+        shuffle: 'Shuffle',
+        clear: 'Clear',
+        nowPlaying: 'Now playing',
+        unknownArtist: 'Unknown artist',
+        remove: 'Remove',
+        dropToEnd: 'Drop here to move to end',
+        queueEmpty: 'Queue is empty',
+        searchTab: 'Search',
+        searchPlaceholder: 'Search on {platform}...',
+        find: 'Find',
+        add: 'Add to queue',
+        added: 'Added',
+        failed: 'Failed',
+        open: 'Open',
+        searchHint: 'Type a query to search on YouTube, Spotify, or SoundCloud',
+        albumArt: 'Album art',
+        errorQueueLoad: 'Failed to load queue.',
+        errorSearchEmpty: 'Enter a query to search.',
+        errorSearchLavalink: 'Failed to search Lavalink.',
+        errorSearchGeneric: 'Failed to search.',
+        errorNoResults: 'Nothing found on {platform}.',
+        errorQueueUpdate: 'Failed to update queue.',
+        errorPlayerUpdate: 'Failed to update player.',
+        errorTogglePlayback: 'Failed to toggle playback.',
+        errorVolumeSet: 'Failed to set volume.',
+        errorSeek: 'Failed to seek.',
+        errorAddQueue: 'Failed to add track to queue.',
+        errorAddTrack: 'Failed to add track.',
+    },
+    ru: {
+        nothingPlaying: 'Сейчас ничего не играет',
+        joinVoice: 'Зайдите в голосовой канал, чтобы начать',
+        paused: 'Пауза',
+        playing: 'Играет',
+        volumeShort: 'Громкость {value}%',
+        progressLabel: 'Прогресс',
+        volumeLabel: 'Громкость',
+        optionsLabel: 'Параметры музыки',
+        queueTab: 'Очередь',
+        queueTitle: 'Очередь',
+        queueTracks: '{count} треков',
+        refresh: 'Обновить',
+        shuffle: 'Перемешать',
+        clear: 'Очистить',
+        nowPlaying: 'Сейчас играет',
+        unknownArtist: 'Неизвестный артист',
+        remove: 'Удалить',
+        dropToEnd: 'Перетащите сюда, чтобы переместить в конец',
+        queueEmpty: 'Очередь пуста',
+        searchTab: 'Поиск',
+        searchPlaceholder: 'Поиск на {platform}...',
+        find: 'Найти',
+        add: 'Добавить в очередь',
+        added: 'Добавлено',
+        failed: 'Ошибка',
+        open: 'Открыть',
+        searchHint: 'Введите запрос для поиска на YouTube, Spotify или SoundCloud',
+        albumArt: 'Обложка',
+        errorQueueLoad: 'Не удалось загрузить очередь.',
+        errorSearchEmpty: 'Введите запрос для поиска.',
+        errorSearchLavalink: 'Не удалось выполнить поиск.',
+        errorSearchGeneric: 'Ошибка поиска.',
+        errorNoResults: 'Ничего не найдено на {platform}.',
+        errorQueueUpdate: 'Не удалось обновить очередь.',
+        errorPlayerUpdate: 'Не удалось обновить плеер.',
+        errorTogglePlayback: 'Не удалось переключить воспроизведение.',
+        errorVolumeSet: 'Не удалось изменить громкость.',
+        errorSeek: 'Не удалось перемотать.',
+        errorAddQueue: 'Не удалось добавить трек в очередь.',
+        errorAddTrack: 'Не удалось добавить трек.',
+    },
+} as const;
+
+const formatText = (template: string, vars?: Record<string, string | number>) => {
+    if (!vars) return template;
+    return template.replace(/\{(\w+)\}/g, (_, key) => String(vars[key] ?? ''));
+};
+
 export const MusicWidget = ({ className = "", nowPlaying, guildId }: { className?: string; nowPlaying?: NowPlaying; guildId: string }) => {
+    const { locale } = useGuildLocale(guildId);
+    const text = strings[locale];
     const [searchPlatform, setSearchPlatform] = useState<SearchPlatform>('youtube');
     const [searchQuery, setSearchQuery] = useState('');
     const [searching, setSearching] = useState(false);
@@ -115,7 +210,7 @@ export const MusicWidget = ({ className = "", nowPlaying, guildId }: { className
             const res = await fetch(`/api/guilds/${guildId}/music/queue`);
             const data = await res.json().catch(() => ({}));
             if (!res.ok) {
-                throw new Error(data.error || 'Failed to load queue.');
+                throw new Error(text.errorQueueLoad);
             }
             if (data?.queue) {
                 setQueueState({
@@ -130,16 +225,16 @@ export const MusicWidget = ({ className = "", nowPlaying, guildId }: { className
                 setQueueState({ current: null, tracks: [] });
             }
         } catch (error: unknown) {
-            const message = error instanceof Error ? error.message : 'Failed to load queue.';
+            const message = error instanceof Error && error.message ? error.message : text.errorQueueLoad;
             setQueueError(message);
         } finally {
             setQueueLoading(false);
         }
-    }, [guildId]);
+    }, [guildId, text.errorQueueLoad]);
 
     const handleSearch = async () => {
         if (!searchQuery.trim()) {
-            setSearchError('Enter a query to search.');
+            setSearchError(text.errorSearchEmpty);
             setSearchResults([]);
             return;
         }
@@ -150,14 +245,14 @@ export const MusicWidget = ({ className = "", nowPlaying, guildId }: { className
             const res = await fetch(`/api/guilds/${guildId}/music/search?platform=${searchPlatform}&query=${encodeURIComponent(searchQuery.trim())}`);
             const data = await res.json().catch(() => ({}));
             if (!res.ok) {
-                throw new Error(data.error || 'Failed to search Lavalink.');
+                throw new Error(text.errorSearchLavalink);
             }
             setSearchResults(data.tracks || []);
             if (!data.tracks || data.tracks.length === 0) {
-                setSearchError(`Nothing found on ${platformLabel}.`);
+                setSearchError(formatText(text.errorNoResults, { platform: platformLabel }));
             }
         } catch (error: unknown) {
-            const message = error instanceof Error ? error.message : 'Failed to search.';
+            const message = error instanceof Error && error.message ? error.message : text.errorSearchGeneric;
             setSearchError(message);
             setSearchResults([]);
         } finally {
@@ -176,7 +271,7 @@ export const MusicWidget = ({ className = "", nowPlaying, guildId }: { className
             });
             const data = await res.json().catch(() => ({}));
             if (!res.ok) {
-                throw new Error(data.error || 'Failed to update queue.');
+                throw new Error(text.errorQueueUpdate);
             }
             if (data?.queue) {
                 setQueueState({
@@ -191,7 +286,7 @@ export const MusicWidget = ({ className = "", nowPlaying, guildId }: { className
                 await fetchQueue();
             }
         } catch (error: unknown) {
-            const message = error instanceof Error ? error.message : 'Failed to update queue.';
+            const message = error instanceof Error && error.message ? error.message : text.errorQueueUpdate;
             setQueueError(message);
         } finally {
             setQueueActionKey(null);
@@ -206,7 +301,7 @@ export const MusicWidget = ({ className = "", nowPlaying, guildId }: { className
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
-            throw new Error(data.error || 'Failed to update player.');
+            throw new Error(text.errorPlayerUpdate);
         }
     };
 
@@ -216,7 +311,7 @@ export const MusicWidget = ({ className = "", nowPlaying, guildId }: { className
         try {
             await sendControl({ paused: !nowPlaying.paused });
         } catch (error: unknown) {
-            const message = error instanceof Error ? error.message : 'Failed to toggle playback.';
+            const message = error instanceof Error && error.message ? error.message : text.errorTogglePlayback;
             setSearchError(message);
         } finally {
             setPausing(false);
@@ -233,7 +328,7 @@ export const MusicWidget = ({ className = "", nowPlaying, guildId }: { className
         try {
             await sendControl({ volume: vol });
         } catch (error: unknown) {
-            const message = error instanceof Error ? error.message : 'Failed to set volume.';
+            const message = error instanceof Error && error.message ? error.message : text.errorVolumeSet;
             setSearchError(message);
         }
     };
@@ -246,7 +341,7 @@ export const MusicWidget = ({ className = "", nowPlaying, guildId }: { className
         try {
             await sendControl({ positionMs: targetMs });
         } catch (error: unknown) {
-            const message = error instanceof Error ? error.message : 'Failed to seek.';
+            const message = error instanceof Error && error.message ? error.message : text.errorSeek;
             setSearchError(message);
         }
     };
@@ -263,12 +358,12 @@ export const MusicWidget = ({ className = "", nowPlaying, guildId }: { className
             });
             const data = await res.json().catch(() => ({}));
             if (!res.ok) {
-                throw new Error(data.error || 'Failed to add track to queue.');
+                throw new Error(text.errorAddQueue);
             }
             setQueueAddStatus((prev) => ({ ...prev, [track.encoded]: 'added' }));
             await fetchQueue();
         } catch (error: unknown) {
-            const message = error instanceof Error ? error.message : 'Failed to add track.';
+            const message = error instanceof Error && error.message ? error.message : text.errorAddTrack;
             setQueueError(message);
             if (track.encoded) {
                 setQueueAddStatus((prev) => ({ ...prev, [track.encoded]: 'failed' }));
@@ -278,8 +373,8 @@ export const MusicWidget = ({ className = "", nowPlaying, guildId }: { className
         }
     };
 
-    const title = nowPlaying?.title || 'Nothing Playing';
-    const subtitle = nowPlaying ? (nowPlaying.author || nowPlaying.uri || '') : 'Join a voice channel to start';
+    const title = nowPlaying?.title || text.nothingPlaying;
+    const subtitle = nowPlaying ? (nowPlaying.author || nowPlaying.uri || '') : text.joinVoice;
     const artwork = nowPlaying?.artworkUrl || 'https://via.placeholder.com/300';
     const isPaused = !!nowPlaying?.paused;
 
@@ -308,11 +403,11 @@ export const MusicWidget = ({ className = "", nowPlaying, guildId }: { className
                     {/* Now Playing Info */}
                     <div className="flex flex-col items-center text-center space-y-4 mt-4">
                         <div className="relative w-48 h-48 rounded-2xl overflow-hidden shadow-2xl">
-                            <Image
-                                src={artwork}
-                                alt="Album Art"
-                                classNames={{ wrapper: "w-full h-full", img: "w-full h-full object-cover" }}
-                            />
+                                <Image
+                                    src={artwork}
+                                    alt={text.albumArt}
+                                    classNames={{ wrapper: "w-full h-full", img: "w-full h-full object-cover" }}
+                                />
                         </div>
                         <div>
                             <h3 className="text-xl font-bold text-foreground line-clamp-1">{title}</h3>
@@ -320,11 +415,11 @@ export const MusicWidget = ({ className = "", nowPlaying, guildId }: { className
                             {nowPlaying && (
                                 <div className="mt-2 flex flex-wrap items-center justify-center gap-2 text-xs text-default-400">
                                     <Chip size="sm" variant="flat" color={nowPlaying.paused ? "warning" : "success"}>
-                                        {nowPlaying.paused ? 'Paused' : 'Playing'}
+                                        {nowPlaying.paused ? text.paused : text.playing}
                                     </Chip>
                                     {typeof nowPlaying.volume === 'number' && (
                                         <Chip size="sm" variant="flat" color="secondary">
-                                            Vol {nowPlaying.volume}%
+                                            {formatText(text.volumeShort, { value: nowPlaying.volume })}
                                         </Chip>
                                     )}
                                     {nowPlaying.sourceName && (
@@ -347,7 +442,7 @@ export const MusicWidget = ({ className = "", nowPlaying, guildId }: { className
                             minValue={0}
                             isDisabled={!nowPlaying?.durationMs}
                             className="max-w-md mx-auto"
-                            aria-label="Progress"
+                            aria-label={text.progressLabel}
                             onChangeEnd={handleSeek}
                         />
                         <div className="flex justify-between text-xs text-default-400 max-w-md mx-auto px-1">
@@ -393,7 +488,7 @@ export const MusicWidget = ({ className = "", nowPlaying, guildId }: { className
                                 minValue={0}
                                 isDisabled={!nowPlaying}
                                 className="max-w-full"
-                                aria-label="Volume"
+                                aria-label={text.volumeLabel}
                                 onChange={handleVolumeChange}
                                 onChangeEnd={handleVolumeCommit}
                                 step={1}
@@ -405,7 +500,7 @@ export const MusicWidget = ({ className = "", nowPlaying, guildId }: { className
                 {/* Right: Queue & Search */}
                 <div className="flex-1 flex flex-col bg-surface/50 min-w-0">
                     <Tabs
-                        aria-label="Music Options"
+                        aria-label={text.optionsLabel}
                         variant="underlined"
                         classNames={{
                             tabList: "w-full border-b border-divider p-0 gap-0",
@@ -417,18 +512,18 @@ export const MusicWidget = ({ className = "", nowPlaying, guildId }: { className
                         <Tab key="queue" title={
                             <div className="flex items-center gap-2">
                                 <List size={18} />
-                                <span>Queue</span>
+                                <span>{text.queueTab}</span>
                             </div>
                         }>
                             <div className="flex flex-col h-full p-4 min-h-[340px]">
                                 <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
                                     <div className="min-w-0">
-                                        <p className="text-xs uppercase tracking-wide text-default-400">Queue</p>
-                                        <p className="text-sm font-semibold">{queueCount} tracks</p>
+                                        <p className="text-xs uppercase tracking-wide text-default-400">{text.queueTitle}</p>
+                                        <p className="text-sm font-semibold">{formatText(text.queueTracks, { count: queueCount })}</p>
                                     </div>
                                     <div className="flex flex-wrap gap-2 justify-end">
                                         <Button size="sm" variant="flat" onPress={fetchQueue} isLoading={queueLoading}>
-                                            Refresh
+                                            {text.refresh}
                                         </Button>
                                         <Button
                                             size="sm"
@@ -437,7 +532,7 @@ export const MusicWidget = ({ className = "", nowPlaying, guildId }: { className
                                             isDisabled={!hasQueue}
                                             isLoading={queueActionKey === 'shuffle'}
                                         >
-                                            Shuffle
+                                            {text.shuffle}
                                         </Button>
                                         <Button
                                             size="sm"
@@ -447,7 +542,7 @@ export const MusicWidget = ({ className = "", nowPlaying, guildId }: { className
                                             isDisabled={!hasQueue}
                                             isLoading={queueActionKey === 'clear'}
                                         >
-                                            Clear
+                                            {text.clear}
                                         </Button>
                                     </div>
                                 </div>
@@ -467,9 +562,9 @@ export const MusicWidget = ({ className = "", nowPlaying, guildId }: { className
                                             />
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                            <p className="text-xs uppercase tracking-wide text-default-400">Now playing</p>
+                                            <p className="text-xs uppercase tracking-wide text-default-400">{text.nowPlaying}</p>
                                             <p className="font-semibold text-foreground truncate">{queueState.current.title}</p>
-                                            <p className="text-default-500 text-sm truncate">{queueState.current.author || queueState.current.uri || 'Unknown artist'}</p>
+                                            <p className="text-default-500 text-sm truncate">{queueState.current.author || queueState.current.uri || text.unknownArtist}</p>
                                         </div>
                                     </div>
                                 )}
@@ -532,7 +627,7 @@ export const MusicWidget = ({ className = "", nowPlaying, guildId }: { className
                                                     </div>
                                                     <div className="flex-1 min-w-0">
                                                         <p className="font-semibold text-foreground truncate">{track.title}</p>
-                                                        <p className="text-default-500 text-sm truncate">{track.author || track.uri || 'Unknown artist'}</p>
+                                                        <p className="text-default-500 text-sm truncate">{track.author || track.uri || text.unknownArtist}</p>
                                                         <div className="flex items-center gap-2 text-xs text-default-400 mt-1">
                                                             <span>{formatTime(track.durationMs ?? 0)}</span>
                                                             {track.sourceName && (
@@ -550,7 +645,7 @@ export const MusicWidget = ({ className = "", nowPlaying, guildId }: { className
                                                             onPress={() => runQueueAction({ action: 'remove', index }, `remove-${index}`)}
                                                             isLoading={queueActionKey === `remove-${index}`}
                                                         >
-                                                            Remove
+                                                            {text.remove}
                                                         </Button>
                                                     </div>
                                                 </div>
@@ -580,14 +675,14 @@ export const MusicWidget = ({ className = "", nowPlaying, guildId }: { className
                                                         setDragOverIndex(null);
                                                     }}
                                                 >
-                                                    Drop here to move to end
+                                                    {text.dropToEnd}
                                                 </div>
                                             )}
                                         </div>
                                     ) : (
                                         <div className="flex flex-col items-center justify-center h-full text-default-400 space-y-2">
                                             <MusicNote size={32} />
-                                            <p>Queue is empty</p>
+                                            <p>{text.queueEmpty}</p>
                                         </div>
                                     )}
                                 </ScrollShadow>
@@ -596,12 +691,12 @@ export const MusicWidget = ({ className = "", nowPlaying, guildId }: { className
                         <Tab key="search" title={
                             <div className="flex items-center gap-2">
                                 <MagnifyingGlass size={18} />
-                                <span>Search</span>
+                                <span>{text.searchTab}</span>
                             </div>
                         }>
                             <div className="p-4 space-y-4 min-h-[340px]">
                                 <Input
-                                    placeholder={`Search on ${platformLabel}...`}
+                                    placeholder={formatText(text.searchPlaceholder, { platform: platformLabel })}
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
                                     onKeyDown={(e) => {
@@ -610,7 +705,7 @@ export const MusicWidget = ({ className = "", nowPlaying, guildId }: { className
                                     startContent={<MagnifyingGlass size={18} className="text-default-400" />}
                                     endContent={
                                         <Button size="sm" color="primary" isLoading={searching} onPress={handleSearch}>
-                                            Find
+                                            {text.find}
                                         </Button>
                                     }
                                     variant="bordered"
@@ -667,7 +762,7 @@ export const MusicWidget = ({ className = "", nowPlaying, guildId }: { className
                                                     </div>
                                                     <div className="flex-1 min-w-0">
                                                         <p className="font-semibold text-foreground truncate">{track.title}</p>
-                                                        <p className="text-default-500 text-sm truncate">{track.author || track.uri || 'Unknown artist'}</p>
+                                                        <p className="text-default-500 text-sm truncate">{track.author || track.uri || text.unknownArtist}</p>
                                                         <div className="flex items-center gap-2 text-xs text-default-400 mt-1">
                                                             <span>{formatTime(track.durationMs ?? 0)}</span>
                                                             {track.sourceName && (
@@ -680,11 +775,11 @@ export const MusicWidget = ({ className = "", nowPlaying, guildId }: { className
                                                     <div className="flex flex-col gap-2 items-end">
                                                         {track.encoded && queueAddStatus[track.encoded] === 'added' ? (
                                                             <Button size="sm" color="success" variant="flat" isDisabled>
-                                                                Added
+                                                                {text.added}
                                                             </Button>
                                                         ) : track.encoded && queueAddStatus[track.encoded] === 'failed' ? (
                                                             <Button size="sm" color="danger" variant="flat" isDisabled>
-                                                                Failed
+                                                                {text.failed}
                                                             </Button>
                                                         ) : (
                                                             <Button
@@ -694,7 +789,7 @@ export const MusicWidget = ({ className = "", nowPlaying, guildId }: { className
                                                                 isLoading={addingTrackId === track.encoded}
                                                                 onPress={() => handleQueueTrack(track)}
                                                             >
-                                                                Add to queue
+                                                                {text.add}
                                                             </Button>
                                                         )}
                                                         <Button
@@ -706,7 +801,7 @@ export const MusicWidget = ({ className = "", nowPlaying, guildId }: { className
                                                             variant="light"
                                                             isDisabled={!track.uri}
                                                         >
-                                                            Open
+                                                            {text.open}
                                                         </Button>
                                                     </div>
                                                 </div>
@@ -714,7 +809,7 @@ export const MusicWidget = ({ className = "", nowPlaying, guildId }: { className
                                         </div>
                                     ) : (
                                         <div className="text-center text-default-400 text-sm mt-8">
-                                            Type a query to search on YouTube, Spotify, or SoundCloud
+                                            {text.searchHint}
                                         </div>
                                     )}
                                 </ScrollShadow>
