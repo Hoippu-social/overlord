@@ -134,3 +134,79 @@ model MusicNowPlaying {
   updatedAt   DateTime @updatedAt
   createdAt   DateTime @default(now())
 }
+
+model MessageEvent {
+  id            Int      @id @default(autoincrement())
+  guildId       String
+  channelId     String
+  messageId     String
+  authorId      String?
+  eventType     String   // DELETE or EDIT
+  isBot         Boolean  @default(false)
+  contentBefore String?
+  contentAfter  String?
+  attachmentsBefore String? // JSON string
+  attachmentsAfter  String? // JSON string
+  createdAt     DateTime @default(now())
+
+  @@index([guildId, channelId, createdAt])
+  @@index([guildId, authorId, createdAt])
+}
+
+model AuditLogEvent {
+  id        Int      @id @default(autoincrement())
+  guildId   String
+  tag       String
+  actorId   String?
+  targetId  String?
+  channelId String?
+  messageId String?
+  payload   String?  // JSON string
+  severity  String?  // INFO/WARN/ERROR
+  createdAt DateTime @default(now())
+
+  @@index([guildId, tag, createdAt])
+}
+
+model AuditTagRoute {
+  id        Int      @id @default(autoincrement())
+  guildId   String
+  tag       String
+  channelId String
+  enabled   Boolean  @default(true)
+  template  String?
+  mentions  String?  // JSON string
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([guildId, tag])
+}
+
+model InviteSnapshot {
+  id        Int      @id @default(autoincrement())
+  guildId   String
+  code      String
+  inviterId String?
+  uses      Int      @default(0)
+  maxUses   Int?
+  expiresAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([guildId, code])
+}
+
+model InviteUseEvent {
+  id              Int      @id @default(autoincrement())
+  guildId         String
+  memberId        String
+  inviterId       String?
+  code            String?
+  joinedAt        DateTime @default(now())
+  leftAt          DateTime?
+  stayDurationSec Int?
+  voiceDurationSec Int?
+  createdAt       DateTime @default(now())
+
+  @@index([guildId, memberId])
+}

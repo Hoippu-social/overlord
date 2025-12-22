@@ -200,184 +200,244 @@ export default function SettingsPage({ params }: { params: Promise<{ guildId: st
     const pingState = getPingState(stats.ping);
 
     return (
-        <div className="space-y-6">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div className="space-y-8 animate-fade-in">
+            {/* Header */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                 <div>
-                    <h1 className="text-3xl font-bold">{text.title}</h1>
-                    <p className="text-default-500">{text.subtitle}</p>
+                    <h1 className="text-4xl font-extrabold tracking-tight bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent mb-2">
+                        {text.title}
+                    </h1>
+                    <p className="text-default-400 text-lg">{text.subtitle}</p>
                 </div>
-                <Chip
-                    color={getStatusColor()}
-                    variant="flat"
-                    startContent={getStatusIcon()}
-                    size="lg"
-                    className="capitalize"
-                >
-                    {stats.botStatus === 'ONLINE'
-                        ? text.statusOnline
-                        : stats.botStatus === 'OFFLINE'
-                            ? text.statusOffline
-                            : text.statusPartial}
-                </Chip>
+
+                <div className={`
+                    h-12 px-5 rounded-2xl flex items-center gap-3 border border-white/5 shadow-2xl backdrop-blur-md
+                    ${stats.botStatus === 'ONLINE' ? 'bg-emerald-500/10 text-emerald-400' :
+                        stats.botStatus === 'OFFLINE' ? 'bg-rose-500/10 text-rose-400' : 'bg-amber-500/10 text-amber-400'}
+                `}>
+                    <div className="relative flex items-center justify-center">
+                        <div className={`absolute w-3 h-3 rounded-full animate-ping ${stats.botStatus === 'ONLINE' ? 'bg-emerald-500' :
+                                stats.botStatus === 'OFFLINE' ? 'bg-rose-500' : 'bg-amber-500'
+                            } opacity-75`} />
+                        <div className={`relative w-2.5 h-2.5 rounded-full ${stats.botStatus === 'ONLINE' ? 'bg-emerald-500' :
+                                stats.botStatus === 'OFFLINE' ? 'bg-rose-500' : 'bg-amber-500'
+                            }`} />
+                    </div>
+                    <span className="font-bold text-sm uppercase tracking-wider">
+                        {stats.botStatus === 'ONLINE' ? text.statusOnline : stats.botStatus === 'OFFLINE' ? text.statusOffline : text.statusPartial}
+                    </span>
+                </div>
             </div>
 
-            <Card className="bg-surface border border-divider">
-                <CardBody className="p-6">
-                    <h3 className="text-xl font-bold mb-4">{text.botControl}</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Control Panel */}
+            <Card className="bg-[#181A20] border border-white/5 shadow-2xl rounded-[32px] overflow-visible">
+                <CardBody className="p-8">
+                    <div className="flex items-center gap-3 mb-6">
+                        <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-default-400">
+                            <Cpu size={22} weight="fill" />
+                        </div>
+                        <h3 className="text-xl font-bold text-white">{text.botControl}</h3>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <Button
-                            color={stats.botStatus === 'OFFLINE' ? 'success' : 'danger'}
-                            size="lg"
-                            startContent={<Power size={20} />}
+                            className={`h-24 text-lg font-bold rounded-[24px] border border-white/5 shadow-lg relative overflow-hidden group transition-all duration-300 ${stats.botStatus === 'OFFLINE'
+                                    ? 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 hover:scale-[1.02] hover:shadow-emerald-500/10'
+                                    : 'bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 hover:scale-[1.02] hover:shadow-rose-500/10'
+                                }`}
                             onPress={() => handleAction(stats.botStatus === 'OFFLINE' ? 'start' : 'stop')}
                             isLoading={loading}
-                            className="h-16 font-semibold text-lg shadow-lg"
                         >
-                            {stats.botStatus === 'OFFLINE' ? text.startBot : text.stopBot}
+                            <div className={`absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-gradient-to-br ${stats.botStatus === 'OFFLINE' ? 'from-emerald-500/20 via-transparent to-transparent' : 'from-rose-500/20 via-transparent to-transparent'
+                                }`} />
+                            <div className="flex flex-col items-center gap-2 relative z-10">
+                                <Power size={32} weight="fill" />
+                                <span>{stats.botStatus === 'OFFLINE' ? text.startBot : text.stopBot}</span>
+                            </div>
                         </Button>
+
                         <Button
-                            color="warning"
-                            variant="flat"
-                            size="lg"
-                            startContent={<ArrowClockwise size={20} />}
+                            className="h-24 text-lg font-bold rounded-[24px] bg-amber-500/10 text-amber-400 border border-white/5 shadow-lg relative overflow-hidden group transition-all duration-300 hover:bg-amber-500/20 hover:scale-[1.02] hover:shadow-amber-500/10"
                             onPress={() => handleAction('restart')}
                             isLoading={loading}
                             isDisabled={stats.botStatus === 'OFFLINE'}
-                            className="h-16 font-semibold text-lg"
                         >
-                            {text.reboot}
+                            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-gradient-to-br from-amber-500/20 via-transparent to-transparent" />
+                            <div className="flex flex-col items-center gap-2 relative z-10">
+                                <ArrowClockwise size={32} weight="fill" className="group-hover:rotate-180 transition-transform duration-500" />
+                                <span>{text.reboot}</span>
+                            </div>
                         </Button>
+
                         <Button
-                            color="danger"
-                            variant="bordered"
-                            size="lg"
-                            startContent={<StopCircle size={20} />}
+                            className="h-24 text-lg font-bold rounded-[24px] bg-white/[0.03] text-default-400 border border-white/5 shadow-lg relative overflow-hidden group transition-all duration-300 hover:bg-white/[0.06] hover:text-white"
                             onPress={() => handleAction('kill')}
                             isLoading={loading}
                             isDisabled={stats.botStatus === 'OFFLINE'}
-                            className="h-16 font-semibold text-lg"
                         >
-                            {text.forceStop}
+                            <div className="flex flex-col items-center gap-2 relative z-10">
+                                <StopCircle size={32} weight="fill" />
+                                <span>{text.forceStop}</span>
+                            </div>
                         </Button>
                     </div>
 
-                    <Divider className="my-6" />
+                    <Divider className="my-8 bg-white/5" />
 
-                    <div className="space-y-3">
-                        <h4 className="text-sm font-semibold text-default-500">{text.moduleStatus}</h4>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                            <div className="flex items-center justify-between p-3 rounded-xl bg-default-50 border border-default-100">
-                                <span className="text-sm font-medium">{text.discordBot}</span>
-                                <Chip size="sm" color={stats.modules.discord ? 'success' : 'danger'} variant="flat" classNames={{ content: "font-semibold" }}>
-                                    {stats.modules.discord ? text.running : text.stopped}
-                                </Chip>
-                            </div>
-                            <div className="flex items-center justify-between p-3 rounded-xl bg-default-50 border border-default-100">
-                                <span className="text-sm font-medium">{text.lavalink}</span>
-                                <Chip size="sm" color={stats.modules.lavalink ? 'success' : 'danger'} variant="flat" classNames={{ content: "font-semibold" }}>
-                                    {stats.modules.lavalink ? text.running : text.stopped}
-                                </Chip>
-                            </div>
-                            <div className="flex items-center justify-between p-3 rounded-xl bg-default-50 border border-default-100">
-                                <span className="text-sm font-medium">{text.database}</span>
-                                <Chip size="sm" color={stats.modules.database ? 'success' : 'danger'} variant="flat" classNames={{ content: "font-semibold" }}>
-                                    {stats.modules.database ? text.connected : text.disconnected}
-                                </Chip>
-                            </div>
+                    <div>
+                        <h4 className="text-sm font-bold text-default-400 uppercase tracking-wider mb-4">{text.moduleStatus}</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            {[
+                                { label: text.discordBot, active: stats.modules.discord, icon: <Cpu weight="fill" /> },
+                                { label: text.lavalink, active: stats.modules.lavalink, icon: <Pulse weight="fill" /> },
+                                { label: text.database, active: stats.modules.database, activeLabel: text.connected, inactiveLabel: text.disconnected, icon: <HardDrives weight="fill" /> }
+                            ].map((mod, i) => (
+                                <div key={i} className="flex items-center justify-between p-4 rounded-[20px] bg-white/[0.02] border border-white/5">
+                                    <div className="flex items-center gap-3">
+                                        <div className={`p-2 rounded-lg ${mod.active ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
+                                            {React.cloneElement(mod.icon as React.ReactElement, { size: 20 })}
+                                        </div>
+                                        <span className="font-bold text-default-200">{mod.label}</span>
+                                    </div>
+                                    <Chip
+                                        size="sm"
+                                        classNames={{
+                                            base: `border-none ${mod.active ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}`,
+                                            content: "font-bold"
+                                        }}
+                                        variant="flat"
+                                    >
+                                        {mod.active ? (mod.activeLabel || text.running) : (mod.inactiveLabel || text.stopped)}
+                                    </Chip>
+                                </div>
+                            ))}
                         </div>
                     </div>
                 </CardBody>
             </Card>
 
+            {/* Metrics Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <Card className="bg-surface border border-divider">
+                {[
+                    {
+                        title: text.cpuUsage,
+                        value: `${stats.cpu}%`,
+                        subval: stats.cpu > 80 ? text.cpuHigh : text.cpuNormal,
+                        color: stats.cpu > 80 ? 'text-rose-400' : 'text-emerald-400',
+                        progress: stats.cpu,
+                        progressColor: "primary",
+                        icon: <Cpu weight="fill" size={24} />
+                    },
+                    {
+                        title: text.ramUsage,
+                        value: `${stats.memory} MB`,
+                        subval: stats.totalMemory ? `/ ${stats.totalMemory} MB` : '',
+                        color: isMemoryHigh ? 'text-rose-400' : 'text-emerald-400',
+                        progress: memoryPercent,
+                        progressColor: "secondary",
+                        icon: <HardDrives weight="fill" size={24} />
+                    },
+                    {
+                        title: text.uptime,
+                        value: stats.uptime,
+                        subval: text.sinceRestart,
+                        color: 'text-white',
+                        progress: 100, // Static full bar looks nice as an "always on" indicator
+                        progressColor: "default",
+                        icon: <ArrowClockwise weight="fill" size={24} />
+                    },
+                    {
+                        title: text.ping,
+                        value: stats.ping !== null ? `${stats.ping}ms` : text.pingNoData,
+                        subval: pingState.label,
+                        color: pingState.className,
+                        progress: stats.ping ? Math.min(100, (stats.ping / 500) * 100) : 0,
+                        progressColor: "warning",
+                        icon: <Pulse weight="fill" size={24} />
+                    }
+                ].map((item, i) => (
+                    <Card key={i} className="bg-[#181A20] border border-white/5 shadow-xl rounded-[28px] group hover:border-white/10 transition-colors">
+                        <CardBody className="p-6">
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="p-2.5 bg-white/5 rounded-xl text-white group-hover:scale-110 transition-transform">
+                                    {item.icon}
+                                </div>
+                                <span className="text-default-400 font-bold text-sm tracking-wide">{item.title}</span>
+                            </div>
+
+                            <div className="flex items-baseline gap-2 mb-4">
+                                <span className="text-3xl font-extrabold text-white tracking-tight">{item.value}</span>
+                                <span className={`text-xs font-bold uppercase ${item.color.replace('text-white', 'text-default-500')}`}>
+                                    {item.subval}
+                                </span>
+                            </div>
+
+                            <Progress
+                                value={item.progress}
+                                color={item.progressColor as any}
+                                size="sm"
+                                radius="full"
+                                classNames={{ indicator: "bg-gradient-to-r from-current to-white/50" }}
+                            />
+                        </CardBody>
+                    </Card>
+                ))}
+            </div>
+
+            {/* Charts Row */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <Card className="bg-[#181A20] border border-white/5 shadow-xl rounded-[32px] p-2">
                     <CardBody className="p-6">
-                        <div className="flex items-center gap-3 mb-2">
-                            <div className="p-2 bg-primary/10 rounded-lg text-primary"><Cpu size={24} weight="fill" /></div>
-                            <span className="text-default-500 font-medium">{text.cpuUsage}</span>
+                        <div className="flex items-center gap-3 mb-6">
+                            <div className="w-2 h-8 rounded-full bg-primary" />
+                            <h4 className="text-lg font-bold text-white">CPU History</h4>
                         </div>
-                        <div className="flex items-end gap-2">
-                            <span className="text-3xl font-bold">{stats.cpu}%</span>
-                            <span className={`text-sm mb-1 font-medium ${stats.cpu > 80 ? 'text-danger' : 'text-success'}`}>
-                                {stats.cpu > 80 ? text.cpuHigh : text.cpuNormal}
-                            </span>
+                        <div className="h-[250px] w-full">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <AreaChart data={cpuHistory}>
+                                    <defs>
+                                        <linearGradient id="colorCpu" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor="#8B5CF6" stopOpacity={0.3} />
+                                            <stop offset="95%" stopColor="#8B5CF6" stopOpacity={0} />
+                                        </linearGradient>
+                                    </defs>
+                                    <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.05} stroke="#fff" vertical={false} />
+                                    <XAxis dataKey="time" tick={{ fill: '#52525b', fontSize: 10 }} axisLine={false} tickLine={false} dy={10} />
+                                    <YAxis tick={{ fill: '#52525b', fontSize: 10 }} axisLine={false} tickLine={false} dx={-10} />
+                                    <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#8B5CF6', strokeWidth: 1, strokeDasharray: '4 4' }} />
+                                    <Area type="monotone" dataKey="value" name="CPU" stroke="#8B5CF6" strokeWidth={3} fill="url(#colorCpu)" />
+                                </AreaChart>
+                            </ResponsiveContainer>
                         </div>
-                        <Progress value={stats.cpu} color="primary" className="mt-3" size="sm" />
                     </CardBody>
                 </Card>
 
-                <Card className="bg-surface border border-divider">
+                <Card className="bg-[#181A20] border border-white/5 shadow-xl rounded-[32px] p-2">
                     <CardBody className="p-6">
-                        <div className="flex items-center gap-3 mb-2">
-                            <div className="p-2 bg-secondary/10 rounded-lg text-secondary"><HardDrives size={24} weight="fill" /></div>
-                            <span className="text-default-500 font-medium">{text.ramUsage}</span>
+                        <div className="flex items-center gap-3 mb-6">
+                            <div className="w-2 h-8 rounded-full bg-emerald-500" />
+                            <h4 className="text-lg font-bold text-white">RAM History</h4>
                         </div>
-                        <div className="flex items-end gap-2">
-                            <span className="text-3xl font-bold">{stats.memory} MB</span>
-                            {stats.totalMemory && (
-                                <span className="text-default-400 text-sm mb-1">/ {stats.totalMemory} MB</span>
-                            )}
-                            <span className={`text-sm mb-1 font-medium ${isMemoryHigh ? 'text-danger' : 'text-success'}`}>
-                                {isMemoryHigh ? text.memoryHigh : text.memoryNormal}
-                            </span>
+                        <div className="h-[250px] w-full">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <AreaChart data={memHistory}>
+                                    <defs>
+                                        <linearGradient id="colorMem" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor="#10B981" stopOpacity={0.3} />
+                                            <stop offset="95%" stopColor="#10B981" stopOpacity={0} />
+                                        </linearGradient>
+                                    </defs>
+                                    <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.05} stroke="#fff" vertical={false} />
+                                    <XAxis dataKey="time" tick={{ fill: '#52525b', fontSize: 10 }} axisLine={false} tickLine={false} dy={10} />
+                                    <YAxis tick={{ fill: '#52525b', fontSize: 10 }} axisLine={false} tickLine={false} dx={-10} />
+                                    <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#10B981', strokeWidth: 1, strokeDasharray: '4 4' }} />
+                                    <Area type="monotone" dataKey="value" name="RAM" stroke="#10B981" strokeWidth={3} fill="url(#colorMem)" />
+                                </AreaChart>
+                            </ResponsiveContainer>
                         </div>
-                        <Progress value={memoryPercent} color="secondary" className="mt-3" size="sm" />
-                    </CardBody>
-                </Card>
-
-                <Card className="bg-surface border border-divider">
-                    <CardBody className="p-6">
-                        <div className="flex items-center gap-3 mb-2">
-                            <div className="p-2 bg-success/10 rounded-lg text-success"><Pulse size={24} weight="fill" /></div>
-                            <span className="text-default-500 font-medium">{text.uptime}</span>
-                        </div>
-                        <div className="flex items-end gap-2">
-                            <span className="text-3xl font-bold">{stats.uptime}</span>
-                        </div>
-                        <div className="text-xs text-default-400 mt-3">{text.sinceRestart}</div>
-                    </CardBody>
-                </Card>
-
-                <Card className="bg-surface border border-divider">
-                    <CardBody className="p-6">
-                        <div className="flex items-center gap-3 mb-2">
-                            <div className="p-2 bg-warning/10 rounded-lg text-warning"><Pulse size={24} weight="fill" /></div>
-                            <span className="text-default-500 font-medium">{text.ping}</span>
-                        </div>
-                        <div className="flex items-end gap-2">
-                            <span className="text-3xl font-bold">
-                                {stats.ping ?? text.pingNoData}{stats.ping !== null && stats.ping !== undefined ? 'ms' : ''}
-                            </span>
-                            <span className={`text-sm mb-1 font-medium ${pingState.className}`}>{pingState.label}</span>
-                        </div>
-                        <div className="text-xs text-default-400 mt-3">{text.ping}</div>
                     </CardBody>
                 </Card>
             </div>
-
-            <Card className="bg-surface border border-divider p-4">
-                <ResponsiveContainer width="100%" height={240}>
-                    <AreaChart data={cpuHistory}>
-                        <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.1} />
-                        <XAxis dataKey="time" tick={{ fill: 'var(--foreground)' }} />
-                        <YAxis tick={{ fill: 'var(--foreground)' }} />
-                        <Tooltip content={<CustomTooltip />} />
-                        <Area type="monotone" dataKey="value" name="CPU" stroke="#6366f1" fill="#6366f1" fillOpacity={0.15} />
-                    </AreaChart>
-                </ResponsiveContainer>
-            </Card>
-
-            <Card className="bg-surface border border-divider p-4">
-                <ResponsiveContainer width="100%" height={240}>
-                    <AreaChart data={memHistory}>
-                        <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.1} />
-                        <XAxis dataKey="time" tick={{ fill: 'var(--foreground)' }} />
-                        <YAxis tick={{ fill: 'var(--foreground)' }} />
-                        <Tooltip content={<CustomTooltip />} />
-                        <Area type="monotone" dataKey="value" name="RAM" stroke="#22c55e" fill="#22c55e" fillOpacity={0.15} />
-                    </AreaChart>
-                </ResponsiveContainer>
-            </Card>
         </div>
     );
 }

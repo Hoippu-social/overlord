@@ -264,32 +264,45 @@ export default function HubPage({ params }: { params: Promise<{ guildId: string 
     };
 
     return (
-        <div className="space-y-6">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div className="space-y-8 animate-fade-in">
+            {/* Header Section */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                 <div>
-                    <h1 className="text-3xl font-bold">{text.pageTitle}</h1>
-                    <p className="text-default-500">{formatText(text.liveData, { server: summary?.guild.name ?? text.na })}</p>
-                    <p className="text-default-400 text-sm">{formatText(text.prefixLabel, { prefix: summary?.guild.prefix ?? text.prefixNotSet })}</p>
+                    <h1 className="text-4xl font-extrabold tracking-tight bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent mb-2">
+                        {text.pageTitle}
+                    </h1>
+                    <div className="flex items-center gap-3 text-default-400">
+                        <span className="font-medium text-lg">{summary?.guild.name ?? text.na}</span>
+                        <div className="w-1 h-1 rounded-full bg-default-400/50" />
+                        <span className="text-default-400/80 font-mono text-sm bg-white/5 px-2 py-0.5 rounded-lg border border-white/5">
+                            {summary?.guild.prefix ?? text.prefixNotSet}
+                        </span>
+                    </div>
                 </div>
 
                 <div className="flex items-center gap-4">
-                    <ButtonGroup size="lg" variant="flat" className="bg-surface-hover/50 rounded-xl p-1 border border-divider">
+                    <ButtonGroup className="bg-[#181A20] border border-white/5 p-1 rounded-2xl shadow-lg">
                         {localeOptions.map((option) => {
                             const isActive = option.key === locale;
                             return (
                                 <Button
                                     key={option.key}
                                     size="sm"
-                                    color={isActive ? "primary" : "default"}
                                     variant={isActive ? "solid" : "light"}
-                                    className={`min-w-unit-8 h-8 px-3 rounded-lg font-medium transition-all ${isActive ? 'shadow-md' : 'hover:bg-default/40'}`}
+                                    color={isActive ? "primary" : "default"}
+                                    className={`min-w-10 h-9 rounded-xl font-bold transition-all ${isActive
+                                            ? 'bg-primary text-white shadow-md'
+                                            : 'text-default-500 hover:text-default-300'
+                                        }`}
                                     onPress={() => setLocale(option.key)}
                                     startContent={
-                                        <img
-                                            src={option.key === 'ru' ? "/icons/free_russia_flag.png" : "/icons/uk_flag.png"}
-                                            className="w-4 h-4 rounded-sm object-contain"
-                                            alt=""
-                                        />
+                                        <div className={`w-5 h-5 rounded-full overflow-hidden border border-white/10 ${isActive ? 'opacity-100' : 'opacity-50'}`}>
+                                            <img
+                                                src={option.key === 'ru' ? "/icons/free_russia_flag.png" : "/icons/uk_flag.png"}
+                                                className="w-full h-full object-cover"
+                                                alt={option.label}
+                                            />
+                                        </div>
                                     }
                                 >
                                     {option.label}
@@ -298,104 +311,147 @@ export default function HubPage({ params }: { params: Promise<{ guildId: string 
                         })}
                     </ButtonGroup>
 
-                    <Link href={`/dashboard/${guildId}/settings`} className="inline-flex">
-                        <Chip
-                            color={getStatusColor(systemStats?.botStatus)}
-                            variant="flat"
-                            startContent={<Pulse size={16} weight="fill" />}
-                            size="lg"
-                            className="capitalize cursor-pointer hover:opacity-90"
-                        >
-                            {systemStats?.botStatus
-                                ? systemStats.botStatus === 'ONLINE'
-                                    ? text.statusOnline
-                                    : systemStats.botStatus === 'OFFLINE'
-                                        ? text.statusOffline
-                                        : text.statusPartial
-                                : text.statusUnknown}
-                        </Chip>
+                    <Link href={`/dashboard/${guildId}/settings`}>
+                        <div className={`
+                            h-11 px-4 rounded-2xl flex items-center gap-3 border border-white/5 shadow-lg transition-all hover:scale-105 active:scale-95
+                            ${systemStats?.botStatus === 'ONLINE' ? 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20' :
+                                systemStats?.botStatus === 'OFFLINE' ? 'bg-rose-500/10 text-rose-400 hover:bg-rose-500/20' : 'bg-amber-500/10 text-amber-400'}
+                        `}>
+                            <div className="relative flex items-center justify-center">
+                                <div className={`absolute w-3 h-3 rounded-full animate-ping ${systemStats?.botStatus === 'ONLINE' ? 'bg-emerald-500' :
+                                        systemStats?.botStatus === 'OFFLINE' ? 'bg-rose-500' : 'bg-amber-500'
+                                    } opacity-75`} />
+                                <div className={`relative w-2 h-2 rounded-full ${systemStats?.botStatus === 'ONLINE' ? 'bg-emerald-500' :
+                                        systemStats?.botStatus === 'OFFLINE' ? 'bg-rose-500' : 'bg-amber-500'
+                                    }`} />
+                            </div>
+                            <span className="font-bold text-sm uppercase tracking-wider">
+                                {systemStats?.botStatus
+                                    ? systemStats.botStatus === 'ONLINE'
+                                        ? text.statusOnline
+                                        : systemStats.botStatus === 'OFFLINE'
+                                            ? text.statusOffline
+                                            : text.statusPartial
+                                    : text.statusUnknown}
+                            </span>
+                        </div>
                     </Link>
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-stretch">
-                <div className="xl:col-span-2 h-full">
-                    <MusicWidget className="h-full" nowPlaying={nowPlaying || undefined} guildId={guildId} />
+            {/* Main Grid */}
+            <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+                {/* Music Widget Area */}
+                <div className="xl:col-span-8 h-full">
+                    <MusicWidget className="h-full rounded-[32px] border-white/5 shadow-2xl bg-[#181A20]" nowPlaying={nowPlaying || undefined} guildId={guildId} />
                 </div>
 
-                <div className="h-full flex flex-col gap-6">
-                    <Card className="bg-surface border border-divider">
-                        <CardBody className="flex flex-row items-center gap-4 p-6">
-                            <div className="p-3 rounded-xl bg-primary/10 text-primary">
-                                <UsersThree size={32} weight="fill" />
-                            </div>
-                            <div className="flex-1">
-                                <p className="text-default-500 text-sm">{text.users}</p>
-                                <h3 className="text-2xl font-bold">{formatCount(totalMembers)}</h3>
-                                <p className="text-default-400 text-xs mt-1">{text.totalMembers}</p>
-                            </div>
-                        </CardBody>
-                    </Card>
+                {/* Stats Column */}
+                <div className="xl:col-span-4 flex flex-col gap-6">
+                    {/* Members Card */}
+                    <div className="bg-[#181A20] rounded-[32px] p-6 border border-white/5 shadow-xl relative overflow-hidden group hover:border-white/10 transition-colors">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-primary/20 blur-[60px] rounded-full translate-x-10 -translate-y-10 group-hover:bg-primary/30 transition-all duration-700" />
 
-                    <Card className="bg-surface border border-divider">
-                        <CardBody className="flex flex-row items-center gap-4 p-6">
-                            <div className="p-3 rounded-xl bg-success/10 text-success">
-                                <UserCircle size={32} weight="fill" />
+                        <div className="flex items-center gap-5 relative z-10">
+                            <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shadow-inner-lg">
+                                <UsersThree size={28} weight="fill" />
                             </div>
                             <div>
-                                <p className="text-default-500 text-sm">{text.online}</p>
-                                <h3 className="text-2xl font-bold">{formatCount(onlineMembers)}</h3>
-                                <p className="text-default-400 text-xs mt-1">{onlineHint}</p>
+                                <p className="text-default-400 text-sm font-medium uppercase tracking-wider mb-0.5">{text.users}</p>
+                                <h3 className="text-3xl font-bold text-white">{formatCount(totalMembers)}</h3>
                             </div>
-                        </CardBody>
-                    </Card>
+                        </div>
+                    </div>
 
-                    <Card className="bg-surface border border-divider flex-1">
-                        <CardHeader className="pb-0 pt-4 px-4 flex-col items-start">
-                            <h4 className="font-bold text-large">{text.syncStatus}</h4>
-                        </CardHeader>
-                        <CardBody className="px-4 py-2 space-y-2">
-                            <div className="flex items-center justify-between text-sm">
-                                <span className="text-default-500">{text.lastSynced}</span>
-                                <span className="text-foreground font-semibold">{formatDate(summary?.lastSyncedAt)}</span>
+                    {/* Online Card */}
+                    <div className="bg-[#181A20] rounded-[32px] p-6 border border-white/5 shadow-xl relative overflow-hidden group hover:border-white/10 transition-colors">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 blur-[60px] rounded-full translate-x-10 -translate-y-10 group-hover:bg-emerald-500/20 transition-all duration-700" />
+
+                        <div className="flex items-center gap-5 relative z-10">
+                            <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-500 shadow-inner-lg">
+                                <UserCircle size={28} weight="fill" />
                             </div>
-                            <div className="flex items-center justify-between text-sm">
-                                <span className="text-default-500">{text.uptime}</span>
-                                <span className="text-foreground font-semibold">{systemStats?.uptime ?? text.na}</span>
+                            <div>
+                                <p className="text-default-400 text-sm font-medium uppercase tracking-wider mb-0.5">{text.online}</p>
+                                <h3 className="text-3xl font-bold text-white">{formatCount(onlineMembers)}</h3>
+                                <p className="text-emerald-500/60 text-xs font-semibold">{onlineHint}</p>
                             </div>
-                            <div className="flex items-center justify-between text-sm">
-                                <span className="text-default-500">{text.ping}</span>
-                                <span className="text-foreground font-semibold">
-                                    {systemStats?.ping ?? text.na}{systemStats?.ping !== null && systemStats?.ping !== undefined ? 'ms' : ''}
+                        </div>
+                    </div>
+
+                    {/* System Status Card */}
+                    <div className="bg-[#181A20] rounded-[32px] p-6 border border-white/5 shadow-xl flex-1 flex flex-col">
+                        <h4 className="font-bold text-lg text-white mb-6 flex items-center gap-2">
+                            <Pulse size={20} className="text-default-400" />
+                            {text.syncStatus}
+                        </h4>
+
+                        <div className="space-y-4 flex-1">
+                            <div className="flex items-center justify-between p-3 rounded-2xl bg-white/[0.02] border border-white/[0.02]">
+                                <span className="text-default-500 text-sm font-medium">{text.lastSynced}</span>
+                                <span className="text-white font-mono text-sm bg-white/5 px-2 py-1 rounded-lg">
+                                    {formatDate(summary?.lastSyncedAt).split(' ').map((part, i) => (
+                                        <span key={i} className={i === 0 ? "text-default-300 mr-2" : "text-white font-bold"}>{part}</span>
+                                    ))}
                                 </span>
                             </div>
-                        </CardBody>
-                    </Card>
+
+                            <div className="flex items-center justify-between p-3 rounded-2xl bg-white/[0.02] border border-white/[0.02]">
+                                <span className="text-default-500 text-sm font-medium">{text.uptime}</span>
+                                <span className="text-emerald-400 font-mono text-sm font-bold">
+                                    {systemStats?.uptime ?? text.na}
+                                </span>
+                            </div>
+
+                            <div className="flex items-center justify-between p-3 rounded-2xl bg-white/[0.02] border border-white/[0.02]">
+                                <span className="text-default-500 text-sm font-medium">{text.ping}</span>
+                                <div className="flex items-center gap-2">
+                                    <div className="flex gap-0.5 items-end h-3">
+                                        <div className={`w-1 rounded-sm bg-emerald-500/30 ${!systemStats?.ping || systemStats.ping < 100 ? 'h-full bg-emerald-500' : 'h-1/2'}`} />
+                                        <div className={`w-1 rounded-sm bg-emerald-500/30 ${!systemStats?.ping || systemStats.ping < 50 ? 'h-3/4 bg-emerald-500' : 'h-1/3'}`} />
+                                        <div className={`w-1 rounded-sm bg-emerald-500/30 ${!systemStats?.ping || systemStats.ping < 20 ? 'h-1/2 bg-emerald-500' : 'h-1/4'}`} />
+                                    </div>
+                                    <span className="text-white font-mono text-sm font-bold">
+                                        {systemStats?.ping ?? text.na}
+                                        <span className="text-default-600 text-xs ml-0.5">ms</span>
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <h2 className="text-xl font-bold mt-8 mb-4">{text.modulesTitle}</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {modules.map((mod) => (
-                    <Link key={mod.href} href={mod.href}>
-                        <Card className="h-full bg-surface border border-divider hover:border-primary/50 transition-colors cursor-pointer group">
-                            <CardBody className="p-6 flex flex-col gap-4">
-                                <div
-                                    className="p-3 w-fit rounded-xl bg-default-100 group-hover:bg-primary/10 transition-colors"
-                                >
-                                    <mod.icon size={32} weight="fill" className="text-default-500 group-hover:text-primary transition-colors" />
+            {/* Modules Section */}
+            <div>
+                <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+                    <div className="w-1.5 h-8 rounded-full bg-gradient-to-b from-primary to-primary/20" />
+                    {text.modulesTitle}
+                </h2>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    {modules.map((mod, i) => (
+                        <Link key={mod.href} href={mod.href} className="group h-full">
+                            <div className="bg-[#181A20] h-full rounded-[24px] p-6 border border-white/5 shadow-lg group-hover:scale-[1.02] group-hover:shadow-2xl group-hover:border-white/10 transition-all duration-300 relative overflow-hidden flex flex-col">
+                                {/* Globular Gradient Hover Blob */}
+                                <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 blur-[50px] rounded-full translate-x-12 -translate-y-12 group-hover:bg-primary/20 transition-all duration-500" />
+
+                                <div className="w-14 h-14 rounded-2xl bg-white/5 border border-white/5 flex items-center justify-center text-default-400 group-hover:text-white group-hover:bg-primary group-hover:rotate-6 transition-all duration-300 shadow-inner mb-6 relative z-10">
+                                    <mod.icon size={26} weight="fill" />
                                 </div>
-                                <div>
-                                    <h3 className="text-lg font-bold group-hover:text-primary transition-colors">{mod.label}</h3>
-                                    <p className="text-default-500 text-sm mt-1">{mod.desc}</p>
+
+                                <div className="relative z-10 mb-4">
+                                    <h3 className="text-lg font-bold text-white mb-2 group-hover:text-primary transition-colors">{mod.label}</h3>
+                                    <p className="text-default-500 text-sm leading-relaxed group-hover:text-default-400 transition-colors">{mod.desc}</p>
                                 </div>
-                                <div className="mt-auto pt-4 flex items-center text-sm text-primary font-medium opacity-0 group-hover:opacity-100 transition-opacity transform translate-x-[-10px] group-hover:translate-x-0 duration-300">
-                                    Manage <CaretRight size={16} className="ml-1" />
+
+                                <div className="mt-auto relative z-10 flex items-center text-sm font-bold text-primary opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300">
+                                    Manage <CaretRight size={16} weight="bold" className="ml-1" />
                                 </div>
-                            </CardBody>
-                        </Card>
-                    </Link>
-                ))}
+                            </div>
+                        </Link>
+                    ))}
+                </div>
             </div>
         </div>
     );

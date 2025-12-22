@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Card, CardBody, Button, Input, Switch, Select, SelectItem, SelectedItems, ButtonGroup, Checkbox, Chip, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from "@nextui-org/react";
-import { Keyboard, CheckCircle, Prohibit, ShieldCheck, UserCircle, Translate } from "@phosphor-icons/react";
+import { Card, CardBody, Button, Input, Switch, Select, SelectItem, SelectedItems, ButtonGroup, Checkbox, Chip, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Divider } from "@nextui-org/react";
+import { Keyboard, CheckCircle, Prohibit, ShieldCheck, UserCircle, Translate, ArrowClockwise } from "@phosphor-icons/react";
 import { DEFAULT_LOCALE, LocaleCode, normalizeLocale, useGuildLocale } from "@/lib/i18n";
 
 interface Role {
@@ -328,236 +328,221 @@ export default function ServerSettingsPage({ params }: { params: Promise<{ guild
     };
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-8 animate-fade-in pb-10">
+            {/* Header */}
             <div>
-                <h1 className="text-3xl font-bold">{text.pageTitle}</h1>
-                <p className="text-default-500">{text.pageSubtitle}</p>
+                <h1 className="text-4xl font-extrabold tracking-tight bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent mb-2">
+                    {text.pageTitle}
+                </h1>
+                <p className="text-default-400 text-lg">{text.pageSubtitle}</p>
             </div>
 
             {settingsError && (
-                <Card className="bg-danger-50 border-danger-200 border">
-                    <CardBody className="text-danger text-sm">{settingsError}</CardBody>
+                <Card className="bg-danger-500/10 border-danger-500/20 border shadow-lg rounded-[24px]">
+                    <CardBody className="text-danger-400 font-medium px-6 py-4">{settingsError}</CardBody>
                 </Card>
             )}
 
             {settingsWarning && !settingsError && (
-                <Card className="bg-warning-50 border-warning-200 border">
-                    <CardBody className="text-warning text-sm">{settingsWarning}</CardBody>
+                <Card className="bg-warning-500/10 border-warning-500/20 border shadow-lg rounded-[24px]">
+                    <CardBody className="text-warning-400 font-medium px-6 py-4">{settingsWarning}</CardBody>
                 </Card>
             )}
-            <Card className="bg-surface border border-divider">
-                <CardBody className="p-6 space-y-4">
-                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 bg-primary/10 rounded-lg text-primary">
-                                <Keyboard size={24} weight="fill" />
-                            </div>
-                            <div>
-                                <h3 className="text-xl font-bold">{text.sectionPrefixTitle}</h3>
-                                <p className="text-default-500 text-sm">{text.sectionPrefixDesc}</p>
-                            </div>
-                        </div>
-                        <Switch
-                            isSelected={prefixCommandsEnabled}
-                            onValueChange={setPrefixCommandsEnabled}
-                            color="success"
-                            size="lg"
-                            isDisabled={settingsLoading}
-                        >
-                            {text.switchPrefixLabel}
-                        </Switch>
-                    </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <Input
-                            label={text.prefixLabel}
-                            placeholder="!"
-                            value={prefix}
-                            onValueChange={setPrefix}
-                            maxLength={5}
-                            variant="bordered"
-                            isDisabled={settingsLoading}
-                            description={t('prefixExample', { prefix: prefix.trim() || '!' })}
-                        />
-                        <div className="flex items-center">
-                            <p className="text-sm text-default-500">
-                                {prefixCommandsEnabled
-                                    ? text.prefixEnabled
-                                    : text.prefixDisabled}
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
+
+                {/* 1. General Settings (Prefix + Language) */}
+                <Card className="bg-[#181A20] border border-white/5 shadow-xl rounded-[32px] overflow-visible group hover:border-white/10 transition-colors h-full">
+                    <CardBody className="p-8 space-y-8">
+                        {/* Prefix Section */}
+                        <div className="space-y-6">
+                            <div className="flex items-start justify-between">
+                                <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shadow-inner-lg">
+                                        <Keyboard size={24} weight="fill" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-xl font-bold text-white mb-1">{text.sectionPrefixTitle}</h3>
+                                        <p className="text-default-500 text-sm">{text.sectionPrefixDesc}</p>
+                                    </div>
+                                </div>
+                                <Switch
+                                    isSelected={prefixCommandsEnabled}
+                                    onValueChange={setPrefixCommandsEnabled}
+                                    color="primary"
+                                    size="lg"
+                                    isDisabled={settingsLoading}
+                                    classNames={{ wrapper: "group-data-[selected=true]:bg-primary" }}
+                                />
+                            </div>
+
+                            <div className="bg-[#0A0B0E] rounded-3xl p-2 border border-white/5 focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/50 transition-all">
+                                <Input
+                                    label={text.prefixLabel}
+                                    placeholder="!"
+                                    value={prefix}
+                                    onValueChange={setPrefix}
+                                    maxLength={5}
+                                    classNames={{
+                                        inputWrapper: "bg-transparent shadow-none hover:bg-transparent group-data-[focus=true]:bg-transparent",
+                                        input: "text-2xl font-bold text-center font-mono",
+                                        label: "hidden"
+                                    }}
+                                    isDisabled={settingsLoading}
+                                />
+                            </div>
+                            <p className="text-center text-default-500 text-sm font-medium">
+                                {t('prefixExample', { prefix: prefix.trim() || '!' })}
                             </p>
                         </div>
-                    </div>
-                </CardBody>
-            </Card>
 
-            <Card className="bg-surface border border-divider">
-                <CardBody className="p-6 space-y-4">
-                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 bg-secondary/10 rounded-lg text-secondary">
-                                {channelMode === 'whitelist' ? <CheckCircle size={24} /> : <Prohibit size={24} />}
+                        <Divider className="bg-white/5" />
+
+                        {/* Language Section */}
+                        <div className="space-y-6">
+                            <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 rounded-2xl bg-blue-500/10 flex items-center justify-center text-blue-500 shadow-inner-lg">
+                                    <Translate size={24} weight="fill" />
+                                </div>
+                                <div>
+                                    <h3 className="text-xl font-bold text-white mb-1">{text.languageTitle}</h3>
+                                    <p className="text-default-500 text-sm">{text.languageDesc}</p>
+                                </div>
+                            </div>
+
+                            <Select
+                                aria-label={text.languageLabel}
+                                selectedKeys={new Set([selectedLocale])}
+                                onSelectionChange={(keys) => {
+                                    const [value] = Array.from(keys) as string[];
+                                    if (value === 'ru' || value === 'en') {
+                                        setSelectedLocale(value);
+                                    }
+                                }}
+                                isDisabled={settingsLoading}
+                                classNames={{
+                                    trigger: "bg-[#0A0B0E] border border-white/5 min-h-[64px] rounded-2xl data-[hover=true]:bg-[#0A0B0E] data-[hover=true]:border-white/10 transition-all",
+                                    value: "text-lg font-medium pl-2",
+                                    popoverContent: "bg-[#181A20] border border-white/10 rounded-2xl shadow-2xl",
+                                    listbox: "bg-transparent p-2 gap-1"
+                                }}
+                                renderValue={(items) => items.map(item => {
+                                    const label = item.key === 'ru' ? 'Русский' : 'English';
+                                    const flag = item.key === 'ru' ? "/icons/free_russia_flag.png" : "/icons/uk_flag.png";
+                                    return (
+                                        <div key={item.key} className="flex items-center gap-3">
+                                            <img src={flag} className="w-8 h-8 rounded-lg object-cover" alt="" />
+                                            <span className="text-white">{label}</span>
+                                        </div>
+                                    );
+                                })}
+                            >
+                                <SelectItem key="ru" textValue="Русский" className="rounded-xl data-[hover=true]:bg-white/5">
+                                    <div className="flex items-center gap-3">
+                                        <img src="/icons/free_russia_flag.png" className="w-6 h-6 rounded-md object-cover" alt="RU" />
+                                        <span className="text-base font-medium">Русский</span>
+                                    </div>
+                                </SelectItem>
+                                <SelectItem key="en" textValue="English" className="rounded-xl data-[hover=true]:bg-white/5">
+                                    <div className="flex items-center gap-3">
+                                        <img src="/icons/uk_flag.png" className="w-6 h-6 rounded-md object-cover" alt="EN" />
+                                        <span className="text-base font-medium">English</span>
+                                    </div>
+                                </SelectItem>
+                            </Select>
+                        </div>
+                    </CardBody>
+                </Card>
+
+                {/* 2. Recovery Settings */}
+                <Card className="bg-[#181A20] border border-white/5 shadow-xl rounded-[32px] overflow-visible group hover:border-white/10 transition-colors h-full">
+                    <CardBody className="p-8">
+                        <div className="flex items-center gap-4 mb-8">
+                            <div className="w-12 h-12 rounded-2xl bg-amber-500/10 flex items-center justify-center text-amber-500 shadow-inner-lg group-hover:scale-110 transition-transform duration-500">
+                                <UserCircle size={28} weight="fill" />
                             </div>
                             <div>
-                                <h3 className="text-xl font-bold">{text.sectionChannelsTitle}</h3>
-                                <p className="text-default-500 text-sm">
-                                    {selectedTextChannels.size === 0
-                                        ? text.sectionChannelsDescNone
-                                        : channelMode === 'whitelist'
-                                            ? text.sectionChannelsDescWhitelist
-                                            : text.sectionChannelsDescBlacklist}
-                                </p>
+                                <h3 className="text-xl font-bold text-white mb-1">{text.sectionRejoinTitle}</h3>
+                                <p className="text-default-500 text-sm">{text.sectionRejoinDesc}</p>
                             </div>
                         </div>
-                        <ButtonGroup>
-                            <Button
-                                color={channelMode === 'whitelist' ? 'success' : 'default'}
-                                variant={channelMode === 'whitelist' ? 'solid' : 'bordered'}
-                                onPress={() => setChannelMode('whitelist')}
-                                isDisabled={settingsLoading}
-                            >
-                                {text.whitelist}
-                            </Button>
-                            <Button
-                                color={channelMode === 'blacklist' ? 'danger' : 'default'}
-                                variant={channelMode === 'blacklist' ? 'solid' : 'bordered'}
-                                onPress={() => setChannelMode('blacklist')}
-                                isDisabled={settingsLoading}
-                            >
-                                {text.blacklist}
-                            </Button>
-                        </ButtonGroup>
-                    </div>
 
-                    <Select
-                        items={textChannels}
-                        label={text.selectTextChannelsLabel}
-                        variant="bordered"
-                        isMultiline={true}
-                        selectionMode="multiple"
-                        placeholder={text.selectTextChannelsPlaceholder}
-                        selectedKeys={selectedTextChannels}
-                        onSelectionChange={(keys) => setSelectedTextChannels(keys as Set<string>)}
-                        color="secondary"
-                        isDisabled={settingsLoading}
-                        classNames={{
-                            trigger: "min-h-unit-12 py-2",
-                            value: "text-large",
-                        }}
-                    >
-                        {(channel) => (
-                            <SelectItem key={channel.id} textValue={channel.name || channel.id} className="text-large">
-                                <div className="flex items-center gap-2">
-                                    <span className="text-lg">{channel.name || channel.id}</span>
+                        <div className="grid grid-cols-1 gap-4">
+                            <div className="flex items-center justify-between p-5 rounded-3xl bg-[#0A0B0E] border border-white/5 transition-colors hover:border-white/10 group/item">
+                                <div>
+                                    <p className="font-bold text-white text-lg mb-1">{text.restoreRolesTitle}</p>
+                                    <p className="text-sm text-default-500">{text.restoreRolesDesc}</p>
                                 </div>
-                            </SelectItem>
-                        )}
-                    </Select>
-                </CardBody>
-            </Card>
-
-            <Card className="bg-surface border border-divider">
-                <CardBody className="p-6 space-y-4">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2 bg-primary/10 rounded-lg text-primary">
-                            <Translate size={24} weight="fill" />
-                        </div>
-                        <div>
-                            <h3 className="text-xl font-bold">{text.languageTitle}</h3>
-                            <p className="text-default-500 text-sm">{text.languageDesc}</p>
-                        </div>
-                    </div>
-
-                    <Select
-                        label={text.languageLabel}
-                        variant="bordered"
-                        selectedKeys={new Set([selectedLocale])}
-                        onSelectionChange={(keys) => {
-                            const [value] = Array.from(keys) as string[];
-                            if (value === 'ru' || value === 'en') {
-                                setSelectedLocale(value);
-                            }
-                        }}
-                        isDisabled={settingsLoading}
-                        renderValue={(items) => {
-                            return items.map((item) => (
-                                <div key={item.key} className="flex items-center gap-2">
-                                    <img
-                                        src={item.key === 'ru' ? "/icons/free_russia_flag.png" : "/icons/uk_flag.png"}
-                                        className="w-4 h-4 rounded-sm object-contain"
-                                        alt=""
-                                    />
-                                    <span>{item.data?.textValue || (item.key === 'ru' ? 'Русский' : 'English')}</span>
+                                <Switch
+                                    isSelected={restoreRolesOnRejoin}
+                                    onValueChange={setRestoreRolesOnRejoin}
+                                    color="warning"
+                                    isDisabled={settingsLoading}
+                                    classNames={{ wrapper: "group-data-[selected=true]:bg-amber-500" }}
+                                />
+                            </div>
+                            <div className="flex items-center justify-between p-5 rounded-3xl bg-[#0A0B0E] border border-white/5 transition-colors hover:border-white/10 group/item">
+                                <div>
+                                    <p className="font-bold text-white text-lg mb-1">{text.restoreNicknameTitle}</p>
+                                    <p className="text-sm text-default-500">{text.restoreNicknameDesc}</p>
                                 </div>
-                            ));
-                        }}
-                    >
-                        <SelectItem
-                            key="ru"
-                            textValue="Русский"
-                            startContent={<img src="/icons/free_russia_flag.png" className="w-5 h-5 rounded-sm object-contain" alt="RU" />}
-                        >
-                            Русский
-                        </SelectItem>
-                        <SelectItem
-                            key="en"
-                            textValue="English"
-                            startContent={<img src="/icons/uk_flag.png" className="w-5 h-5 rounded-sm object-contain" alt="EN" />}
-                        >
-                            English
-                        </SelectItem>
-                    </Select>
-                    <p className="text-xs text-default-500">{text.languageNote}</p>
-                </CardBody>
-            </Card>
-
-            <Card className="bg-surface border border-divider">
-                <CardBody className="p-6 space-y-4">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2 bg-success/10 rounded-lg text-success">
-                            <ShieldCheck size={24} weight="fill" />
+                                <Switch
+                                    isSelected={restoreNicknameOnRejoin}
+                                    onValueChange={setRestoreNicknameOnRejoin}
+                                    color="warning"
+                                    isDisabled={settingsLoading}
+                                    classNames={{ wrapper: "group-data-[selected=true]:bg-amber-500" }}
+                                />
+                            </div>
                         </div>
-                        <div>
-                            <h3 className="text-xl font-bold">{text.sectionAdminsTitle}</h3>
-                            <p className="text-default-500 text-sm">{text.sectionAdminsDesc}</p>
-                        </div>
-                    </div>
+                    </CardBody>
+                </Card>
 
-                    <Select
-                        items={roles}
-                        label={text.selectAdminRolesLabel}
-                        variant="bordered"
-                        isMultiline={true}
-                        selectionMode="multiple"
-                        placeholder={text.selectAdminRolesPlaceholder}
-                        selectedKeys={adminRoles}
-                        onSelectionChange={(keys) => setAdminRoles(keys as Set<string>)}
-                        color="secondary"
-                        isDisabled={settingsLoading}
-                        classNames={{
-                            trigger: "min-h-unit-12 py-2",
-                            value: "text-large",
-                            popoverContent: "bg-surface border border-divider",
-                            listbox: "p-1",
-                        }}
-                        listboxProps={{
-                            itemClasses: {
-                                base: "py-2 px-2 min-h-[48px]",
-                            },
-                        }}
-                        renderValue={(items: SelectedItems<Role>) => {
-                            return (
-                                <div className="flex flex-wrap gap-2">
+                {/* 3. Admins Section */}
+                <Card className="bg-[#181A20] border border-white/5 shadow-xl rounded-[32px] overflow-visible group hover:border-white/10 transition-colors h-full">
+                    <CardBody className="p-8">
+                        <div className="flex items-center gap-4 mb-8">
+                            <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-500 shadow-inner-lg group-hover:scale-110 transition-transform duration-500">
+                                <ShieldCheck size={28} weight="fill" />
+                            </div>
+                            <div>
+                                <h3 className="text-xl font-bold text-white mb-1">{text.sectionAdminsTitle}</h3>
+                                <p className="text-default-500 text-sm">{text.sectionAdminsDesc}</p>
+                            </div>
+                        </div>
+
+                        <Select
+                            aria-label={text.selectAdminRolesLabel}
+                            items={roles}
+                            variant="faded"
+                            isMultiline={true}
+                            selectionMode="multiple"
+                            placeholder={text.selectAdminRolesPlaceholder}
+                            selectedKeys={adminRoles}
+                            onSelectionChange={(keys) => setAdminRoles(keys as Set<string>)}
+                            isDisabled={settingsLoading}
+                            classNames={{
+                                trigger: "bg-[#0A0B0E] border border-white/5 min-h-[120px] rounded-2xl data-[hover=true]:bg-[#0A0B0E] data-[hover=true]:border-white/10 transition-all p-4 items-start",
+                                value: "text-lg font-medium",
+                                popoverContent: "bg-[#181A20] border border-white/10 rounded-2xl shadow-2xl",
+                                listbox: "bg-transparent p-2 gap-1",
+                                innerWrapper: "pt-1"
+                            }}
+                            listboxProps={{
+                                itemClasses: { base: "py-2 px-2 min-h-[48px] rounded-xl data-[hover=true]:bg-white/5 text-default-500 data-[selected=true]:bg-white/10" },
+                            }}
+                            renderValue={(items: SelectedItems<Role>) => (
+                                <div className="flex flex-wrap gap-2 w-full">
                                     {items.map((item) => {
                                         const roleColor = item.data?.color && item.data.color !== '#000000' ? item.data.color : '#3f3f46';
-                                        const textColor = getTextColor(roleColor);
                                         return (
                                             <Chip
                                                 key={item.key}
-                                                variant="solid"
-                                                style={{ backgroundColor: roleColor }}
-                                                className={`border-none ${textColor} font-medium`}
+                                                variant="flat"
+                                                style={{ backgroundColor: hexToRgba(roleColor, 0.2), color: roleColor }}
+                                                className="border border-white/5 h-8"
                                             >
-                                                <div className="flex items-center gap-1">
+                                                <div className="flex items-center gap-1.5 font-bold">
                                                     {item.data?.icon && <span>{item.data.icon}</span>}
                                                     <span>{item.data?.name}</span>
                                                 </div>
@@ -565,116 +550,168 @@ export default function ServerSettingsPage({ params }: { params: Promise<{ guild
                                         );
                                     })}
                                 </div>
-                            );
-                        }}
-                    >
-                        {(role) => {
-                            const hasColor = role.color && role.color !== '#000000';
-                            const textBorderColor = hasColor ? role.color : '#a1a1aa';
-                            const bgColor = hasColor ? role.color : '#52525b';
-                            const isSelected = adminRoles.has(role.id);
+                            )}
+                        >
+                            {(role) => {
+                                const hasColor = role.color && role.color !== '#000000';
+                                const textBorderColor = hasColor ? role.color : '#a1a1aa';
+                                const bgColor = hasColor ? role.color : '#52525b';
+                                const isSelected = adminRoles.has(role.id);
 
-                            return (
-                                <SelectItem key={role.id} textValue={role.name} className="data-[hover=true]:bg-default/40">
-                                    <div className="flex items-center gap-3 w-full px-1.5 py-1.5">
-                                        <Checkbox isSelected={isSelected} color="secondary" disableAnimation />
-                                        <div
-                                            className="flex items-center gap-2 px-3 py-1.5 rounded-lg border bg-gradient-to-r from-white/10 to-transparent"
-                                            style={{
-                                                borderColor: textBorderColor,
-                                                backgroundColor: hexToRgba(bgColor, 0.2)
-                                            }}
-                                        >
-                                            {role.icon && <span className="text-lg">{role.icon}</span>}
-                                            <span className="text-lg font-medium" style={{ color: textBorderColor }}>{role.name}</span>
+                                return (
+                                    <SelectItem key={role.id} textValue={role.name}>
+                                        <div className="flex items-center gap-3 w-full">
+                                            <Checkbox isSelected={isSelected} color="success" disableAnimation classNames={{ wrapper: "before:border-white/30" }} />
+                                            <div
+                                                className="flex items-center gap-2 px-3 py-1.5 rounded-lg border bg-gradient-to-r from-white/5 to-transparent flex-1"
+                                                style={{ borderColor: hexToRgba(bgColor, 0.3) }}
+                                            >
+                                                {role.icon && <span className="text-lg">{role.icon}</span>}
+                                                <span className="text-base font-bold" style={{ color: textBorderColor }}>{role.name}</span>
+                                            </div>
                                         </div>
+                                    </SelectItem>
+                                );
+                            }}
+                        </Select>
+                    </CardBody>
+                </Card>
+
+                {/* 4. Channels Section */}
+                <Card className="bg-[#181A20] border border-white/5 shadow-xl rounded-[32px] overflow-visible group hover:border-white/10 transition-colors h-full">
+                    <CardBody className="p-8">
+                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-6 mb-8">
+                            <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 rounded-2xl bg-purple-500/10 flex items-center justify-center text-purple-500 shadow-inner-lg group-hover:scale-110 transition-transform duration-500">
+                                    {channelMode === 'whitelist' ? <CheckCircle size={24} weight="fill" /> : <Prohibit size={24} weight="fill" />}
+                                </div>
+                                <div>
+                                    <h3 className="text-xl font-bold text-white mb-1">{text.sectionChannelsTitle}</h3>
+                                    <p className="text-default-500 text-sm max-w-[200px]">
+                                        {selectedTextChannels.size === 0
+                                            ? text.sectionChannelsDescNone
+                                            : channelMode === 'whitelist'
+                                                ? text.sectionChannelsDescWhitelist
+                                                : text.sectionChannelsDescBlacklist}
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex bg-[#0A0B0E] p-1.5 rounded-2xl border border-white/5">
+                                <Button
+                                    size="sm"
+                                    className={`rounded-xl font-bold transition-all ${channelMode === 'whitelist' ? 'bg-emerald-500/20 text-emerald-400 shadow-lg' : 'bg-transparent text-default-500'}`}
+                                    onPress={() => setChannelMode('whitelist')}
+                                    isDisabled={settingsLoading}
+                                >
+                                    {text.whitelist}
+                                </Button>
+                                <Button
+                                    size="sm"
+                                    className={`rounded-xl font-bold transition-all ${channelMode === 'blacklist' ? 'bg-rose-500/20 text-rose-400 shadow-lg' : 'bg-transparent text-default-500'}`}
+                                    onPress={() => setChannelMode('blacklist')}
+                                    isDisabled={settingsLoading}
+                                >
+                                    {text.blacklist}
+                                </Button>
+                            </div>
+                        </div>
+
+                        <Select
+                            aria-label={text.selectTextChannelsLabel}
+                            items={textChannels}
+                            variant="faded"
+                            isMultiline={true}
+                            selectionMode="multiple"
+                            placeholder={text.selectTextChannelsPlaceholder}
+                            selectedKeys={selectedTextChannels}
+                            onSelectionChange={(keys) => setSelectedTextChannels(keys as Set<string>)}
+                            isDisabled={settingsLoading}
+                            classNames={{
+                                trigger: "bg-[#0A0B0E] border border-white/5 min-h-[120px] rounded-2xl data-[hover=true]:bg-[#0A0B0E] data-[hover=true]:border-white/10 transition-all p-4 items-start",
+                                value: "text-lg font-medium",
+                                popoverContent: "bg-[#181A20] border border-white/10 rounded-2xl shadow-2xl",
+                                listbox: "bg-transparent p-2 gap-1",
+                                innerWrapper: "pt-1"
+                            }}
+                            listboxProps={{
+                                itemClasses: { base: "py-2 px-2 min-h-[48px] rounded-xl data-[hover=true]:bg-white/5 text-default-500 data-[selected=true]:bg-white/10" },
+                            }}
+                            renderValue={(items) => (
+                                <div className="flex flex-wrap gap-2">
+                                    {items.map((item) => (
+                                        <Chip key={item.key} variant="flat" className="bg-white/5 text-default-200 border border-white/5 h-8 pl-1">
+                                            <div className="flex items-center gap-1 font-bold">
+                                                <span className="text-default-400">#</span>
+                                                <span>{item.textValue}</span>
+                                            </div>
+                                        </Chip>
+                                    ))}
+                                </div>
+                            )}
+                        >
+                            {(channel) => (
+                                <SelectItem key={channel.id} textValue={channel.name || channel.id}>
+                                    <div className="flex items-center gap-3">
+                                        <span className="text-default-400 text-lg font-mono">#</span>
+                                        <span className="text-base font-bold text-white">{channel.name || channel.id}</span>
                                     </div>
                                 </SelectItem>
-                            );
-                        }}
-                    </Select>
-                </CardBody>
-            </Card>
-
-            <Card className="bg-surface border border-divider">
-                <CardBody className="p-6 space-y-4">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2 bg-warning/10 rounded-lg text-warning">
-                            <UserCircle size={24} weight="fill" />
-                        </div>
-                        <div>
-                            <h3 className="text-xl font-bold">{text.sectionRejoinTitle}</h3>
-                            <p className="text-default-500 text-sm">{text.sectionRejoinDesc}</p>
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="flex items-center justify-between p-4 rounded-xl bg-default-50 border border-default-100">
-                            <div>
-                                <p className="font-semibold">{text.restoreRolesTitle}</p>
-                                <p className="text-xs text-default-500">{text.restoreRolesDesc}</p>
-                            </div>
-                            <Switch
-                                isSelected={restoreRolesOnRejoin}
-                                onValueChange={setRestoreRolesOnRejoin}
-                                color="warning"
-                                isDisabled={settingsLoading}
-                            />
-                        </div>
-                        <div className="flex items-center justify-between p-4 rounded-xl bg-default-50 border border-default-100">
-                            <div>
-                                <p className="font-semibold">{text.restoreNicknameTitle}</p>
-                                <p className="text-xs text-default-500">{text.restoreNicknameDesc}</p>
-                            </div>
-                            <Switch
-                                isSelected={restoreNicknameOnRejoin}
-                                onValueChange={setRestoreNicknameOnRejoin}
-                                color="warning"
-                                isDisabled={settingsLoading}
-                            />
-                        </div>
-                    </div>
-                </CardBody>
-            </Card>
-
-            <div className="flex gap-3 pt-2">
-                <Button
-                    color="primary"
-                    size="lg"
-                    className="flex-1 font-semibold shadow-lg shadow-primary/20"
-                    onPress={handleSaveSettings}
-                    isLoading={isSaving}
-                    isDisabled={!isDirty || settingsLoading}
-                >
-                    {isSaving ? text.saving : text.saveSettings}
-                </Button>
-                <Button
-                    variant="flat"
-                    size="lg"
-                    className="font-semibold"
-                    onPress={handleResetSettings}
-                    isDisabled={settingsLoading}
-                >
-                    {text.resetDefaults}
-                </Button>
+                            )}
+                        </Select>
+                    </CardBody>
+                </Card>
             </div>
 
-            <Modal isOpen={!!syncPromptLocale} onClose={() => setSyncPromptLocale(null)} backdrop="blur">
+            {/* Floating Action Bar */}
+            <div className="sticky bottom-6 z-20 flex justify-center w-full">
+                <div className="bg-[#181A20]/80 backdrop-blur-xl border border-white/10 shadow-2xl rounded-[24px] p-2 flex gap-3 w-full max-w-2xl transform transition-all duration-300 hover:scale-[1.01] hover:bg-[#181A20]/90">
+                    <Button
+                        color="primary"
+                        size="lg"
+                        className="flex-1 h-14 rounded-2xl font-bold text-lg shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all duration-300"
+                        onPress={handleSaveSettings}
+                        isLoading={isSaving}
+                        isDisabled={!isDirty || settingsLoading}
+                        startContent={!isSaving && <CheckCircle size={24} weight="fill" />}
+                    >
+                        {isSaving ? text.saving : text.saveSettings}
+                    </Button>
+                    <Button
+                        variant="bordered"
+                        size="lg"
+                        className="h-14 w-14 min-w-14 rounded-2xl border-white/10 text-default-500 hover:text-white hover:bg-white/5 hover:border-white/20"
+                        onPress={handleResetSettings}
+                        isDisabled={settingsLoading}
+                        isIconOnly
+                        aria-label={text.resetDefaults}
+                    >
+                        <ArrowClockwise size={24} weight="bold" />
+                    </Button>
+                </div>
+            </div>
+
+            <Modal isOpen={!!syncPromptLocale} onClose={() => setSyncPromptLocale(null)} backdrop="blur" classNames={{
+                base: "bg-[#181A20] border border-white/10 shadow-2xl rounded-[32px]",
+                header: "border-b border-white/5 pb-4",
+                footer: "border-t border-white/5 pt-4",
+                closeButton: "hover:bg-white/5 active:bg-white/10 rounded-full",
+            }}>
                 <ModalContent>
                     {(onClose) => {
                         const promptLocaleLabel = syncPromptLocale === 'ru' ? 'Русский' : 'English';
                         return (
                             <>
-                                <ModalHeader className="flex flex-col gap-1">{text.languageSyncPromptTitle}</ModalHeader>
-                                <ModalBody>
-                                    <p>{t('languageSyncPromptDesc', { locale: promptLocaleLabel })}</p>
+                                <ModalHeader className="flex flex-col gap-1 text-2xl font-bold text-white">{text.languageSyncPromptTitle}</ModalHeader>
+                                <ModalBody className="py-6">
+                                    <p className="text-lg text-default-400">{t('languageSyncPromptDesc', { locale: promptLocaleLabel })}</p>
                                 </ModalBody>
                                 <ModalFooter>
-                                    <Button color="default" variant="flat" onPress={onClose}>
+                                    <Button color="default" variant="flat" onPress={onClose} className="rounded-xl font-bold h-12">
                                         {text.languageSyncSkip}
                                     </Button>
                                     <Button
                                         color="primary"
+                                        className="rounded-xl font-bold h-12 shadow-lg shadow-primary/20"
                                         onPress={() => {
                                             if (syncPromptLocale) {
                                                 setLocale(syncPromptLocale);
@@ -694,3 +731,4 @@ export default function ServerSettingsPage({ params }: { params: Promise<{ guild
         </div>
     );
 }
+

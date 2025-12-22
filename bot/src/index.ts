@@ -10,6 +10,7 @@ import { loadEvents } from './handlers/eventHandler';
 import { LavalinkManager } from 'lavalink-client';
 import { initializeLavalink } from './utils/LavalinkManager';
 import { reconcileTempVoiceRooms } from './utils/tempVoice';
+import { primeInviteCache } from './utils/inviteTracker';
 import { startDashboardApi } from './utils/dashboardApi';
 import http from 'http';
 
@@ -28,11 +29,14 @@ const client = new Client({
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildVoiceStates,
         GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.MessageContent,
         GatewayIntentBits.GuildMembers,
         GatewayIntentBits.GuildPresences,
+        GatewayIntentBits.GuildInvites,
     ],
     partials: [
         Partials.Channel,
+        Partials.Message,
         Partials.GuildMember,
     ],
     presence: {
@@ -490,6 +494,9 @@ client.once('ready', async () => {
 
     logger.info('Reconciling temp voice rooms...');
     await reconcileTempVoiceRooms(client);
+
+    logger.info('Priming invite cache...');
+    await primeInviteCache(client);
 });
 
 const hasPresenceIntent = client.options.intents.has(GatewayIntentBits.GuildPresences);

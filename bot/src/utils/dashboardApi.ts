@@ -1,6 +1,7 @@
 import http from 'http';
 import { Client } from 'discord.js';
 import logger from './logger';
+import { prisma } from './database';
 
 const PORT = Number.parseInt(process.env.DASHBOARD_API_PORT || '3002', 10);
 const API_KEY = process.env.DASHBOARD_API_KEY || '';
@@ -232,11 +233,151 @@ export function startDashboardApi(client: Client): http.Server {
                 return;
             }
 
+            if (url.pathname === '/api/audit/events') {
+                if (req.method !== 'GET') {
+                    res.writeHead(405);
+                    res.end('Method Not Allowed');
+                    return;
+                }
+
+                const guildId = url.searchParams.get('guildId') || '';
+                if (!guildId) {
+                    res.writeHead(400);
+                    res.end('guildId is required');
+                    return;
+                }
+
+                const tag = url.searchParams.get('tag') || undefined;
+                const limit = Math.min(Number(url.searchParams.get('limit') || 50), 200);
+                const beforeId = Number(url.searchParams.get('beforeId') || 0);
+
+                const where: any = { guildId };
+                if (tag) where.tag = tag;
+                if (beforeId) where.id = { lt: beforeId };
+
+                const rows = await prisma.auditLogEvent.findMany({
+                    where,
+                    orderBy: { id: 'desc' },
+                    take: limit,
+                });
+
+                const data = rows.map((row: any) => ({
+                    ...row,
+                    payload: row.payload ? safeJson(row.payload) : null,
+                }));
+
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ ok: true, events: data }));
+                return;
+            }
+
+            if (url.pathname === '/api/audit/messages') {
+                if (req.method !== 'GET') {
+                    res.writeHead(405);
+                    res.end('Method Not Allowed');
+                    return;
+                }
+
+                const guildId = url.searchParams.get('guildId') || '';
+                if (!guildId) {
+                    res.writeHead(400);
+                    res.end('guildId is required');
+                    return;
+                }
+
+                const eventType = url.searchParams.get('eventType') || undefined;
+                const channelId = url.searchParams.get('channelId') || undefined;
+                const authorId = url.searchParams.get('authorId') || undefined;
+                const limit = Math.min(Number(url.searchParams.get('limit') || 50), 200);
+                const beforeId = Number(url.searchParams.get('beforeId') || 0);
+
+                const where: any = { guildId };
+                if (eventType) where.eventType = eventType;
+                if (channelId) where.channelId = channelId;
+                if (authorId) where.authorId = authorId;
+                if (beforeId) where.id = { lt: beforeId };
+
+                const rows = await prisma.messageEvent.findMany({
+                    where,
+                    orderBy: { id: 'desc' },
+                    take: limit,
+                });
+
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ ok: true, events: rows }));
+                return;
+            }
+
+            if (url.pathname === '/api/audit/routes') {
+                const guildId = url.searchParams.get('guildId') || '';
+                if (!guildId) {
+                    res.writeHead(400);
+                    res.end('guildId is required');
+                    return;
+                }
+
+                if (req.method === 'GET') {
+                    const routes = await prisma.auditTagRoute.findMany({
+                        where: { guildId },
+                        orderBy: { tag: 'asc' },
+                    });
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ ok: true, routes }));
+                    return;
+                }
+
+                if (req.method === 'POST') {
+                    const raw = await readBody(req);
+                    const body = raw ? JSON.parse(raw) : {};
+                    const tag = typeof body.tag === 'string' ? body.tag : '';
+                    const channelId = typeof body.channelId === 'string' ? body.channelId : '';
+                    const enabled = typeof body.enabled === 'boolean' ? body.enabled : true;
+                    const template = typeof body.template === 'string' ? body.template : null;
+                    const mentions = body.mentions ? JSON.stringify(body.mentions) : null;
+
+                    if (!tag || !channelId) {
+                        res.writeHead(400);
+                        res.end('tag and channelId are required');
+                        return;
+                    }
+
+                    const route = await prisma.auditTagRoute.upsert({
+                        where: { guildId_tag: { guildId, tag } },
+                        update: { channelId, enabled, template, mentions },
+                        create: { guildId, tag, channelId, enabled, template, mentions },
+                    });
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ ok: true, route }));
+                    return;
+                }
+
+                if (req.method === 'DELETE') {
+                    const raw = await readBody(req);
+                    const body = raw ? JSON.parse(raw) : {};
+                    const tag = typeof body.tag === 'string' ? body.tag : url.searchParams.get('tag') || '';
+                    if (!tag) {
+                        res.writeHead(400);
+                        res.end('tag is required');
+                        return;
+                    }
+                    await prisma.auditTagRoute.delete({
+                        where: { guildId_tag: { guildId, tag } },
+                    });
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ ok: true }));
+                    return;
+                }
+
+                res.writeHead(405);
+                res.end('Method Not Allowed');
+                return;
+            }
+
             res.writeHead(404);
             res.end('Not Found');
             return;
         } catch (error) {
-            logger.error('[DashboardAPI] Queue error:', error);
+            logger.error('[DashboardAPI] Error:', error);
             res.writeHead(500);
             res.end('Internal Server Error');
         }
@@ -247,4 +388,12 @@ export function startDashboardApi(client: Client): http.Server {
     });
 
     return server;
+}
+
+function safeJson(value: string) {
+    try {
+        return JSON.parse(value);
+    } catch {
+        return value;
+    }
 }

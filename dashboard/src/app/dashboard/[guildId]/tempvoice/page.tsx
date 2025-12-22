@@ -9,11 +9,13 @@ import {
     Select,
     SelectItem,
     Chip,
-    ButtonGroup,
     Divider,
     Spinner,
     Textarea,
-    Tooltip
+    Tooltip,
+    Switch,
+    Tabs,
+    Tab
 } from '@nextui-org/react';
 import {
     ArrowsClockwise,
@@ -25,6 +27,13 @@ import {
     Sparkle,
     TextT,
     UsersThree,
+    MicrophoneStage,
+    SquaresFour,
+    Desktop,
+    MagicWand,
+    ListDashes,
+    FloppyDisk,
+    Warning
 } from '@phosphor-icons/react';
 import { useGuildLocale } from '@/lib/i18n';
 
@@ -55,124 +64,124 @@ type TempVoiceResponse = {
     error?: string;
 };
 
-const limitPresets = [0, 4, 8, 12, 25, 50];
+const limitPresets = [0, 2, 4, 10, 20, 50];
 
 const strings = {
     en: {
         title: 'Temporary Voice',
-        subtitle: 'Configure temporary voice rooms and the control panel for /setupv.',
+        subtitle: 'Automated voice channels that are created on demand.',
         refresh: 'Refresh',
-        sendPanel: 'Send panel',
-        statusConfigured: 'Configured',
-        statusNotConfigured: 'Not configured',
-        channelsTitle: 'Channels & Panel',
-        channelsDesc: 'Create new channels automatically or select existing ones for the temp-voice system.',
-        modeCreate: 'Create new',
-        modeExisting: 'Use existing',
-        labelCategory: 'Category',
-        labelHub: 'Hub (voice)',
-        labelInterface: 'Panel (text)',
+        sendPanel: 'Send Control Panel',
+        sendPanelDesc: 'Post the interface message to the text channel.',
+        statusConfigured: 'System Active',
+        statusNotConfigured: 'Not Configured',
+        channelsTitle: 'Configuration',
+        channelsDesc: 'Setup the structure for your temporary voice system.',
+        modeCreate: 'Auto-Create',
+        modeExisting: 'Manual Link',
+        labelCategory: 'Category Name',
+        labelHub: 'Hub Channel Name',
+        labelInterface: 'Interface Channel Name',
         placeholderCategoryName: 'Temporary Voice',
-        placeholderHubName: 'Join to Create',
-        placeholderInterfaceName: 'temp-voice-control',
-        selectCategory: 'Select a category',
-        selectHub: 'Select a voice channel',
-        selectInterface: 'Select a text channel',
-        statusTitle: 'Status',
-        statusDesc: 'Current temp-voice configuration summary.',
-        statusRooms: 'Active rooms',
-        notSet: 'Not set',
-        nameTemplateLabel: 'Name template',
-        userLimitLabel: 'User limit',
-        roomsTitle: 'Room settings',
-        roomsDesc: 'Set the room name template and member limit for created rooms.',
-        nameTemplateField: 'Room name template',
-        nameTemplatePlaceholder: 'Example: Room {user}',
-        userLimitField: 'User limit',
-        userLimitPlaceholder: '0 = no limit',
-        userLimitHint: '0 means no limit.',
-        save: 'Save settings',
-        delete: 'Delete system',
-        deleteTooltip: 'Deletes the category, channels, and panel created by the system.',
-        dangerTitle: 'Delete system',
-        dangerDesc: 'This will remove the temp-voice setup, channels, and panel. Type DELETE to confirm.',
-        confirmLabel: 'Type to confirm',
+        placeholderHubName: '➕ Join to Create',
+        placeholderInterfaceName: 'temp-voice-controls',
+        selectCategory: 'Select Category',
+        selectHub: 'Select Voice Channel',
+        selectInterface: 'Select Text Channel',
+        statusTitle: 'System Status',
+        statusDesc: 'Live metrics and connection status.',
+        statusRooms: 'Active Rooms',
+        notSet: 'Not configured',
+        nameTemplateLabel: 'Room Template',
+        userLimitLabel: 'User Limit',
+        roomsTitle: 'Room Defaults',
+        roomsDesc: 'Default settings for new temporary rooms.',
+        nameTemplateField: 'Room Name Pattern',
+        nameTemplatePlaceholder: 'e.g. {user}\'s Room',
+        userLimitField: 'Max Users',
+        userLimitPlaceholder: '0 = Unlimited',
+        userLimitHint: 'Set to 0 for unlimited slots.',
+        save: 'Save Changes',
+        delete: 'Tear Down System',
+        deleteTooltip: 'This will delete the configuration and optionally the channels.',
+        dangerTitle: 'Danger Zone',
+        dangerDesc: 'Irreversible actions for system removal.',
+        confirmLabel: 'Type DELETE to confirm',
         confirmPlaceholder: 'DELETE',
-        confirmButton: 'Confirm delete',
-        errorLoad: 'Failed to load temp-voice settings.',
-        errorSave: 'Failed to save settings.',
-        errorSendPanel: 'Failed to send control panel.',
-        errorDelete: 'Failed to delete temp-voice settings.',
-        errorMissingChannels: 'Select the category, hub, and panel channels.',
-        errorMissingPanel: 'Select the category, hub, and panel channels before sending.',
-        errorConfirmDelete: 'Type DELETE to confirm deletion.',
+        confirmButton: 'Delete System',
+        errorLoad: 'Failed to load settings',
+        errorSave: 'Failed to save settings',
+        errorSendPanel: 'Failed to send panel',
+        errorDelete: 'Failed to delete system',
+        errorMissingChannels: 'Please fill in all channel fields',
+        errorMissingPanel: 'Configuration incomplete',
+        errorConfirmDelete: 'Incorrect confirmation text',
         defaultCategoryName: 'Temporary Voice',
         defaultHubName: 'Join to Create',
-        defaultInterfaceName: 'temp-voice-control',
-        defaultNameTemplate: 'Room {user}',
-        noLimit: 'No limit',
+        defaultInterfaceName: 'temp-voice-controls',
+        defaultNameTemplate: '{user}\'s Room',
+        noLimit: 'Unlimited',
+        channelsSection: 'Channel Setup',
+        roomSection: 'Room Logic'
     },
     ru: {
-        title: 'Временные комнаты',
-        subtitle: 'Настройка временных голосовых комнат и панели управления /setupv.',
+        title: 'Временные Комнаты',
+        subtitle: 'Автоматические голосовые каналы, создаваемые по требованию.',
         refresh: 'Обновить',
-        sendPanel: 'Отправить панель',
-        statusConfigured: 'Настроено',
+        sendPanel: 'Отправить Панель',
+        sendPanelDesc: 'Отправить сообщение управления в текстовый канал.',
+        statusConfigured: 'Система активна',
         statusNotConfigured: 'Не настроено',
-        channelsTitle: 'Каналы и панель',
-        channelsDesc: 'Создайте новые каналы автоматически или выберите существующие для системы временных комнат.',
-        modeCreate: 'Создать',
-        modeExisting: 'Использовать существующие',
-        labelCategory: 'Категория',
-        labelHub: 'Хаб (voice)',
-        labelInterface: 'Панель (text)',
-        placeholderCategoryName: 'Временные комнаты',
-        placeholderHubName: 'Войти, чтобы создать',
-        placeholderInterfaceName: 'temp-voice-control',
+        channelsTitle: 'Конфигурация',
+        channelsDesc: 'Настройте структуру системы временных комнат.',
+        modeCreate: 'Авто-создание',
+        modeExisting: 'Ручная привязка',
+        labelCategory: 'Название категории',
+        labelHub: 'Название хаба',
+        labelInterface: 'Название канала управления',
+        placeholderCategoryName: 'Временные каналы',
+        placeholderHubName: '➕ Создать комнату',
+        placeholderInterfaceName: 'управление-комнатами',
         selectCategory: 'Выберите категорию',
         selectHub: 'Выберите голосовой канал',
         selectInterface: 'Выберите текстовый канал',
-        statusTitle: 'Состояние',
-        statusDesc: 'Сводка настроек системы временных комнат.',
+        statusTitle: 'Статус Системы',
+        statusDesc: 'Текущие показатели и проверки.',
         statusRooms: 'Активных комнат',
         notSet: 'Не задано',
-        nameTemplateLabel: 'Шаблон названия',
-        userLimitLabel: 'Лимит пользователей',
-        roomsTitle: 'Параметры комнат',
-        roomsDesc: 'Настройте шаблон названия и лимит участников для создаваемых комнат.',
-        nameTemplateField: 'Шаблон названия комнаты',
-        nameTemplatePlaceholder: 'Например: комната {user}',
-        userLimitField: 'Лимит пользователей',
+        nameTemplateLabel: 'Шаблон имени',
+        userLimitLabel: 'Лимит мест',
+        roomsTitle: 'Настройки Комнат',
+        roomsDesc: 'Параметры по умолчанию для новых комнат.',
+        nameTemplateField: 'Шаблон названия',
+        nameTemplatePlaceholder: 'Например: Комната {user}',
+        userLimitField: 'Макс. пользователей',
         userLimitPlaceholder: '0 = без лимита',
-        userLimitHint: '0 означает без лимита.',
-        save: 'Сохранить',
+        userLimitHint: '0 означает отсутствие ограничений.',
+        save: 'Сохранить изменения',
         delete: 'Удалить систему',
-        deleteTooltip: 'Удалит категорию, каналы и панель, созданные системой.',
-        dangerTitle: 'Удалить систему',
-        dangerDesc: 'Это удалит настройки, каналы и панель. Для подтверждения введите DELETE.',
-        confirmLabel: 'Подтверждение',
+        deleteTooltip: 'Это удалит конфигурацию и созданные каналы.',
+        dangerTitle: 'Опасная Зона',
+        dangerDesc: 'Необратимые действия по удалению системы.',
+        confirmLabel: 'Введите DELETE',
         confirmPlaceholder: 'DELETE',
-        confirmButton: 'Подтвердить удаление',
-        errorLoad: 'Не удалось загрузить настройки временных комнат.',
-        errorSave: 'Не удалось сохранить настройки.',
-        errorSendPanel: 'Не удалось отправить панель управления.',
-        errorDelete: 'Не удалось удалить настройки временных комнат.',
-        errorMissingChannels: 'Выберите категорию, хаб и канал панели.',
-        errorMissingPanel: 'Выберите категорию, хаб и канал панели перед отправкой.',
-        errorConfirmDelete: 'Введите DELETE для подтверждения удаления.',
-        defaultCategoryName: 'Временные комнаты',
-        defaultHubName: 'Войти, чтобы создать',
-        defaultInterfaceName: 'temp-voice-control',
+        confirmButton: 'Удалить систему',
+        errorLoad: 'Ошибка загрузки',
+        errorSave: 'Ошибка сохранения',
+        errorSendPanel: 'Ошибка отправки панели',
+        errorDelete: 'Ошибка удаления',
+        errorMissingChannels: 'Заполните все поля каналов',
+        errorMissingPanel: 'Конфигурация не завершена',
+        errorConfirmDelete: 'Неверный текст подтверждения',
+        defaultCategoryName: 'Временные каналы',
+        defaultHubName: 'Создать комнату',
+        defaultInterfaceName: 'управление-комнатами',
         defaultNameTemplate: 'Комната {user}',
         noLimit: 'Без лимита',
+        channelsSection: 'Настройка Каналов',
+        roomSection: 'Логика Комнат'
     },
 } as const;
-
-const ChannelItem = ({ item }: { item: ChannelOption }) => (
-    <div className="flex items-center gap-2 w-full px-2 py-1.5">
-        <span className="text-base truncate">{item.name || item.id}</span>
-    </div>
-);
 
 export default function TempVoicePage({ params }: { params: Promise<{ guildId: string }> }) {
     const { guildId } = React.use(params);
@@ -200,7 +209,7 @@ export default function TempVoicePage({ params }: { params: Promise<{ guildId: s
         hubChannelId: '',
         interfaceChannelId: '',
         nameTemplate: '',
-        userLimit: '',
+        userLimit: '0',
     });
     const [config, setConfig] = useState<TempVoiceConfig | null>(null);
     const [roomsCount, setRoomsCount] = useState(0);
@@ -242,7 +251,7 @@ export default function TempVoicePage({ params }: { params: Promise<{ guildId: s
             hubChannelId: cfg.hubChannelId || '',
             interfaceChannelId: cfg.interfaceChannelId || '',
             nameTemplate: cfg.nameTemplate || defaults.nameTemplate,
-            userLimit: cfg.userLimit === null || cfg.userLimit === undefined ? '' : String(cfg.userLimit),
+            userLimit: cfg.userLimit === null || cfg.userLimit === undefined ? '0' : String(cfg.userLimit),
         }));
     };
 
@@ -253,9 +262,8 @@ export default function TempVoicePage({ params }: { params: Promise<{ guildId: s
         try {
             const res = await fetch(`/api/guilds/${guildId}/tempvoice`);
             const data: TempVoiceResponse = await res.json();
-            if (!res.ok) {
-                throw new Error(text.errorLoad);
-            }
+            if (!res.ok) throw new Error(text.errorLoad);
+
             setConfig(data.config || null);
             setRoomsCount(data.roomsCount || 0);
             setChannels({
@@ -310,9 +318,7 @@ export default function TempVoicePage({ params }: { params: Promise<{ guildId: s
                 body: JSON.stringify(payload),
             });
             const data = await res.json();
-            if (!res.ok) {
-                throw new Error(text.errorSave);
-            }
+            if (!res.ok) throw new Error(text.errorSave);
 
             setConfig(data.config || null);
             applyConfigToForm(data.config || null);
@@ -351,9 +357,7 @@ export default function TempVoicePage({ params }: { params: Promise<{ guildId: s
             });
 
             const data = await res.json().catch(() => ({}));
-            if (!res.ok) {
-                throw new Error(text.errorSendPanel);
-            }
+            if (!res.ok) throw new Error(text.errorSendPanel);
 
             if (data.config) {
                 setConfig(data.config);
@@ -380,18 +384,11 @@ export default function TempVoicePage({ params }: { params: Promise<{ guildId: s
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ confirm: true }),
             });
-            const data = await res.json();
-            if (!res.ok) {
-                throw new Error(text.errorDelete);
-            }
+            if (!res.ok) throw new Error(text.errorDelete);
+
             setConfig(null);
             setDeleteConfirm('');
-            setForm((prev) => ({
-                ...prev,
-                categoryId: '',
-                hubChannelId: '',
-                interfaceChannelId: '',
-            }));
+            setForm(prev => ({ ...prev, categoryId: '', hubChannelId: '', interfaceChannelId: '' }));
             await fetchData();
         } catch (err: unknown) {
             setError(text.errorDelete);
@@ -402,367 +399,345 @@ export default function TempVoicePage({ params }: { params: Promise<{ guildId: s
 
     const limitLabel = (limit: number) => (limit === 0 ? text.noLimit : `${limit}`);
 
+    // UI HELPER: Shared Input Styles
+    const inputStyles = {
+        inputWrapper: "bg-[#0A0B0E] border border-white/5 data-[hover=true]:border-white/10 group-data-[focus=true]:border-primary/50 transition-colors h-12 rounded-xl",
+        input: "font-medium",
+        label: "hidden"
+    };
+
     return (
-        <div className="space-y-6">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div>
-                    <h1 className="text-3xl font-bold">{text.title}</h1>
-                    <p className="text-default-500">{text.subtitle}</p>
+        <div className="space-y-8 pb-10 animate-fade-in min-h-screen">
+            {/* Header */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex items-center gap-5">
+                    <div className="w-16 h-16 rounded-[24px] bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 flex items-center justify-center text-white shadow-xl border border-white/5">
+                        <MicrophoneStage size={32} weight="fill" className="text-violet-400" />
+                    </div>
+                    <div>
+                        <h1 className="text-4xl font-extrabold tracking-tight bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent">
+                            {text.title}
+                        </h1>
+                        <p className="text-default-500 text-lg">{text.subtitle}</p>
+                    </div>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-3">
                     <Button
-                        variant="flat"
-                        startContent={<ArrowsClockwise size={18} />}
                         onPress={fetchData}
                         isDisabled={loading}
+                        isIconOnly
+                        className="bg-[#181A20] border border-white/5 text-default-500"
                     >
-                        {text.refresh}
+                        <ArrowsClockwise size={20} className={loading ? "animate-spin" : ""} />
                     </Button>
-                    <Button
-                        variant="flat"
-                        onPress={handleSendPanel}
-                        isLoading={sendingPanel}
-                        isDisabled={loading || sendingPanel}
-                    >
-                        {text.sendPanel}
-                    </Button>
-                    <Chip color={config ? 'success' : 'warning'} variant="flat" startContent={<Sparkle size={16} />}>
-                        {config ? text.statusConfigured : text.statusNotConfigured}
-                    </Chip>
+                    {config && (
+                        <Chip
+                            classNames={{
+                                base: "bg-emerald-500/10 border border-emerald-500/20 h-10 px-4",
+                                content: "font-bold text-emerald-500"
+                            }}
+                            startContent={<Sparkle weight="fill" size={18} className="mr-1" />}
+                        >
+                            {text.statusConfigured}
+                        </Chip>
+                    )}
                 </div>
             </div>
 
             {error && (
-                <Card className="bg-danger-50 border-danger-200 border">
-                    <CardBody className="text-danger text-sm">{error}</CardBody>
-                </Card>
+                <div className="bg-rose-500/10 border border-rose-500/20 text-rose-500 p-4 rounded-2xl flex items-center gap-3">
+                    <Warning size={24} weight="fill" />
+                    <p className="font-bold">{error}</p>
+                </div>
             )}
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                <Card className="bg-surface border border-divider lg:col-span-2">
-                    <CardBody className="p-6 space-y-4">
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 rounded-xl bg-primary/10 text-primary">
-                                <Buildings size={24} weight="fill" />
-                            </div>
-                            <div className="flex-1">
-                                <h3 className="text-xl font-bold">{text.channelsTitle}</h3>
-                                <p className="text-default-500 text-sm">{text.channelsDesc}</p>
-                            </div>
-                            <ButtonGroup radius="sm">
-                                <Button
-                                    color={mode === 'create' ? 'primary' : 'default'}
-                                    variant={mode === 'create' ? 'solid' : 'flat'}
-                                    onPress={() => setMode('create')}
-                                >
-                                    {text.modeCreate}
-                                </Button>
-                                <Button
-                                    color={mode === 'existing' ? 'primary' : 'default'}
-                                    variant={mode === 'existing' ? 'solid' : 'flat'}
-                                    onPress={() => setMode('existing')}
-                                >
-                                    {text.modeExisting}
-                                </Button>
-                            </ButtonGroup>
-                        </div>
+            {/* Main Content Grid */}
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
 
-                        <Divider />
+                {/* Column 1: Configuration (Span 2) */}
+                <div className="xl:col-span-2 space-y-6">
+                    <Card className="bg-[#181A20] border border-white/5 shadow-xl rounded-[32px]">
+                        <CardBody className="p-8 space-y-8">
 
-                        {mode === 'create' ? (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <Input
-                                    label={text.labelCategory}
-                                    placeholder={text.placeholderCategoryName}
-                                    value={form.categoryName}
-                                    onChange={(e) => setForm({ ...form, categoryName: e.target.value })}
-                                    variant="bordered"
-                                />
-                                <Input
-                                    label={text.labelHub}
-                                    placeholder={text.placeholderHubName}
-                                    value={form.hubName}
-                                    onChange={(e) => setForm({ ...form, hubName: e.target.value })}
-                                    variant="bordered"
-                                />
-                                <Input
-                                    label={text.labelInterface}
-                                    placeholder={text.placeholderInterfaceName}
-                                    value={form.interfaceName}
-                                    onChange={(e) => setForm({ ...form, interfaceName: e.target.value })}
-                                    variant="bordered"
-                                />
-                            </div>
-                        ) : (
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <Select
-                                    label={text.labelCategory}
-                                    variant="bordered"
-                                    placeholder={text.selectCategory}
-                                    selectedKeys={form.categoryId ? [form.categoryId] : []}
-                                    onSelectionChange={(keys) => {
-                                        const value = Array.from(keys)[0] as string | undefined;
-                                        setForm({ ...form, categoryId: value || '' });
-                                    }}
-                                    items={channels.categories}
-                                    classNames={{
-                                        trigger: "min-h-unit-12 py-2",
-                                        value: "text-large",
-                                        listbox: "p-1 space-y-1",
-                                    }}
-                                    listboxProps={{
-                                        itemClasses: {
-                                            base: "px-2 py-2 min-h-[44px]",
-                                        },
-                                    }}
-                                >
-                                    {(item) => (
-                                        <SelectItem key={item.id} textValue={item.name || item.id} className="text-large">
-                                            <ChannelItem item={item} />
-                                        </SelectItem>
-                                    )}
-                                </Select>
-                                <Select
-                                    label={text.labelHub}
-                                    variant="bordered"
-                                    placeholder={text.selectHub}
-                                    selectedKeys={form.hubChannelId ? [form.hubChannelId] : []}
-                                    onSelectionChange={(keys) => {
-                                        const value = Array.from(keys)[0] as string | undefined;
-                                        setForm({ ...form, hubChannelId: value || '' });
-                                    }}
-                                    items={channels.voice}
-                                    classNames={{
-                                        trigger: "min-h-unit-12 py-2",
-                                        value: "text-large",
-                                        listbox: "p-1 space-y-1",
-                                    }}
-                                    listboxProps={{
-                                        itemClasses: {
-                                            base: "px-2 py-2 min-h-[44px]",
-                                        },
-                                    }}
-                                >
-                                    {(item) => (
-                                        <SelectItem key={item.id} textValue={item.name || item.id} className="text-large">
-                                            <ChannelItem item={item} />
-                                        </SelectItem>
-                                    )}
-                                </Select>
-                                <Select
-                                    label={text.labelInterface}
-                                    variant="bordered"
-                                    placeholder={text.selectInterface}
-                                    selectedKeys={form.interfaceChannelId ? [form.interfaceChannelId] : []}
-                                    onSelectionChange={(keys) => {
-                                        const value = Array.from(keys)[0] as string | undefined;
-                                        setForm({ ...form, interfaceChannelId: value || '' });
-                                    }}
-                                    items={channels.text}
-                                    classNames={{
-                                        trigger: "min-h-unit-12 py-2",
-                                        value: "text-large",
-                                        listbox: "p-1 flex flex-col gap-1",
-                                    }}
-                                    listboxProps={{
-                                        itemClasses: {
-                                            base: "px-2 py-2 min-h-[44px]",
-                                        },
-                                    }}
-                                >
-                                    {(item) => (
-                                        <SelectItem key={item.id} textValue={item.name || item.id} className="text-large">
-                                            <ChannelItem item={item} />
-                                        </SelectItem>
-                                    )}
-                                </Select>
-                            </div>
-                        )}
-                    </CardBody>
-                </Card>
+                            {/* Section 1: Connection Mode */}
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary shadow-inner-lg">
+                                        <MagicWand size={24} weight="fill" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-xl font-bold text-white">{text.channelsTitle}</h3>
+                                        <p className="text-default-500 text-sm">{text.channelsDesc}</p>
+                                    </div>
+                                </div>
 
-                <Card className="bg-surface border border-divider">
-                    <CardBody className="p-6 space-y-4">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 rounded-xl bg-secondary/10 text-secondary">
-                                    <ChatsTeardrop size={24} weight="fill" />
+                                <Tabs
+                                    selectedKey={mode}
+                                    onSelectionChange={(k) => setMode(k as Mode)}
+                                    color="primary"
+                                    radius="lg"
+                                    classNames={{
+                                        tabList: "bg-[#0A0B0E] border border-white/5 p-1",
+                                        cursor: "shadow-lg",
+                                        tabContent: "font-bold group-data-[selected=true]:text-white"
+                                    }}
+                                >
+                                    <Tab key="create" title={text.modeCreate} />
+                                    <Tab key="existing" title={text.modeExisting} />
+                                </Tabs>
+                            </div>
+
+                            <Divider className="bg-white/5" />
+
+                            {/* Section 2: Channel Inputs */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-8">
+                                <div className="space-y-3">
+                                    <label className="text-sm font-bold text-default-500 uppercase tracking-wider flex items-center gap-2">
+                                        <SquaresFour weight="bold" /> {text.labelCategory}
+                                    </label>
+                                    {mode === 'create' ? (
+                                        <Input
+                                            value={form.categoryName}
+                                            onChange={(e) => setForm({ ...form, categoryName: e.target.value })}
+                                            placeholder={text.placeholderCategoryName}
+                                            classNames={inputStyles}
+                                        />
+                                    ) : (
+                                        <Select
+                                            selectedKeys={form.categoryId ? [form.categoryId] : []}
+                                            onSelectionChange={(keys) => setForm({ ...form, categoryId: Array.from(keys)[0] as string || '' })}
+                                            items={channels.categories}
+                                            placeholder={text.selectCategory}
+                                            classNames={{
+                                                trigger: "bg-[#0A0B0E] border border-white/5 h-12 rounded-xl",
+                                                popoverContent: "bg-[#181A20] border border-white/10"
+                                            }}
+                                            renderValue={(items) => items.map(item => <span key={item.key} className="text-white font-medium">{item.textValue}</span>)}
+                                        >
+                                            {(item) => <SelectItem key={item.id} textValue={item.name || item.id} classNames={{ base: "data-[hover=true]:bg-white/5 text-default-400 data-[hover=true]:text-white" }}>{item.name || item.id}</SelectItem>}
+                                        </Select>
+                                    )}
+                                </div>
+
+                                <div className="space-y-3">
+                                    <label className="text-sm font-bold text-default-500 uppercase tracking-wider flex items-center gap-2">
+                                        <MicrophoneStage weight="bold" /> {text.labelHub}
+                                    </label>
+                                    {mode === 'create' ? (
+                                        <Input
+                                            value={form.hubName}
+                                            onChange={(e) => setForm({ ...form, hubName: e.target.value })}
+                                            placeholder={text.placeholderHubName}
+                                            classNames={inputStyles}
+                                        />
+                                    ) : (
+                                        <Select
+                                            selectedKeys={form.hubChannelId ? [form.hubChannelId] : []}
+                                            onSelectionChange={(keys) => setForm({ ...form, hubChannelId: Array.from(keys)[0] as string || '' })}
+                                            items={channels.voice}
+                                            placeholder={text.selectHub}
+                                            classNames={{
+                                                trigger: "bg-[#0A0B0E] border border-white/5 h-12 rounded-xl",
+                                                popoverContent: "bg-[#181A20] border border-white/10"
+                                            }}
+                                            renderValue={(items) => items.map(item => <span key={item.key} className="text-white font-medium">{item.textValue}</span>)}
+                                        >
+                                            {(item) => <SelectItem key={item.id} textValue={item.name || item.id} classNames={{ base: "data-[hover=true]:bg-white/5 text-default-400 data-[hover=true]:text-white" }}>{item.name || item.id}</SelectItem>}
+                                        </Select>
+                                    )}
+                                </div>
+
+                                <div className="space-y-3 md:col-span-2">
+                                    <label className="text-sm font-bold text-default-500 uppercase tracking-wider flex items-center gap-2">
+                                        <Desktop weight="bold" /> {text.labelInterface}
+                                    </label>
+                                    {mode === 'create' ? (
+                                        <Input
+                                            value={form.interfaceName}
+                                            onChange={(e) => setForm({ ...form, interfaceName: e.target.value })}
+                                            placeholder={text.placeholderInterfaceName}
+                                            classNames={inputStyles}
+                                        />
+                                    ) : (
+                                        <Select
+                                            selectedKeys={form.interfaceChannelId ? [form.interfaceChannelId] : []}
+                                            onSelectionChange={(keys) => setForm({ ...form, interfaceChannelId: Array.from(keys)[0] as string || '' })}
+                                            items={channels.text}
+                                            placeholder={text.selectInterface}
+                                            classNames={{
+                                                trigger: "bg-[#0A0B0E] border border-white/5 h-12 rounded-xl",
+                                                popoverContent: "bg-[#181A20] border border-white/10"
+                                            }}
+                                            renderValue={(items) => items.map(item => <span key={item.key} className="text-white font-medium">{item.textValue}</span>)}
+                                        >
+                                            {(item) => <SelectItem key={item.id} textValue={item.name || item.id} classNames={{ base: "data-[hover=true]:bg-white/5 text-default-400 data-[hover=true]:text-white" }}>{item.name || item.id}</SelectItem>}
+                                        </Select>
+                                    )}
+                                </div>
+                            </div>
+                        </CardBody>
+                    </Card>
+
+                    <Card className="bg-[#181A20] border border-white/5 shadow-xl rounded-[32px]">
+                        <CardBody className="p-8 space-y-8">
+                            <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 rounded-xl bg-secondary/10 flex items-center justify-center text-secondary shadow-inner-lg">
+                                    <ListDashes size={24} weight="fill" />
                                 </div>
                                 <div>
-                                    <h3 className="text-xl font-bold">{text.statusTitle}</h3>
-                                    <p className="text-default-500 text-sm">{text.statusDesc}</p>
+                                    <h3 className="text-xl font-bold text-white">{text.roomsTitle}</h3>
+                                    <p className="text-default-500 text-sm">{text.roomsDesc}</p>
                                 </div>
                             </div>
-                            {loading && <Spinner size="sm" color="secondary" />}
-                        </div>
 
-                        <div className="grid grid-cols-2 gap-3">
-                            <StatusChip
-                                label={text.labelCategory}
-                                value={resolveChannelName(config?.categoryId) || text.notSet}
-                                hint={config?.categoryId && !resolveChannelName(config?.categoryId) ? `ID: ${config.categoryId}` : undefined}
-                            />
-                            <StatusChip
-                                label={text.labelHub}
-                                value={resolveChannelName(config?.hubChannelId) || text.notSet}
-                                hint={config?.hubChannelId && !resolveChannelName(config?.hubChannelId) ? `ID: ${config.hubChannelId}` : undefined}
-                            />
-                            <StatusChip
-                                label={text.labelInterface}
-                                value={resolveChannelName(config?.interfaceChannelId) || text.notSet}
-                                hint={config?.interfaceChannelId && !resolveChannelName(config?.interfaceChannelId) ? `ID: ${config.interfaceChannelId}` : undefined}
-                            />
-                            <StatusChip label={text.statusRooms} value={roomsCount.toString()} />
-                        </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                <div className="space-y-3">
+                                    <label className="text-sm font-bold text-default-500 uppercase tracking-wider flex items-center gap-2">
+                                        <TextT weight="bold" /> {text.nameTemplateField}
+                                    </label>
+                                    <Input
+                                        value={form.nameTemplate}
+                                        onChange={(e) => setForm({ ...form, nameTemplate: e.target.value })}
+                                        placeholder={text.nameTemplatePlaceholder}
+                                        classNames={inputStyles}
+                                    />
+                                    <p className="text-xs text-default-600">Variables: <code>{`{user}`}</code>, <code>{`{index}`}</code></p>
+                                </div>
 
-                        <Divider />
-
-                        <div className="space-y-2">
-                            <p className="text-sm text-default-500">{text.nameTemplateLabel}</p>
-                            <Chip color="secondary" variant="flat">{config?.nameTemplate || defaults.nameTemplate}</Chip>
-                            <p className="text-sm text-default-500">{text.userLimitLabel}</p>
-                            <Chip color="secondary" variant="flat">{config?.userLimit ?? text.noLimit}</Chip>
-                        </div>
-                    </CardBody>
-                </Card>
-            </div>
-
-            <Card className="bg-surface border border-divider">
-                <CardBody className="p-6 space-y-4">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2 rounded-xl bg-success/10 text-success">
-                            <UsersFour size={24} weight="fill" />
-                        </div>
-                        <div className="flex-1">
-                            <h3 className="text-xl font-bold">{text.roomsTitle}</h3>
-                            <p className="text-default-500 text-sm">{text.roomsDesc}</p>
-                        </div>
-                    </div>
-
-                    <div className="space-y-5">
-                        <div className="space-y-2">
-                            <FieldLabel icon={<TextT size={18} />} text={text.nameTemplateField} />
-                            <Textarea
-                                minRows={2}
-                                placeholder={text.nameTemplatePlaceholder}
-                                value={form.nameTemplate}
-                                onChange={(e) => setForm({ ...form, nameTemplate: e.target.value })}
-                                variant="bordered"
-                            />
-                        </div>
-
-                        <div className="space-y-3 w-full">
-                            <FieldLabel icon={<UsersThree size={18} />} text={text.userLimitField} />
-                            <Input
-                                type="number"
-                                placeholder={text.userLimitPlaceholder}
-                                value={form.userLimit}
-                                onChange={(e) => setForm({ ...form, userLimit: e.target.value })}
-                                variant="bordered"
-                            />
-
-                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                                {limitPresets.map((limit) => {
-                                    const selected = form.userLimit === String(limit);
-                                    return (
-                                        <Button
-                                            key={limit}
-                                            size="sm"
-                                            fullWidth
-                                            radius="lg"
-                                            variant={selected ? 'solid' : 'bordered'}
-                                            color="primary"
-                                            onPress={() => setForm((prev) => ({ ...prev, userLimit: String(limit) }))}
-                                        >
-                                            {limitLabel(limit)}
-                                        </Button>
-                                    );
-                                })}
+                                <div className="space-y-3">
+                                    <label className="text-sm font-bold text-default-500 uppercase tracking-wider flex items-center gap-2">
+                                        <UsersThree weight="bold" /> {text.userLimitField}
+                                    </label>
+                                    <Input
+                                        type="number"
+                                        value={String(form.userLimit)}
+                                        onChange={(e) => setForm({ ...form, userLimit: e.target.value })}
+                                        classNames={inputStyles}
+                                        endContent={<span className="text-xs text-default-500 font-mono">USERS</span>}
+                                    />
+                                    <div className="flex flex-wrap gap-2">
+                                        {limitPresets.map(limit => (
+                                            <button
+                                                key={limit}
+                                                onClick={() => setForm(prev => ({ ...prev, userLimit: String(limit) }))}
+                                                className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors border ${String(form.userLimit) === String(limit)
+                                                        ? "bg-secondary/20 text-secondary border-secondary/50"
+                                                        : "bg-[#0A0B0E] text-default-500 border-white/5 hover:bg-white/5"
+                                                    }`}
+                                            >
+                                                {limit === 0 ? "∞" : limit}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
                             </div>
-                            <p className="text-xs text-default-500">{text.userLimitHint}</p>
-                        </div>
-                    </div>
+                        </CardBody>
+                    </Card>
 
-                    <Divider />
+                    <Button
+                        size="lg"
+                        color="primary"
+                        onPress={handleSave}
+                        isLoading={saving}
+                        className="w-full h-16 rounded-2xl text-lg font-bold shadow-lg shadow-primary/20"
+                        startContent={!saving && <FloppyDisk size={24} weight="fill" />}
+                    >
+                        {text.save}
+                    </Button>
+                </div>
 
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                        <Button color="primary" onPress={handleSave} isLoading={saving} isDisabled={loading || saving}>
-                            {text.save}
-                        </Button>
-                        <Tooltip content={text.deleteTooltip}>
-                            <Button
-                                color="danger"
-                                variant="flat"
-                                onPress={handleDelete}
-                                isLoading={deleting}
-                                isDisabled={deleting || loading}
-                                startContent={<TrashSimple size={18} />}
-                            >
-                                {text.delete}
-                            </Button>
-                        </Tooltip>
-                    </div>
-                </CardBody>
-            </Card>
+                {/* Column 2: Status & Actions (Span 1) */}
+                <div className="space-y-6">
 
-            <Card className="bg-surface border border-danger/30">
-                <CardBody className="p-6 space-y-4">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2 rounded-xl bg-danger/10 text-danger">
-                            <ShieldCheck size={24} weight="fill" />
-                        </div>
-                        <div className="flex-1">
-                            <h3 className="text-xl font-bold text-danger">{text.dangerTitle}</h3>
-                            <p className="text-default-500 text-sm">{text.dangerDesc}</p>
-                        </div>
-                    </div>
+                    {/* Status Card */}
+                    <Card className="bg-[#181A20] border border-white/5 shadow-xl rounded-[32px]">
+                        <CardBody className="p-6">
+                            <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
+                                <Sparkle weight="fill" className="text-yellow-500" /> {text.statusTitle}
+                            </h3>
 
-                    <div className="flex flex-col md:flex-row gap-3 items-end">
-                        <Input
-                            label={text.confirmLabel}
-                            placeholder={text.confirmPlaceholder}
-                            value={deleteConfirm}
-                            onChange={(e) => setDeleteConfirm(e.target.value)}
-                            variant="bordered"
-                            className="md:flex-1"
-                        />
-                        <Button
-                            color="danger"
-                            variant="solid"
-                            onPress={handleDelete}
-                            isLoading={deleting}
-                            isDisabled={deleting || loading}
-                            startContent={<TrashSimple size={18} />}
-                        >
-                            {text.confirmButton}
-                        </Button>
-                    </div>
-                </CardBody>
-            </Card>
-        </div>
-    );
-}
+                            <div className="space-y-4">
+                                <div className="bg-[#0A0B0E] p-4 rounded-2xl border border-white/5 flex justify-between items-center group">
+                                    <span className="text-default-500 font-medium text-sm">{text.statusRooms}</span>
+                                    <span className="text-2xl font-black text-white group-hover:scale-110 transition-transform">{roomsCount}</span>
+                                </div>
 
-function StatusChip({ label, value, hint }: { label: string; value: string; hint?: string }) {
-    return (
-        <div className="p-3 rounded-lg border border-divider bg-default-50 space-y-1">
-            <p className="text-xs uppercase tracking-wide text-default-500 font-semibold">{label}</p>
-            {hint ? (
-                <Tooltip content={hint} placement="top" delay={300}>
-                    <p className="font-semibold truncate">{value}</p>
-                </Tooltip>
-            ) : (
-                <p className="font-semibold truncate">{value}</p>
-            )}
-        </div>
-    );
-}
+                                <div className="space-y-2">
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-default-500">Hub</span>
+                                        <span className={`font-bold ${config?.hubChannelId ? 'text-emerald-500' : 'text-default-400'}`}>
+                                            {config?.hubChannelId ? 'Linked' : 'Missing'}
+                                        </span>
+                                    </div>
+                                    <div className="h-1.5 w-full bg-[#0A0B0E] rounded-full overflow-hidden">
+                                        <div className={`h-full transition-all ${config?.hubChannelId ? 'bg-emerald-500 w-full' : 'bg-default-800 w-0'}`} />
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-default-500">Interface</span>
+                                        <span className={`font-bold ${config?.interfaceChannelId ? 'text-emerald-500' : 'text-default-400'}`}>
+                                            {config?.interfaceChannelId ? 'Linked' : 'Missing'}
+                                        </span>
+                                    </div>
+                                    <div className="h-1.5 w-full bg-[#0A0B0E] rounded-full overflow-hidden">
+                                        <div className={`h-full transition-all ${config?.interfaceChannelId ? 'bg-emerald-500 w-full' : 'bg-default-800 w-0'}`} />
+                                    </div>
+                                </div>
+                            </div>
+                        </CardBody>
+                    </Card>
 
-function FieldLabel({ icon, text }: { icon: React.ReactNode; text: string }) {
-    return (
-        <div className="flex items-center gap-2 text-sm font-semibold text-default-500">
-            <span className="text-default-400">{icon}</span>
-            <span className="uppercase tracking-wide">{text}</span>
+                    {/* Actions Card */}
+                    {config && (
+                        <Card className="bg-gradient-to-br from-violet-600/10 to-transparent border border-violet-500/20 shadow-xl rounded-[32px]">
+                            <CardBody className="p-6">
+                                <Desktop size={32} weight="fill" className="text-violet-400 mb-4" />
+                                <h3 className="text-lg font-bold text-white mb-2">{text.sendPanel}</h3>
+                                <p className="text-default-500 text-sm mb-4">{text.sendPanelDesc}</p>
+                                <Button
+                                    onPress={handleSendPanel}
+                                    isLoading={sendingPanel}
+                                    className="bg-violet-500 text-white font-bold w-full rounded-xl shadow-lg shadow-violet-500/20"
+                                >
+                                    Send Message
+                                </Button>
+                            </CardBody>
+                        </Card>
+                    )}
+
+                    {/* Danger Zone */}
+                    {config && (
+                        <Card className="bg-rose-950/20 border border-rose-500/20 shadow-xl rounded-[32px]">
+                            <CardBody className="p-6">
+                                <h3 className="text-lg font-bold text-rose-500 mb-2">{text.dangerTitle}</h3>
+                                <p className="text-rose-400/80 text-sm mb-4 leading-relaxed">{text.dangerDesc}</p>
+
+                                <Input
+                                    placeholder={text.confirmPlaceholder}
+                                    value={deleteConfirm}
+                                    onChange={(e) => setDeleteConfirm(e.target.value)}
+                                    classNames={{
+                                        inputWrapper: "bg-rose-950/40 border border-rose-500/30 mb-3",
+                                        input: "text-rose-200 placeholder:text-rose-500/30 font-mono"
+                                    }}
+                                />
+
+                                <Button
+                                    onPress={handleDelete}
+                                    isLoading={deleting}
+                                    isDisabled={deleteConfirm.toUpperCase() !== 'DELETE'}
+                                    className="bg-rose-500 text-white font-bold w-full rounded-xl shadow-lg shadow-rose-500/20 disabled:bg-rose-500/20 disabled:text-rose-500/50"
+                                    startContent={<TrashSimple weight="fill" size={18} />}
+                                >
+                                    {text.confirmButton}
+                                </Button>
+                            </CardBody>
+                        </Card>
+                    )}
+
+                </div>
+            </div>
         </div>
     );
 }

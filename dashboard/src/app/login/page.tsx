@@ -1,12 +1,12 @@
 'use client';
 
-import React from 'react';
+import React, { Suspense } from 'react';
 import { Card, CardBody, Button } from "@nextui-org/react";
 import { DiscordLogo } from "@phosphor-icons/react";
 import { signIn } from 'next-auth/react';
 import { useSearchParams } from 'next/navigation';
 
-export default function LoginPage() {
+function LoginContent() {
     const [loading, setLoading] = React.useState(false);
     const searchParams = useSearchParams();
     const errorParam = searchParams.get('error');
@@ -43,5 +43,19 @@ export default function LoginPage() {
                 </CardBody>
             </Card>
         </div>
+    );
+}
+
+export default function LoginPage() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen flex items-center justify-center bg-background p-4">
+                <Card className="w-full max-w-md bg-surface border border-divider">
+                    <CardBody className="p-8 text-center">Loading...</CardBody>
+                </Card>
+            </div>
+        }>
+            <LoginContent />
+        </Suspense>
     );
 }

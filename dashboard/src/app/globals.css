@@ -1,49 +1,52 @@
-@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-    /* Brand Colors (Static) */
-    --color-primary: #6366F1;
+    /* Brand Colors (Soft Violet Gradient Base) */
+    --color-primary: #8B5CF6; /* Violet-500 */
     --color-success: #10B981;
     --color-destructive: #F43F5E;
     --color-warning: #F59E0B;
 
-    /* Light Mode (Default) */
-    --bg-base: #FFFFFF;
-    --surface-card: #F2F3F5;
-    --surface-hover: #E3E5E8;
-    --text-primary: #060607;
-    --text-secondary: #4E5058;
-    --border-divider: #E3E5E8;
+    /* Light Mode (Soft Light) */
+    --bg-base: #F8FAFC;
+    --surface-card: #FFFFFF;
+    --surface-hover: #F1F5F9;
+    --text-primary: #0F172A;
+    --text-secondary: #64748B;
+    --border-divider: #E2E8F0;
 }
 
 [data-theme="light"] {
-    --bg-base: #FFFFFF;
-    --surface-card: #F2F3F5;
-    --surface-hover: #E3E5E8;
-    --text-primary: #060607;
-    --text-secondary: #4E5058;
-    --border-divider: #E3E5E8;
+    --bg-base: #F8FAFC;
+    --surface-card: #FFFFFF;
+    --surface-hover: #F1F5F9;
+    --text-primary: #0F172A;
+    --text-secondary: #64748B;
+    --border-divider: #E2E8F0;
 }
 
 .dark {
-    /* Dark Mode */
-    --bg-base: #313338;
-    --surface-card: #2B2D31;
-    --surface-hover: #404249;
-    --text-primary: #F2F3F5;
-    --text-secondary: #B5BAC1;
-    --border-divider: #1E1F22;
+    /* Hard Dark Mode -> Soft Dark Mode */
+    --bg-base: #0F1115;      /* Deep Charcoal */
+    --surface-card: #181A20; /* Soft Black */
+    --surface-hover: #23262E;/* Lighter Charcoal */
+    
+    --text-primary: #F8FAFC; /* Off-white */
+    --text-secondary: #94A3B8; /* Slate-400 */
+    
+    --border-divider: rgba(255, 255, 255, 0.05); /* Subtle borders */
 }
 
 body {
-    font-family: 'Nunito', sans-serif;
+    font-family: 'Outfit', sans-serif;
     background-color: var(--bg-base);
     color: var(--text-primary);
     transition: background-color 0.3s ease, color 0.3s ease;
+    -webkit-font-smoothing: antialiased;
 }
 
 /* Scrollbar Styling */

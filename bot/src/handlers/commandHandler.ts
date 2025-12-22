@@ -4,7 +4,7 @@ import path from 'path';
 import logger from '../utils/logger';
 import { Command } from '../utils/types';
 
-export const commands = new Collection<string, Command>();
+export const commands = new Collection<string, Command<any>>();
 
 export async function loadCommands(client: Client) {
     const commandsPath = path.join(__dirname, '../commands');

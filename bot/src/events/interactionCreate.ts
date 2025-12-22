@@ -3,6 +3,7 @@ import { useMainPlayer, useQueue, QueryType } from 'discord-player';
 import { buildHelpModuleEmbed, buildHelpOverviewEmbed, buildHelpSelectRow, HELP_MENU_CUSTOM_ID, VISIBLE_COMMANDS } from '../utils/helpMenu';
 import { getGuildLocale, t } from '../utils/i18n';
 import logger from '../utils/logger';
+import { buildAuditConfigUi, deleteAuditRoute, getAuditRoute, upsertAuditRoute } from '../utils/auditConfigUi';
 
 export default {
     name: Events.InteractionCreate,
@@ -16,6 +17,28 @@ export default {
                     .slice(0, 25)
                     .map((name) => ({ name: `/${name}`, value: name }));
                 await interaction.respond(choices);
+            }
+            return;
+        }
+
+        // ----- Context menu handling -----
+        if (interaction.isContextMenuCommand()) {
+            const { commands } = await import('../handlers/commandHandler');
+            const command = commands.get(interaction.commandName);
+            if (!command) {
+                logger.error(`No context command matching ${interaction.commandName} was found.`);
+                return;
+            }
+
+            try {
+                await command.execute(interaction as any);
+            } catch (error) {
+                logger.error(`Error executing ${interaction.commandName}:`, error);
+                if (interaction.replied || interaction.deferred) {
+                    await interaction.followUp({ content: 'Command failed.', ephemeral: true });
+                } else {
+                    await interaction.reply({ content: 'Command failed.', ephemeral: true });
+                }
             }
             return;
         }
@@ -80,6 +103,36 @@ export default {
                 if (interaction.replied || interaction.deferred) await interaction.followUp(replyOpts);
                 else await interaction.reply(replyOpts);
             }
+            return;
+        }
+
+        // ----- Audit config handling -----
+        if (interaction.isStringSelectMenu() && interaction.customId.startsWith('audit_tag_select:')) {
+            const [, userId] = interaction.customId.split(':');
+            if (interaction.user.id !== userId) {
+                await interaction.reply({ content: t(await getGuildLocale(interaction.guildId), 'general.notForYou'), ephemeral: true });
+                return;
+            }
+
+            const tag = interaction.values[0];
+            if (!interaction.guildId) return;
+            const ui = await buildAuditConfigUi(interaction.guildId, userId, tag);
+            await interaction.update(ui);
+            return;
+        }
+
+        if (interaction.isChannelSelectMenu() && interaction.customId.startsWith('audit_channel_select:')) {
+            const [, tag, userId] = interaction.customId.split(':');
+            if (interaction.user.id !== userId) {
+                await interaction.reply({ content: t(await getGuildLocale(interaction.guildId), 'general.notForYou'), ephemeral: true });
+                return;
+            }
+
+            if (!interaction.guildId) return;
+            const channelId = interaction.values[0];
+            await upsertAuditRoute(interaction.guildId, tag, { channelId, enabled: true });
+            const ui = await buildAuditConfigUi(interaction.guildId, userId, tag);
+            await interaction.update(ui);
             return;
         }
 
@@ -186,6 +239,54 @@ export default {
 
         if (interaction.isButton() && interaction.customId === 'cancel_search') {
             await interaction.message.delete();
+            return;
+        }
+
+        if (interaction.isButton() && interaction.customId.startsWith('audit_route_')) {
+            const parts = interaction.customId.split(':');
+            const action = parts[0];
+            const tag = parts[1] || '';
+            const userId = parts[2] || '';
+
+            if (action === 'audit_route_close') {
+                const closeUserId = parts[1] || '';
+                if (interaction.user.id !== closeUserId) {
+                    await interaction.reply({ content: t(await getGuildLocale(interaction.guildId), 'general.notForYou'), ephemeral: true });
+                    return;
+                }
+                await interaction.update({ content: 'Audit config closed.', embeds: [], components: [] });
+                return;
+            }
+
+            if (interaction.user.id !== userId) {
+                await interaction.reply({ content: t(await getGuildLocale(interaction.guildId), 'general.notForYou'), ephemeral: true });
+                return;
+            }
+
+            if (!interaction.guildId) return;
+
+            const route = await getAuditRoute(interaction.guildId, tag);
+
+            if (action === 'audit_route_enable') {
+                if (!route?.channelId) {
+                    await interaction.reply({ content: 'Select a channel first.', ephemeral: true });
+                    return;
+                }
+                await upsertAuditRoute(interaction.guildId, tag, { enabled: true });
+            } else if (action === 'audit_route_disable') {
+                if (!route) {
+                    await interaction.reply({ content: 'Route not set.', ephemeral: true });
+                    return;
+                }
+                await upsertAuditRoute(interaction.guildId, tag, { enabled: false });
+            } else if (action === 'audit_route_clear') {
+                if (route) {
+                    await deleteAuditRoute(interaction.guildId, tag);
+                }
+            }
+
+            const ui = await buildAuditConfigUi(interaction.guildId, userId, tag);
+            await interaction.update(ui);
             return;
         }
 

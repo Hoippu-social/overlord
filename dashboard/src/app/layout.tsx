@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
-import { Nunito } from "next/font/google";
+import { Outfit } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
 
-const nunito = Nunito({ subsets: ["latin"] });
+const outfit = Outfit({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "Discord Bot Dashboard",
@@ -20,7 +20,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={nunito.className}>
+      <body className={outfit.className}>
         <Providers>{children}</Providers>
       </body>
     </html>

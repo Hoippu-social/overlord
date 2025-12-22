@@ -239,47 +239,47 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             });
 
             if (body.sendPanel || !previous || previous.interfaceChannelId !== body.interfaceChannelId) {
-                const token = getToken();
-                await sendTempVoicePanel(token, body.interfaceChannelId, body.hubChannelId);
+                const botToken = getToken();
+                await sendTempVoicePanel(botToken, body.interfaceChannelId, body.hubChannelId);
             }
 
             return NextResponse.json({ config });
         }
 
-        const token = getToken();
+        const botToken = getToken();
 
         // Clean old setup
         const existing = await prisma.tempVoiceConfig.findUnique({ where: { guildId } });
         if (existing) {
-            if (existing.hubChannelId) await deleteChannel(token, existing.hubChannelId, 'Replacing temp voice hub');
-            if (existing.interfaceChannelId) await deleteChannel(token, existing.interfaceChannelId, 'Replacing temp voice interface');
-            if (existing.categoryId) await deleteChannel(token, existing.categoryId, 'Replacing temp voice category');
-            await deleteRooms(token, guildId);
+            if (existing.hubChannelId) await deleteChannel(botToken, existing.hubChannelId, 'Replacing temp voice hub');
+            if (existing.interfaceChannelId) await deleteChannel(botToken, existing.interfaceChannelId, 'Replacing temp voice interface');
+            if (existing.categoryId) await deleteChannel(botToken, existing.categoryId, 'Replacing temp voice category');
+            await deleteRooms(botToken, guildId);
         }
 
         const categoryName: string = (body.categoryName || 'Temporary Voice').trim();
         const hubName: string = (body.hubName || 'Join to Create').trim();
         const interfaceName: string = (body.interfaceName || 'temp-voice-control').trim();
 
-        const category: any = await discordRequest('POST', `/guilds/${guildId}/channels`, token, {
+        const category: any = await discordRequest('POST', `/guilds/${guildId}/channels`, botToken, {
             name: categoryName,
             type: 4,
         }, 'Temp voice category from dashboard');
 
-        const hub: any = await discordRequest('POST', `/guilds/${guildId}/channels`, token, {
+        const hub: any = await discordRequest('POST', `/guilds/${guildId}/channels`, botToken, {
             name: hubName,
             type: 2,
             parent_id: category.id,
             user_limit: userLimit || 0,
         }, 'Temp voice hub from dashboard');
 
-        const iface: any = await discordRequest('POST', `/guilds/${guildId}/channels`, token, {
+        const iface: any = await discordRequest('POST', `/guilds/${guildId}/channels`, botToken, {
             name: interfaceName,
             type: 0,
             parent_id: category.id,
         }, 'Temp voice interface from dashboard');
 
-        await sendTempVoicePanel(token, iface.id, hub.id);
+        await sendTempVoicePanel(botToken, iface.id, hub.id);
 
         const config = await prisma.tempVoiceConfig.upsert({
             where: { guildId },
@@ -325,14 +325,14 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
             return NextResponse.json({ error: 'Нужно подтверждение удаления' }, { status: 400 });
         }
 
-        const token = getToken();
+        const botToken = getToken();
         const config = await prisma.tempVoiceConfig.findUnique({ where: { guildId } });
 
-        await deleteRooms(token, guildId);
+        await deleteRooms(botToken, guildId);
 
-        if (config?.hubChannelId) await deleteChannel(token, config.hubChannelId, 'Temp voice removal');
-        if (config?.interfaceChannelId) await deleteChannel(token, config.interfaceChannelId, 'Temp voice removal');
-        if (config?.categoryId) await deleteChannel(token, config.categoryId, 'Temp voice removal');
+        if (config?.hubChannelId) await deleteChannel(botToken, config.hubChannelId, 'Temp voice removal');
+        if (config?.interfaceChannelId) await deleteChannel(botToken, config.interfaceChannelId, 'Temp voice removal');
+        if (config?.categoryId) await deleteChannel(botToken, config.categoryId, 'Temp voice removal');
 
         await prisma.tempVoiceConfig.deleteMany({ where: { guildId } });
         await prisma.tempVoiceRoom.deleteMany({ where: { guildId } });
