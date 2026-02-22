@@ -1,0 +1,1 @@
+export const BOT_OWNER_ID = '218751322613088256';

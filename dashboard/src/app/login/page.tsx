@@ -8,13 +8,33 @@ import { useSearchParams } from 'next/navigation';
 
 function LoginContent() {
     const [loading, setLoading] = React.useState(false);
+    const [password, setPassword] = React.useState('');
+    const [errorMessage, setErrorMessage] = React.useState('');
     const searchParams = useSearchParams();
-    const errorParam = searchParams.get('error');
-    const errorMessage = errorParam ? 'Discord login failed. Please try again.' : '';
+    const router = require('next/navigation').useRouter();
 
-    const handleDiscordLogin = async () => {
+    const handlePasswordLogin = async (e: React.FormEvent) => {
+        e.preventDefault();
         setLoading(true);
-        await signIn('discord', { callbackUrl: '/dashboard' });
+        setErrorMessage('');
+
+        try {
+            const res = await fetch('/api/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password })
+            });
+            if (res.ok) {
+                // Force a hard navigation to dashboard to reload states
+                window.location.href = '/dashboard';
+            } else {
+                setErrorMessage('Invalid admin password');
+            }
+        } catch (err) {
+            setErrorMessage('Login failed');
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -23,23 +43,32 @@ function LoginContent() {
                 <CardBody className="p-8 space-y-6">
                     <div className="text-center space-y-2">
                         <h1 className="text-2xl font-bold">Welcome Back</h1>
-                        <p className="text-default-500">Sign in with your Discord account to continue</p>
+                        <p className="text-default-500">Sign in with the admin password to continue</p>
                     </div>
 
                     {errorMessage && (
                         <div className="text-sm text-danger text-center">{errorMessage}</div>
                     )}
 
-                    <Button
-                        color="primary"
-                        fullWidth
-                        isLoading={loading}
-                        className="font-semibold"
-                        startContent={!loading ? <DiscordLogo size={20} weight="fill" /> : null}
-                        onPress={handleDiscordLogin}
-                    >
-                        Continue with Discord
-                    </Button>
+                    <form onSubmit={handlePasswordLogin} className="space-y-4">
+                        <input
+                            type="password"
+                            className="w-full p-2 border border-divider rounded bg-background text-foreground"
+                            placeholder="Password"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            disabled={loading}
+                        />
+                        <Button
+                            color="primary"
+                            fullWidth
+                            isLoading={loading}
+                            className="font-semibold"
+                            type="submit"
+                        >
+                            Sign In
+                        </Button>
+                    </form>
                 </CardBody>
             </Card>
         </div>

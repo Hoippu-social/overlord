@@ -11,12 +11,14 @@ import {
     ChatsTeardrop,
     Ticket,
     Buildings,
+    Globe,
     Gear,
     UsersThree,
     UserCircle,
     Pulse,
     CaretRight,
     Translate,
+    ChartBar,
 } from "@phosphor-icons/react";
 import Link from 'next/link';
 import { useGuildLocale } from '@/lib/i18n';
@@ -99,8 +101,9 @@ const strings = {
             music: { label: 'Music', desc: 'Playback settings and queue tools' },
             tempVoice: { label: 'Temp Voice', desc: 'Auto voice rooms and templates' },
             tickets: { label: 'Tickets', desc: 'Support system management' },
-            botSettings: { label: 'Bot settings', desc: 'Bot control and system status' },
-            serverSettings: { label: 'Server settings', desc: 'Prefix, roles, and channels' },
+            serverSettings: { label: 'Настройки сервера', desc: 'Префикс, роли, каналы' },
+            statistics: { label: 'Статистика', desc: 'Аналитика сообщений и голоса' },
+            serverSelection: 'Выбор сервера',
         },
     },
     ru: {
@@ -137,6 +140,8 @@ const strings = {
             tickets: { label: 'Тикеты', desc: 'Управление тикетами' },
             botSettings: { label: 'Настройки бота', desc: 'Управление ботом и статус' },
             serverSettings: { label: 'Настройки сервера', desc: 'Префикс, роли, каналы' },
+            statistics: { label: 'Статистика', desc: 'Аналитика сообщений и голоса' },
+            serverSelection: 'Выбор сервера',
         },
     },
 } as const;
@@ -177,7 +182,7 @@ export default function HubPage({ params }: { params: Promise<{ guildId: string 
         { label: text.modules.music.label, href: `/dashboard/${guildId}/music`, icon: MusicNote, desc: text.modules.music.desc },
         { label: text.modules.tempVoice.label, href: `/dashboard/${guildId}/tempvoice`, icon: ChatsTeardrop, desc: text.modules.tempVoice.desc },
         { label: text.modules.tickets.label, href: `/dashboard/${guildId}/tickets`, icon: Ticket, desc: text.modules.tickets.desc },
-        { label: text.modules.botSettings.label, href: `/dashboard/${guildId}/settings`, icon: Gear, desc: text.modules.botSettings.desc },
+        { label: text.modules.statistics.label, href: `/dashboard/${guildId}/stats`, icon: ChartBar, desc: text.modules.statistics.desc },
         { label: text.modules.serverSettings.label, href: `/dashboard/${guildId}/server-settings`, icon: Buildings, desc: text.modules.serverSettings.desc },
     ];
 
@@ -280,8 +285,18 @@ export default function HubPage({ params }: { params: Promise<{ guildId: string 
                     </div>
                 </div>
 
-                <div className="flex items-center gap-4">
-                    <ButtonGroup className="bg-[#181A20] border border-white/5 p-1 rounded-2xl shadow-lg">
+                <div className="flex items-center gap-3 bg-[#181A20]/50 p-1.5 rounded-2xl border border-white/5 shadow-2xl">
+                    <Button
+                        as={Link}
+                        href="/dashboard"
+                        variant="flat"
+                        className="bg-[#181A20] border border-white/5 text-default-400 font-bold rounded-xl h-11 px-4 hover:bg-white/5 transition-all"
+                        startContent={<Globe size={20} weight="fill" />}
+                    >
+                        {text.modules.serverSelection}
+                    </Button>
+
+                    <ButtonGroup className="bg-[#181A20] border border-white/5 p-1 rounded-xl shadow-lg">
                         {localeOptions.map((option) => {
                             const isActive = option.key === locale;
                             return (
@@ -290,9 +305,9 @@ export default function HubPage({ params }: { params: Promise<{ guildId: string 
                                     size="sm"
                                     variant={isActive ? "solid" : "light"}
                                     color={isActive ? "primary" : "default"}
-                                    className={`min-w-10 h-9 rounded-xl font-bold transition-all ${isActive
-                                            ? 'bg-primary text-white shadow-md'
-                                            : 'text-default-500 hover:text-default-300'
+                                    className={`min-w-10 h-9 rounded-lg font-bold transition-all ${isActive
+                                        ? 'bg-primary text-white shadow-md'
+                                        : 'text-default-500 hover:text-default-300'
                                         }`}
                                     onPress={() => setLocale(option.key)}
                                     startContent={
@@ -311,18 +326,20 @@ export default function HubPage({ params }: { params: Promise<{ guildId: string 
                         })}
                     </ButtonGroup>
 
+                    <div className="w-px h-6 bg-white/5 mx-1" />
+
                     <Link href={`/dashboard/${guildId}/settings`}>
                         <div className={`
-                            h-11 px-4 rounded-2xl flex items-center gap-3 border border-white/5 shadow-lg transition-all hover:scale-105 active:scale-95
+                            h-11 px-4 rounded-xl flex items-center gap-3 border border-white/5 shadow-lg transition-all hover:scale-105 active:scale-95
                             ${systemStats?.botStatus === 'ONLINE' ? 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20' :
                                 systemStats?.botStatus === 'OFFLINE' ? 'bg-rose-500/10 text-rose-400 hover:bg-rose-500/20' : 'bg-amber-500/10 text-amber-400'}
                         `}>
                             <div className="relative flex items-center justify-center">
                                 <div className={`absolute w-3 h-3 rounded-full animate-ping ${systemStats?.botStatus === 'ONLINE' ? 'bg-emerald-500' :
-                                        systemStats?.botStatus === 'OFFLINE' ? 'bg-rose-500' : 'bg-amber-500'
+                                    systemStats?.botStatus === 'OFFLINE' ? 'bg-rose-500' : 'bg-amber-500'
                                     } opacity-75`} />
                                 <div className={`relative w-2 h-2 rounded-full ${systemStats?.botStatus === 'ONLINE' ? 'bg-emerald-500' :
-                                        systemStats?.botStatus === 'OFFLINE' ? 'bg-rose-500' : 'bg-amber-500'
+                                    systemStats?.botStatus === 'OFFLINE' ? 'bg-rose-500' : 'bg-amber-500'
                                     }`} />
                             </div>
                             <span className="font-bold text-sm uppercase tracking-wider">

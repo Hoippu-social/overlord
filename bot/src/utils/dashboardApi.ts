@@ -373,6 +373,163 @@ export function startDashboardApi(client: Client): http.Server {
                 return;
             }
 
+
+            // /api/enrich — resolve user/channel info from Discord cache
+            if (url.pathname === '/api/enrich') {
+                if (req.method !== 'POST') {
+                    res.writeHead(405);
+                    res.end('Method Not Allowed');
+                    return;
+                }
+
+                const raw = await readBody(req);
+                const body = raw ? JSON.parse(raw) : {};
+                const guildId = typeof body.guildId === 'string' ? body.guildId : '';
+                const userIds: string[] = Array.isArray(body.userIds) ? body.userIds : [];
+                const channelIds: string[] = Array.isArray(body.channelIds) ? body.channelIds : [];
+
+                if (!guildId) {
+                    res.writeHead(400);
+                    res.end('guildId is required');
+                    return;
+                }
+
+                const guild = client.guilds.cache.get(guildId);
+                const users: Record<string, any> = {};
+                const channels: Record<string, any> = {};
+
+                // Resolve users
+                for (const userId of userIds) {
+                    try {
+                        // Try guild member first (get server nickname)
+                        let member = guild?.members.cache.get(userId);
+                        if (!member && guild) {
+                            try { member = await guild.members.fetch(userId); } catch { }
+                        }
+
+                        if (member) {
+                            const user = member.user;
+                            const avatarUrl = member.displayAvatarURL({ size: 64, extension: 'webp' });
+                            users[userId] = {
+                                id: userId,
+                                name: member.displayName,           // server nickname or username
+                                username: user.username,
+                                discriminator: user.discriminator,
+                                tag: user.discriminator !== '0' ? `${user.username}#${user.discriminator}` : `@${user.username}`,
+                                avatar: avatarUrl,
+                                globalName: user.globalName || user.username,
+                            };
+                        } else {
+                            // Fallback: try to fetch user globally
+                            try {
+                                const user = await client.users.fetch(userId);
+                                users[userId] = {
+                                    id: userId,
+                                    name: user.globalName || user.username,
+                                    username: user.username,
+                                    discriminator: user.discriminator,
+                                    tag: user.discriminator !== '0' ? `${user.username}#${user.discriminator}` : `@${user.username}`,
+                                    avatar: user.displayAvatarURL({ size: 64, extension: 'webp' }),
+                                    globalName: user.globalName || user.username,
+                                };
+                            } catch {
+                                users[userId] = { id: userId, name: userId, username: userId, tag: userId, avatar: null };
+                            }
+                        }
+                    } catch {
+                        users[userId] = { id: userId, name: userId, username: userId, tag: userId, avatar: null };
+                    }
+                }
+
+                // Resolve channels
+                for (const channelId of channelIds) {
+                    const channel = guild?.channels.cache.get(channelId) || client.channels.cache.get(channelId);
+                    if (channel && 'name' in channel) {
+                        channels[channelId] = {
+                            id: channelId,
+                            name: channel.name,
+                            type: channel.type,
+                        };
+                    } else {
+                        channels[channelId] = { id: channelId, name: channelId, type: null };
+                    }
+                }
+
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ ok: true, users, channels }));
+                return;
+            }
+
+            // /api/search — search guild members by nickname, username or tag
+            if (url.pathname === '/api/search') {
+                if (req.method !== 'GET') {
+                    res.writeHead(405);
+                    res.end('Method Not Allowed');
+                    return;
+                }
+
+                const guildId = url.searchParams.get('guildId') || '';
+                const query = (url.searchParams.get('q') || '').toLowerCase().trim();
+                const type = url.searchParams.get('type') || 'users'; // users | channels
+
+                if (!guildId || !query) {
+                    res.writeHead(400);
+                    res.end('guildId and q are required');
+                    return;
+                }
+
+                const guild = client.guilds.cache.get(guildId);
+                if (!guild) {
+                    res.writeHead(404);
+                    res.end('Guild not found');
+                    return;
+                }
+
+                if (type === 'users') {
+                    // Search in cache first
+                    const results = guild.members.cache
+                        .filter(m => {
+                            const nick = m.displayName.toLowerCase();
+                            const username = m.user.username.toLowerCase();
+                            const tag = m.user.tag.toLowerCase();
+                            return nick.includes(query) || username.includes(query) || tag.includes(query);
+                        })
+                        .map(m => ({
+                            id: m.user.id,
+                            name: m.displayName,
+                            username: m.user.username,
+                            tag: m.user.discriminator !== '0'
+                                ? `${m.user.username}#${m.user.discriminator}`
+                                : `@${m.user.username}`,
+                            avatar: m.displayAvatarURL({ size: 64, extension: 'webp' }),
+                        }))
+                        .slice(0, 25);
+
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ ok: true, results: Array.from(results.values()) }));
+                    return;
+                }
+
+                if (type === 'channels') {
+                    const results = guild.channels.cache
+                        .filter(c => 'name' in c && c.name!.toLowerCase().includes(query))
+                        .map(c => ({
+                            id: c.id,
+                            name: (c as any).name,
+                            type: c.type,
+                        }))
+                        .slice(0, 25);
+
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ ok: true, results: Array.from(results.values()) }));
+                    return;
+                }
+
+                res.writeHead(400);
+                res.end('Invalid type');
+                return;
+            }
+
             res.writeHead(404);
             res.end('Not Found');
             return;

@@ -12,3 +12,18 @@ coverage/
 *.gz
 logs/
 *.pid
+*.txt
+lavalink.session
+
+# Database
+*.db
+*.db-journal
+
+# Backups
+backups/
+
+# App Specific
+sync_status*.json
+api_response*.json
+test_db.js
+check_db.js

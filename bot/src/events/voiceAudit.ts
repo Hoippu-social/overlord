@@ -1,4 +1,4 @@
-import { Events, VoiceState } from 'discord.js';
+import { Client, Events, VoiceState } from 'discord.js';
 import { addVoiceDuration } from '../utils/inviteTracker';
 import { logAuditEvent } from '../utils/auditLog';
 
@@ -6,6 +6,21 @@ const voiceSessions = new Map<string, number>();
 
 function makeKey(guildId: string, userId: string) {
     return `${guildId}:${userId}`;
+}
+
+/**
+ * Scan all guilds on startup and seed voiceSessions for members already in voice.
+ */
+export async function initVoiceSessions(client: Client) {
+    for (const guild of client.guilds.cache.values()) {
+        for (const [, state] of guild.voiceStates.cache) {
+            if (state.channelId && state.member && !state.member.user.bot) {
+                const key = makeKey(guild.id, state.member.id);
+                voiceSessions.set(key, Date.now());
+            }
+        }
+    }
+    console.log(`[VoiceAudit] Initialized ${voiceSessions.size} active voice sessions`);
 }
 
 export default {

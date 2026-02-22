@@ -118,5 +118,16 @@ export const authOptions: NextAuthOptions = {
 };
 
 export async function getAuthToken(request: NextRequest) {
+    const sessionToken = request.cookies.get('session');
+
+    // If the admin password session is present, return a fake token with admin privileges.
+    // The accessToken is "admin" to bypass auth checks downstream if they check for string.
+    if (sessionToken && sessionToken.value) {
+        return {
+            accessToken: 'admin',
+            allowedGuilds: undefined // Let `resolveAllowedGuildIds` or `canAccessGuild` handle 'admin'
+        };
+    }
+
     return getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
 }

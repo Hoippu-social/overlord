@@ -9,12 +9,7 @@ import { loadCommands } from './handlers/commandHandler';
 import { loadEvents } from './handlers/eventHandler';
 import { LavalinkManager } from 'lavalink-client';
 import { initializeLavalink } from './utils/LavalinkManager';
-import { reconcileTempVoiceRooms } from './utils/tempVoice';
-import { primeInviteCache } from './utils/inviteTracker';
-import { startDashboardApi } from './utils/dashboardApi';
-import http from 'http';
-
-let dashboardServer: http.Server | null = null;
+import { StatsService } from './services/StatsService';
 
 declare module 'discord.js' {
     interface Client {
@@ -70,8 +65,9 @@ const cleanup = () => {
 
 process.on('SIGINT', async () => {
     logger.info('Received SIGINT, shutting down gracefully...');
-    if (dashboardServer) {
-        dashboardServer.close();
+    const server = (client as any).dashboardServer;
+    if (server) {
+        server.close();
         logger.info('Dashboard API server closed');
     }
     cleanup();
@@ -81,13 +77,30 @@ process.on('SIGINT', async () => {
 
 process.on('SIGTERM', async () => {
     logger.info('Received SIGTERM, shutting down gracefully...');
-    if (dashboardServer) {
-        dashboardServer.close();
+    const server = (client as any).dashboardServer;
+    if (server) {
+        server.close();
         logger.info('Dashboard API server closed');
     }
     cleanup();
     client.destroy();
     process.exit(0);
+});
+
+// Prevent async crashes (e.g. Lavalink WebSocket throws) from killing the process
+process.on('unhandledRejection', (reason, promise) => {
+    logger.error('[Process] Unhandled rejection:', reason);
+});
+
+process.on('uncaughtException', (error) => {
+    // Only log Lavalink-related errors; re-throw truly critical ones
+    if (error.message?.includes('Lavalink') || error.message?.includes('/v4/info') || error.message?.includes('not connected')) {
+        logger.warn('[Process] Non-fatal Lavalink error caught:', error.message);
+    } else {
+        logger.error('[Process] Uncaught exception:', error);
+        // For truly unknown errors, still exit to avoid corrupt state
+        process.exit(1);
+    }
 });
 
 async function main() {
@@ -106,6 +119,9 @@ async function main() {
         logger.error('DISCORD_TOKEN is not defined in .env');
         process.exit(1);
     }
+
+    // Initialize StatsService (Dual-DB Architecture)
+    await StatsService.init();
 
     // Initialize Lavalink
     initializeLavalink(client);
@@ -475,29 +491,7 @@ client.on('interactionCreate', async (interaction) => {
     await player.musicHandler.updateMessage(true);
 });
 
-client.once('ready', async () => {
-    logger.info(`Logged in as ${client.user?.tag}!`);
-    // Initialize Lavalink Client with user data
-    client.lavalink.init({
-        id: client.user!.id,
-        username: client.user!.username
-    });
 
-    dashboardServer = startDashboardApi(client);
-
-    // Sync Guild Data
-    logger.info('Syncing guild data...');
-    for (const guild of client.guilds.cache.values()) {
-        await syncGuildData(guild);
-    }
-    logger.info('Guild data synced!');
-
-    logger.info('Reconciling temp voice rooms...');
-    await reconcileTempVoiceRooms(client);
-
-    logger.info('Priming invite cache...');
-    await primeInviteCache(client);
-});
 
 const hasPresenceIntent = client.options.intents.has(GatewayIntentBits.GuildPresences);
 

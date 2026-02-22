@@ -4,7 +4,8 @@ import { getToken } from 'next-auth/jwt';
 
 export async function middleware(request: NextRequest) {
     const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
-    const isAuthenticated = Boolean(token);
+    const sessionToken = request.cookies.get('session');
+    const isAuthenticated = Boolean(token) || (sessionToken && sessionToken.value);
 
     if (request.nextUrl.pathname.startsWith('/dashboard')) {
         if (!isAuthenticated) {

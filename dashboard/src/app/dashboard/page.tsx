@@ -53,9 +53,10 @@ export default function Dashboard() {
     useEffect(() => {
         setMounted(true);
         fetch('/api/guilds')
-            .then((res) => {
-                if (res.status === 401) {
-                    router.push('/login');
+            .then(async (res) => {
+                if (res.status === 401 || res.status === 403) {
+                    await fetch('/api/logout', { method: 'POST' });
+                    await signOut({ callbackUrl: '/login' });
                     return [];
                 }
                 return res.json();
@@ -69,6 +70,7 @@ export default function Dashboard() {
     }, [router]);
 
     const handleLogout = async () => {
+        await fetch('/api/logout', { method: 'POST' });
         await signOut({ callbackUrl: '/login' });
     };
 

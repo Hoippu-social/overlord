@@ -1,0 +1,45 @@
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
+
+async function main() {
+    const guildId = '1374115841855197184';
+    const cutoffDate = new Date('2026-02-01T00:00:00Z');
+
+    console.log('=== Полная очистка исторических данных для пересинхронизации ===\n');
+    console.log(`Guild: ${guildId}`);
+    console.log(`Удаляем данные до: ${cutoffDate.toISOString()}\n`);
+
+    // Delete ALL StatMessage records before cutoff (including partial syncs)
+    const deletedMessages = await prisma.statMessage.deleteMany({
+        where: {
+            guildId,
+            createdAt: { lt: cutoffDate }
+        }
+    });
+    console.log(`Удалено StatMessage: ${deletedMessages.count}`);
+
+    // Delete StatHourly records before cutoff
+    const deletedHourly = await prisma.statHourly.deleteMany({
+        where: {
+            guildId,
+            dateHour: { lt: cutoffDate }
+        }
+    });
+    console.log(`Удалено StatHourly: ${deletedHourly.count}`);
+
+    // Delete StatDaily records before cutoff
+    const deletedDaily = await prisma.statDaily.deleteMany({
+        where: {
+            guildId,
+            date: { lt: cutoffDate }
+        }
+    });
+    console.log(`Удалено StatDaily: ${deletedDaily.count}`);
+
+    console.log('\n✓ Очистка завершена!');
+}
+
+main()
+    .catch(console.error)
+    .finally(() => prisma.$disconnect());

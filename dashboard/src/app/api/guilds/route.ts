@@ -7,6 +7,25 @@ export async function GET(request: NextRequest) {
     const token = await getAuthToken(request);
     const accessToken = typeof token?.accessToken === 'string' ? token.accessToken : null;
 
+    const sessionToken = request.cookies.get('session');
+
+    // Admin login using password
+    if (sessionToken && sessionToken.value) {
+        try {
+            const allGuilds = await prisma.guild.findMany({
+                select: {
+                    id: true,
+                    name: true,
+                    icon: true
+                }
+            });
+            return NextResponse.json(allGuilds);
+        } catch (error) {
+            console.error('Failed to fetch guilds for admin:', error);
+            return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+        }
+    }
+
     if (!accessToken) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -32,8 +51,11 @@ export async function GET(request: NextRequest) {
         });
 
         return NextResponse.json(filteredGuilds);
-    } catch (error) {
+    } catch (error: any) {
         console.error('Failed to fetch guilds:', error);
+        if (error?.message?.includes('401')) {
+            return NextResponse.json({ error: 'Unauthorized Discord Token' }, { status: 401 });
+        }
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }

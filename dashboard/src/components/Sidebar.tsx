@@ -16,7 +16,9 @@ import {
     CaretLeft,
     List,
     ChatsTeardrop,
-    Translate
+    Translate,
+    ChartBar,
+    Globe,
 } from "@phosphor-icons/react";
 import { cn } from "@nextui-org/react";
 import { useGuildLocale } from "@/lib/i18n";
@@ -33,24 +35,28 @@ const strings = {
         hub: 'Hub',
         moderation: 'Moderation',
         auditLogs: 'Audit Logs',
+        stats: 'Statistics',
         economy: 'Economy',
         music: 'Music',
         tempVoice: 'Temp Voice',
         tickets: 'Tickets',
         botSettings: 'Bot settings',
         serverSettings: 'Server settings',
+        serverSelection: 'Server selection',
     },
     ru: {
         title: 'Панель управления',
         hub: 'Главная',
         moderation: 'Модерация',
         auditLogs: 'Журнал аудита',
+        stats: 'Статистика',
         economy: 'Экономика',
         music: 'Музыка',
         tempVoice: 'Временные комнаты',
         tickets: 'Тикеты',
         botSettings: 'Настройки бота',
         serverSettings: 'Настройки сервера',
+        serverSelection: 'Выбор сервера',
     },
 } as const;
 
@@ -68,11 +74,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggle, guildId }
         { label: text.hub, href: `/dashboard/${guildId}`, icon: SquaresFour },
         { label: text.moderation, href: `/dashboard/${guildId}/moderation`, icon: ShieldCheck },
         { label: text.auditLogs, href: `/dashboard/${guildId}/audit`, icon: Scroll },
+        { label: text.stats, href: `/dashboard/${guildId}/stats`, icon: ChartBar },
         { label: text.economy, href: `/dashboard/${guildId}/economy`, icon: Coins },
         { label: text.music, href: `/dashboard/${guildId}/music`, icon: MusicNote },
         { label: text.tempVoice, href: `/dashboard/${guildId}/tempvoice`, icon: ChatsTeardrop },
         { label: text.tickets, href: `/dashboard/${guildId}/tickets`, icon: Ticket },
-        { label: text.botSettings, href: `/dashboard/${guildId}/settings`, icon: Gear },
         { label: text.serverSettings, href: `/dashboard/${guildId}/server-settings`, icon: Buildings },
     ];
 
@@ -139,57 +145,90 @@ export const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggle, guildId }
                 })}
             </ScrollShadow>
 
-            <div className={cn("border-t border-divider", collapsed ? "p-3 flex items-center" : "p-4")}>
-                {collapsed ? (
-                    <Dropdown placement="top-start">
-                        <DropdownTrigger>
-                            <Button isIconOnly variant="light" aria-label="Language">
-                                <Translate size={20} />
-                            </Button>
-                        </DropdownTrigger>
-                        <DropdownMenu
-                            aria-label="Language"
-                            selectionMode="single"
-                            selectedKeys={new Set([locale])}
-                            onSelectionChange={(keys) => {
-                                const [value] = Array.from(keys) as string[];
-                                if (value === 'ru' || value === 'en') {
-                                    setLocale(value);
-                                }
-                            }}
-                        >
-                            {localeOptions.map((option) => (
-                                <DropdownItem
-                                    key={option.key}
-                                    startContent={
-                                        <img
-                                            src={option.key === 'ru' ? "/icons/free_russia_flag.png" : "/icons/uk_flag.png"}
-                                            className="w-4 h-4 rounded-sm object-contain"
-                                            alt=""
-                                        />
-                                    }
-                                >
-                                    {option.label}
-                                </DropdownItem>
-                            ))}
-                        </DropdownMenu>
-                    </Dropdown>
-                ) : (
-                    <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-2 text-xs font-semibold text-default-500 uppercase tracking-wide">
-                            <Translate size={16} />
-                            <span>Language</span>
+            <div className={cn("border-t border-divider p-4 pt-6 space-y-6", collapsed && "px-2 items-center")}>
+                {!collapsed ? (
+                    <>
+                        <div className="space-y-2">
+                            <Link href={`/dashboard/${guildId}/settings`} className="block w-full group">
+                                <div className="flex items-center gap-3 px-3 py-2 rounded-xl text-foreground-500 hover:bg-surface-hover hover:text-foreground transition-all">
+                                    <Gear size={20} weight="fill" />
+                                    <span className="font-semibold text-sm">{text.botSettings}</span>
+                                </div>
+                            </Link>
+                            <Link href="/dashboard" className="block w-full group">
+                                <div className="flex items-center gap-3 px-3 py-2 rounded-xl text-foreground-500 hover:bg-surface-hover hover:text-foreground transition-all">
+                                    <Globe size={20} weight="fill" />
+                                    <span className="font-semibold text-sm">{text.serverSelection}</span>
+                                </div>
+                            </Link>
                         </div>
-                        <ButtonGroup size="sm" variant="bordered">
-                            {localeOptions.map((option) => {
-                                const isActive = option.key === locale;
-                                return (
-                                    <Button
+
+                        <div className="flex items-center justify-between gap-3 px-1">
+                            <div className="flex items-center gap-2 text-[10px] font-bold text-default-400 uppercase tracking-widest">
+                                <Translate size={14} />
+                                <span>Language</span>
+                            </div>
+                            <ButtonGroup size="sm" variant="flat" className="bg-surface-hover p-1 rounded-xl">
+                                {localeOptions.map((option) => {
+                                    const isActive = option.key === locale;
+                                    return (
+                                        <Button
+                                            key={option.key}
+                                            size="sm"
+                                            variant={isActive ? "solid" : "light"}
+                                            color={isActive ? "primary" : "default"}
+                                            className={cn(
+                                                "min-w-10 h-8 rounded-lg text-[11px] font-bold px-2 gap-1.5",
+                                                isActive ? "bg-primary text-white shadow-sm" : "text-default-500 hover:bg-white/5"
+                                            )}
+                                            onPress={() => setLocale(option.key)}
+                                            startContent={
+                                                <div className="w-4 h-4 rounded-full overflow-hidden border border-white/10">
+                                                    <img
+                                                        src={option.key === 'ru' ? "/icons/free_russia_flag.png" : "/icons/uk_flag.png"}
+                                                        className="w-full h-full object-cover"
+                                                        alt=""
+                                                    />
+                                                </div>
+                                            }
+                                        >
+                                            {option.label}
+                                        </Button>
+                                    );
+                                })}
+                            </ButtonGroup>
+                        </div>
+                    </>
+                ) : (
+                    <div className="flex flex-col gap-4 items-center">
+                        <Tooltip content={text.botSettings} placement="right">
+                            <Link href={`/dashboard/${guildId}/settings`} className="w-10 h-10 flex items-center justify-center rounded-xl text-foreground-500 hover:bg-surface-hover hover:text-foreground transition-colors">
+                                <Gear size={24} weight="fill" />
+                            </Link>
+                        </Tooltip>
+                        <Tooltip content={text.serverSelection} placement="right">
+                            <Link href="/dashboard" className="w-10 h-10 flex items-center justify-center rounded-xl text-foreground-500 hover:bg-surface-hover hover:text-foreground transition-colors">
+                                <Globe size={24} weight="fill" />
+                            </Link>
+                        </Tooltip>
+                        <Dropdown placement="right-end">
+                            <DropdownTrigger>
+                                <Button isIconOnly variant="light" size="sm">
+                                    <Translate size={20} />
+                                </Button>
+                            </DropdownTrigger>
+                            <DropdownMenu
+                                aria-label="Language"
+                                selectionMode="single"
+                                selectedKeys={new Set([locale])}
+                                onSelectionChange={(keys) => {
+                                    const [value] = Array.from(keys) as string[];
+                                    if (value === 'ru' || value === 'en') setLocale(value);
+                                }}
+                            >
+                                {localeOptions.map((option) => (
+                                    <DropdownItem
                                         key={option.key}
-                                        size="sm"
-                                        color={isActive ? "primary" : "default"}
-                                        variant={isActive ? "solid" : "bordered"}
-                                        onPress={() => setLocale(option.key)}
                                         startContent={
                                             <img
                                                 src={option.key === 'ru' ? "/icons/free_russia_flag.png" : "/icons/uk_flag.png"}
@@ -199,10 +238,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggle, guildId }
                                         }
                                     >
                                         {option.label}
-                                    </Button>
-                                );
-                            })}
-                        </ButtonGroup>
+                                    </DropdownItem>
+                                ))}
+                            </DropdownMenu>
+                        </Dropdown>
                     </div>
                 )}
             </div>
