@@ -3,13 +3,11 @@ import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
 import logger from './utils/logger';
-import { getGuildLocale, t } from './utils/i18n';
 import { connectDB, prisma } from './utils/database';
 import { loadCommands } from './handlers/commandHandler';
 import { loadEvents } from './handlers/eventHandler';
 import { LavalinkManager } from 'lavalink-client';
 import { initializeLavalink } from './utils/LavalinkManager';
-import { StatsService } from './services/StatsService';
 
 declare module 'discord.js' {
     interface Client {
@@ -24,14 +22,10 @@ const client = new Client({
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildVoiceStates,
         GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.MessageContent,
         GatewayIntentBits.GuildMembers,
-        GatewayIntentBits.GuildPresences,
-        GatewayIntentBits.GuildInvites,
     ],
     partials: [
         Partials.Channel,
-        Partials.Message,
         Partials.GuildMember,
     ],
     presence: {
@@ -65,11 +59,6 @@ const cleanup = () => {
 
 process.on('SIGINT', async () => {
     logger.info('Received SIGINT, shutting down gracefully...');
-    const server = (client as any).dashboardServer;
-    if (server) {
-        server.close();
-        logger.info('Dashboard API server closed');
-    }
     cleanup();
     client.destroy();
     process.exit(0);
@@ -77,30 +66,9 @@ process.on('SIGINT', async () => {
 
 process.on('SIGTERM', async () => {
     logger.info('Received SIGTERM, shutting down gracefully...');
-    const server = (client as any).dashboardServer;
-    if (server) {
-        server.close();
-        logger.info('Dashboard API server closed');
-    }
     cleanup();
     client.destroy();
     process.exit(0);
-});
-
-// Prevent async crashes (e.g. Lavalink WebSocket throws) from killing the process
-process.on('unhandledRejection', (reason, promise) => {
-    logger.error('[Process] Unhandled rejection:', reason);
-});
-
-process.on('uncaughtException', (error) => {
-    // Only log Lavalink-related errors; re-throw truly critical ones
-    if (error.message?.includes('Lavalink') || error.message?.includes('/v4/info') || error.message?.includes('not connected')) {
-        logger.warn('[Process] Non-fatal Lavalink error caught:', error.message);
-    } else {
-        logger.error('[Process] Uncaught exception:', error);
-        // For truly unknown errors, still exit to avoid corrupt state
-        process.exit(1);
-    }
 });
 
 async function main() {
@@ -120,9 +88,6 @@ async function main() {
         process.exit(1);
     }
 
-    // Initialize StatsService (Dual-DB Architecture)
-    await StatsService.init();
-
     // Initialize Lavalink
     initializeLavalink(client);
 
@@ -139,10 +104,9 @@ client.on('interactionCreate', async (interaction) => {
     // Handle Modal Submit
     if (interaction.isModalSubmit()) {
         if (interaction.customId.startsWith('search_modal_')) {
-            const locale = await getGuildLocale(interaction.guildId);
             const userId = interaction.customId.split('_')[2];
             if (interaction.user.id !== userId) {
-                await interaction.reply({ content: t(locale, 'general.notForYou'), ephemeral: true });
+                await interaction.reply({ content: 'This modal is not for you!', ephemeral: true });
                 return;
             }
 
@@ -152,7 +116,7 @@ client.on('interactionCreate', async (interaction) => {
             const player = client.lavalink.getPlayer(interaction.guildId!);
 
             if (!player) {
-                await interaction.followUp({ content: t(locale, 'general.playerNotFound'), ephemeral: true });
+                await interaction.followUp({ content: 'Player not found!', ephemeral: true });
                 return;
             }
 
@@ -160,7 +124,7 @@ client.on('interactionCreate', async (interaction) => {
             const result = await player.search({ query: selectedPrefix + newQuery }, interaction.user);
 
             if (result.loadType === 'empty' || !result.tracks.length) {
-                await interaction.editReply({ content: t(locale, 'search.noResults'), components: [] });
+                await interaction.editReply({ content: 'No results found!', components: [] });
                 return;
             }
 
@@ -168,25 +132,28 @@ client.on('interactionCreate', async (interaction) => {
 
             const platformSelect = new StringSelectMenuBuilder()
                 .setCustomId(`search_platform_${interaction.user.id}`)
-                .setPlaceholder(t(locale, 'search.platformPlaceholder', { platform: selectedPrefix === 'ytsearch:' ? 'YouTube' : selectedPrefix === 'spsearch:' ? 'Spotify' : 'SoundCloud' }))
+                .setPlaceholder('Площадка: ' + (selectedPrefix === 'ytsearch:' ? 'YouTube' : selectedPrefix === 'spsearch:' ? 'Spotify' : 'SoundCloud'))
                 .addOptions(
                     new StringSelectMenuOptionBuilder()
                         .setLabel('YouTube')
-                        .setDescription(t(locale, 'search.platformDesc.youtube'))
-                        .setValue('ytsearch:'),
+                        .setDescription('Поиск видео на YouTube')
+                        .setValue('ytsearch:')
+                        .setEmoji('🔴'),
                     new StringSelectMenuOptionBuilder()
                         .setLabel('Spotify')
-                        .setDescription(t(locale, 'search.platformDesc.spotify'))
-                        .setValue('spsearch:'),
+                        .setDescription('Поиск треков на Spotify')
+                        .setValue('spsearch:')
+                        .setEmoji('🟢'),
                     new StringSelectMenuOptionBuilder()
                         .setLabel('SoundCloud')
-                        .setDescription(t(locale, 'search.platformDesc.soundcloud'))
-                        .setValue('scsearch:'),
+                        .setDescription('Поиск на SoundCloud')
+                        .setValue('scsearch:')
+                        .setEmoji('🟠')
                 );
 
             const trackSelect = new StringSelectMenuBuilder()
                 .setCustomId(`search_track_${interaction.user.id}`)
-                .setPlaceholder(t(locale, 'search.trackPlaceholder'))
+                .setPlaceholder('Выберите трек')
                 .addOptions(
                     tracks.map((track, index) => {
                         const duration = track.info.duration ? `[${Math.floor(track.info.duration / 60000)}:${Math.floor((track.info.duration % 60000) / 1000).toString().padStart(2, '0')}]` : '';
@@ -199,20 +166,20 @@ client.on('interactionCreate', async (interaction) => {
 
             const changeButton = new ButtonBuilder()
                 .setCustomId(`search_change_${interaction.user.id}`)
-                .setLabel(t(locale, 'search.changeLabel'))
+                .setLabel('Изменить трек')
                 .setStyle(ButtonStyle.Secondary);
 
             const cancelButton = new ButtonBuilder()
                 .setCustomId(`search_cancel_${interaction.user.id}`)
-                .setLabel(t(locale, 'search.cancelLabel'))
+                .setLabel('Отмена')
                 .setStyle(ButtonStyle.Danger);
 
             const row1 = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(platformSelect);
             const row2 = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(trackSelect);
-            const row3 = new ActionRowBuilder<any>().addComponents(changeButton, cancelButton);
+            const row3 = new ActionRowBuilder<ButtonBuilder>().addComponents(changeButton, cancelButton);
 
             await interaction.editReply({
-                content: t(locale, 'search.title', { query: newQuery }),
+                content: `🎵 Результаты поиска для: **${newQuery}**`,
                 components: [row1, row2, row3]
             });
 
@@ -228,10 +195,9 @@ client.on('interactionCreate', async (interaction) => {
 
         // Platform selection
         if (customId.startsWith('search_platform_')) {
-            const locale = await getGuildLocale(interaction.guildId);
             const userId = customId.split('_')[2];
             if (interaction.user.id !== userId) {
-                await interaction.reply({ content: t(locale, 'general.notForYou'), ephemeral: true });
+                await interaction.reply({ content: 'This menu is not for you!', ephemeral: true });
                 return;
             }
 
@@ -239,13 +205,13 @@ client.on('interactionCreate', async (interaction) => {
 
             const player = client.lavalink.getPlayer(interaction.guildId!);
             if (!player) {
-                await interaction.followUp({ content: t(locale, 'general.playerNotFound'), ephemeral: true });
+                await interaction.followUp({ content: 'Player not found!', ephemeral: true });
                 return;
             }
 
-            const pendingSearch = player.get('pendingSearch') as string | undefined;
+            const pendingSearch = player.get('pendingSearch');
             if (!pendingSearch) {
-                await interaction.followUp({ content: t(locale, 'search.pendingMissing'), ephemeral: true });
+                await interaction.followUp({ content: 'No pending search found!', ephemeral: true });
                 return;
             }
 
@@ -253,37 +219,38 @@ client.on('interactionCreate', async (interaction) => {
             const result = await player.search({ query: prefix + pendingSearch }, interaction.user);
 
             if (result.loadType === 'empty' || !result.tracks.length) {
-                await interaction.editReply({ content: t(locale, 'search.noResults'), components: [] });
+                await interaction.editReply({ content: 'No results found!', components: [] });
                 return;
             }
 
             // Show top 10 results
             const tracks = result.tracks.slice(0, 10);
 
-            const platformName = prefix === 'ytsearch:' ? 'YouTube' : prefix === 'spsearch:' ? 'Spotify' : 'SoundCloud';
-
             // Recreate platform select
             const platformSelect = new StringSelectMenuBuilder()
                 .setCustomId(`search_platform_${interaction.user.id}`)
-                .setPlaceholder(t(locale, 'search.platformPlaceholderSelected', { platform: platformName }))
+                .setPlaceholder('Выбранная площадка: ' + (prefix === 'ytsearch:' ? 'YouTube' : prefix === 'spsearch:' ? 'Spotify' : 'SoundCloud'))
                 .addOptions(
                     new StringSelectMenuOptionBuilder()
                         .setLabel('YouTube')
-                        .setDescription(t(locale, 'search.platformDesc.youtube'))
-                        .setValue('ytsearch:'),
+                        .setDescription('Поиск видео на YouTube')
+                        .setValue('ytsearch:')
+                        .setEmoji('🔴'),
                     new StringSelectMenuOptionBuilder()
                         .setLabel('Spotify')
-                        .setDescription(t(locale, 'search.platformDesc.spotify'))
-                        .setValue('spsearch:'),
+                        .setDescription('Поиск треков на Spotify')
+                        .setValue('spsearch:')
+                        .setEmoji('🟢'),
                     new StringSelectMenuOptionBuilder()
                         .setLabel('SoundCloud')
-                        .setDescription(t(locale, 'search.platformDesc.soundcloud'))
-                        .setValue('scsearch:'),
+                        .setDescription('Поиск на SoundCloud')
+                        .setValue('scsearch:')
+                        .setEmoji('🟠')
                 );
 
             const trackSelect = new StringSelectMenuBuilder()
                 .setCustomId(`search_track_${interaction.user.id}`)
-                .setPlaceholder(t(locale, 'search.trackPlaceholder'))
+                .setPlaceholder('Выберите трек')
                 .addOptions(
                     tracks.map((track, index) => {
                         const duration = track.info.duration ? `[${Math.floor(track.info.duration / 60000)}:${Math.floor((track.info.duration % 60000) / 1000).toString().padStart(2, '0')}]` : '';
@@ -297,12 +264,12 @@ client.on('interactionCreate', async (interaction) => {
             const { ButtonBuilder, ButtonStyle } = await import('discord.js');
             const changeButton = new ButtonBuilder()
                 .setCustomId(`search_change_${interaction.user.id}`)
-                .setLabel(t(locale, 'search.changeLabel'))
+                .setLabel('Изменить трек')
                 .setStyle(ButtonStyle.Secondary);
 
             const cancelButton = new ButtonBuilder()
                 .setCustomId(`search_cancel_${interaction.user.id}`)
-                .setLabel(t(locale, 'search.cancelLabel'))
+                .setLabel('Отмена')
                 .setStyle(ButtonStyle.Danger);
 
             const row1 = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(platformSelect);
@@ -310,7 +277,7 @@ client.on('interactionCreate', async (interaction) => {
             const row3 = new ActionRowBuilder<any>().addComponents(changeButton, cancelButton);
 
             await interaction.editReply({
-                content: t(locale, 'search.title', { query: pendingSearch }),
+                content: `🎵 Результаты поиска для: **${pendingSearch}**`,
                 components: [row1, row2, row3]
             });
 
@@ -322,10 +289,9 @@ client.on('interactionCreate', async (interaction) => {
 
         // Track selection
         if (customId.startsWith('search_track_')) {
-            const locale = await getGuildLocale(interaction.guildId);
             const userId = customId.split('_')[2];
             if (interaction.user.id !== userId) {
-                await interaction.reply({ content: t(locale, 'general.notForYou'), ephemeral: true });
+                await interaction.reply({ content: 'This menu is not for you!', ephemeral: true });
                 return;
             }
 
@@ -333,13 +299,13 @@ client.on('interactionCreate', async (interaction) => {
 
             const player = client.lavalink.getPlayer(interaction.guildId!);
             if (!player) {
-                await interaction.followUp({ content: t(locale, 'general.playerNotFound'), ephemeral: true });
+                await interaction.followUp({ content: 'Player not found!', ephemeral: true });
                 return;
             }
 
             const searchResults = player.get('searchResults') as any[];
             if (!searchResults) {
-                await interaction.followUp({ content: t(locale, 'search.pendingMissing'), ephemeral: true });
+                await interaction.followUp({ content: 'Search results expired!', ephemeral: true });
                 return;
             }
 
@@ -347,7 +313,7 @@ client.on('interactionCreate', async (interaction) => {
             const track = searchResults[trackIndex];
 
             if (!track) {
-                await interaction.followUp({ content: t(locale, 'search.invalidSelection'), ephemeral: true });
+                await interaction.followUp({ content: 'Invalid track selection!', ephemeral: true });
                 return;
             }
 
@@ -357,7 +323,7 @@ client.on('interactionCreate', async (interaction) => {
             if (!player.playing) await player.play();
 
             await interaction.editReply({
-                content: t(locale, 'search.trackAdded', { title: track.info.title }),
+                content: `✅ **${track.info.title}** добавлен в очередь!`,
                 components: []
             });
 
@@ -374,15 +340,14 @@ client.on('interactionCreate', async (interaction) => {
 
     // Handle search menu buttons
     if (customId.startsWith('search_cancel_')) {
-        const locale = await getGuildLocale(interaction.guildId);
         const userId = customId.split('_')[2];
         if (interaction.user.id !== userId) {
-            await interaction.reply({ content: t(locale, 'general.notForYou'), ephemeral: true });
+            await interaction.reply({ content: 'This button is not for you!', ephemeral: true });
             return;
         }
 
         await interaction.update({
-            content: t(locale, 'search.cancelled'),
+            content: '❌ Поиск отменён',
             components: []
         });
 
@@ -396,16 +361,15 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     if (customId.startsWith('search_change_')) {
-        const locale = await getGuildLocale(interaction.guildId);
         const userId = customId.split('_')[2];
         if (interaction.user.id !== userId) {
-            await interaction.reply({ content: t(locale, 'general.notForYou'), ephemeral: true });
+            await interaction.reply({ content: 'This button is not for you!', ephemeral: true });
             return;
         }
 
         const player = client.lavalink.getPlayer(interaction.guildId!);
         if (!player) {
-            await interaction.reply({ content: t(locale, 'general.playerNotFound'), ephemeral: true });
+            await interaction.reply({ content: 'Player not found!', ephemeral: true });
             return;
         }
 
@@ -414,13 +378,13 @@ client.on('interactionCreate', async (interaction) => {
         // Show Modal for new search query
         const modal = new ModalBuilder()
             .setCustomId(`search_modal_${interaction.user.id}`)
-            .setTitle(t(locale, 'search.modalTitle'));
+            .setTitle('Изменение запроса');
 
         const queryInput = new TextInputBuilder()
             .setCustomId('search_query')
-            .setLabel(t(locale, 'search.modalLabel'))
+            .setLabel('Введите запрос')
             .setStyle(TextInputStyle.Short)
-            .setPlaceholder(t(locale, 'search.modalPlaceholder'))
+            .setPlaceholder('Название трека, артиста, альбома...')
             .setValue(String(pendingSearch))
             .setRequired(true);
 
@@ -435,7 +399,7 @@ client.on('interactionCreate', async (interaction) => {
 
     const player = client.lavalink.getPlayer(interaction.guildId!);
     if (!player || !player.musicHandler) {
-        await interaction.reply({ content: t(await getGuildLocale(interaction.guildId), 'general.playerMissing'), ephemeral: true });
+        await interaction.reply({ content: 'Player not found or active.', ephemeral: true });
         return;
     }
 
@@ -459,7 +423,7 @@ client.on('interactionCreate', async (interaction) => {
         case 'player_prev':
             const success = await player.musicHandler?.playPrevious();
             if (!success) {
-                await interaction.followUp({ content: t(await getGuildLocale(interaction.guildId), 'interactions.prevTrackMissing'), ephemeral: true });
+                await interaction.followUp({ content: 'No previous track available.', ephemeral: true });
             }
             return; // trackStart will send new message
 
@@ -480,10 +444,8 @@ client.on('interactionCreate', async (interaction) => {
 
         case 'player_queue':
             // Show queue ephemeral
-            const locale = await getGuildLocale(interaction.guildId);
             const tracks = player.queue.tracks.slice(0, 10).map((t, i) => `${i + 1}. ${t.info.title}`).join('\n');
-            const list = tracks || t(locale, 'interactions.queueEmpty');
-            await interaction.followUp({ content: t(locale, 'interactions.queueCheck', { tracks: list }), ephemeral: true });
+            await interaction.followUp({ content: `**Queue:**\n${tracks || 'Empty'}`, ephemeral: true });
             return; // Don't update message for queue check
     }
 
@@ -491,16 +453,21 @@ client.on('interactionCreate', async (interaction) => {
     await player.musicHandler.updateMessage(true);
 });
 
+client.once('ready', async () => {
+    logger.info(`Logged in as ${client.user?.tag}!`);
+    // Initialize Lavalink Client with user data
+    client.lavalink.init({
+        id: client.user!.id,
+        username: client.user!.username
+    });
 
-
-const hasPresenceIntent = client.options.intents.has(GatewayIntentBits.GuildPresences);
-
-const getOnlineCount = (guild: any) => {
-    if (!hasPresenceIntent) return null;
-    const presences = guild?.presences?.cache;
-    if (!presences) return null;
-    return presences.filter((presence: any) => presence?.status && presence.status !== 'offline' && presence.status !== 'invisible').size;
-};
+    // Sync Guild Data
+    logger.info('Syncing guild data...');
+    for (const guild of client.guilds.cache.values()) {
+        await syncGuildData(guild);
+    }
+    logger.info('Guild data synced!');
+});
 
 async function syncGuildData(guild: any) {
     try {
@@ -520,27 +487,20 @@ async function syncGuildData(guild: any) {
             position: r.position
         }));
 
-        const memberCount = typeof guild.memberCount === 'number' ? guild.memberCount : null;
-        const onlineCount = getOnlineCount(guild);
-
         await prisma.guild.upsert({
             where: { id: guild.id },
             update: {
                 name: guild.name,
                 icon: guild.icon,
                 channels: JSON.stringify(channels),
-                roles: JSON.stringify(roles),
-                memberCount,
-                onlineCount
+                roles: JSON.stringify(roles)
             },
             create: {
                 id: guild.id,
                 name: guild.name,
                 icon: guild.icon,
                 channels: JSON.stringify(channels),
-                roles: JSON.stringify(roles),
-                memberCount,
-                onlineCount
+                roles: JSON.stringify(roles)
             }
         });
 
@@ -558,18 +518,6 @@ async function syncGuildData(guild: any) {
     }
 }
 
-const guildSyncTimers = new Map<string, NodeJS.Timeout>();
-
-const scheduleGuildSync = (guild: any, delayMs = 15000) => {
-    if (!guild?.id) return;
-    if (guildSyncTimers.has(guild.id)) return;
-    const timer = setTimeout(() => {
-        guildSyncTimers.delete(guild.id);
-        syncGuildData(guild);
-    }, delayMs);
-    guildSyncTimers.set(guild.id, timer);
-};
-
 // Auto-sync events
 client.on('channelCreate', (channel) => {
     if ('guild' in channel) syncGuildData(channel.guild);
@@ -583,10 +531,5 @@ client.on('channelUpdate', (oldChannel, newChannel) => {
 client.on('roleCreate', (role) => syncGuildData(role.guild));
 client.on('roleDelete', (role) => syncGuildData(role.guild));
 client.on('roleUpdate', (oldRole, newRole) => syncGuildData(newRole.guild));
-client.on('guildMemberAdd', (member) => scheduleGuildSync(member.guild, 2000));
-client.on('guildMemberRemove', (member) => scheduleGuildSync(member.guild, 2000));
-client.on('presenceUpdate', (_oldPresence, newPresence) => {
-    if (newPresence?.guild) scheduleGuildSync(newPresence.guild);
-});
 
 main();

@@ -1,48 +1,10 @@
 import { Events, Interaction, GuildMember, EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { useMainPlayer, useQueue, QueryType } from 'discord-player';
-import { buildHelpModuleEmbed, buildHelpOverviewEmbed, buildHelpSelectRow, HELP_MENU_CUSTOM_ID, VISIBLE_COMMANDS } from '../utils/helpMenu';
-import { getGuildLocale, t } from '../utils/i18n';
 import logger from '../utils/logger';
-import { buildAuditConfigUi, deleteAuditRoute, getAuditRoute, upsertAuditRoute } from '../utils/auditConfigUi';
 
 export default {
     name: Events.InteractionCreate,
     async execute(interaction: Interaction) {
-        // Autocomplete for /help command lookup
-        if (interaction.isAutocomplete()) {
-            const focused = interaction.options.getFocused().toLowerCase();
-            if (interaction.commandName === 'help') {
-                const choices = VISIBLE_COMMANDS
-                    .filter((name) => name.toLowerCase().includes(focused))
-                    .slice(0, 25)
-                    .map((name) => ({ name: `/${name}`, value: name }));
-                await interaction.respond(choices);
-            }
-            return;
-        }
-
-        // ----- Context menu handling -----
-        if (interaction.isContextMenuCommand()) {
-            const { commands } = await import('../handlers/commandHandler');
-            const command = commands.get(interaction.commandName);
-            if (!command) {
-                logger.error(`No context command matching ${interaction.commandName} was found.`);
-                return;
-            }
-
-            try {
-                await command.execute(interaction as any);
-            } catch (error) {
-                logger.error(`Error executing ${interaction.commandName}:`, error);
-                if (interaction.replied || interaction.deferred) {
-                    await interaction.followUp({ content: 'Command failed.', ephemeral: true });
-                } else {
-                    await interaction.reply({ content: 'Command failed.', ephemeral: true });
-                }
-            }
-            return;
-        }
-
         // ----- Slash command handling -----
         if (interaction.isChatInputCommand()) {
             const { commands } = await import('../handlers/commandHandler');
@@ -51,8 +13,6 @@ export default {
                 logger.error(`No command matching ${interaction.commandName} was found.`);
                 return;
             }
-
-            const locale = await getGuildLocale(interaction.guildId);
 
             // Music Command Restrictions
             const musicCommands = ['play', 'skip', 'stop', 'pause', 'resume', 'queue', 'volume', 'loop', 'shuffle', 'nowplaying'];
@@ -69,12 +29,12 @@ export default {
 
                         if (musicConfig.channelMode === 'WHITELIST') {
                             if (!voiceChannelId || !allowedChannels.includes(voiceChannelId)) {
-                                await interaction.reply({ content: `❌ ${t(locale, 'interactions.musicChannelWhitelist')}`, ephemeral: true });
+                                await interaction.reply({ content: `❌ You must be in a whitelisted Voice Channel to use music commands.`, ephemeral: true });
                                 return;
                             }
                         } else if (musicConfig.channelMode === 'BLACKLIST') {
                             if (voiceChannelId && allowedChannels.includes(voiceChannelId)) {
-                                await interaction.reply({ content: `❌ ${t(locale, 'interactions.musicChannelBlacklist')}`, ephemeral: true });
+                                await interaction.reply({ content: `❌ Music commands are not allowed in this Voice Channel.`, ephemeral: true });
                                 return;
                             }
                         }
@@ -88,7 +48,7 @@ export default {
                         const isAdmin = member.permissions.has('Administrator');
 
                         if (!hasDJRole && !isAdmin) {
-                            await interaction.reply({ content: `❌ ${t(locale, 'interactions.djOnly')}`, ephemeral: true });
+                            await interaction.reply({ content: `❌ DJ Mode is enabled. You need a DJ role to use music commands.`, ephemeral: true });
                             return;
                         }
                     }
@@ -99,78 +59,26 @@ export default {
                 await command.execute(interaction);
             } catch (error) {
                 logger.error(`Error executing ${interaction.commandName}:`, error);
-                const replyOpts = { content: t(locale, 'general.commandError'), ephemeral: true };
+                const replyOpts = { content: 'There was an error while executing this command!', ephemeral: true };
                 if (interaction.replied || interaction.deferred) await interaction.followUp(replyOpts);
                 else await interaction.reply(replyOpts);
             }
             return;
         }
 
-        // ----- Audit config handling -----
-        if (interaction.isStringSelectMenu() && interaction.customId.startsWith('audit_tag_select:')) {
-            const [, userId] = interaction.customId.split(':');
-            if (interaction.user.id !== userId) {
-                await interaction.reply({ content: t(await getGuildLocale(interaction.guildId), 'general.notForYou'), ephemeral: true });
-                return;
-            }
-
-            const tag = interaction.values[0];
-            if (!interaction.guildId) return;
-            const ui = await buildAuditConfigUi(interaction.guildId, userId, tag);
-            await interaction.update(ui);
-            return;
-        }
-
-        if (interaction.isChannelSelectMenu() && interaction.customId.startsWith('audit_channel_select:')) {
-            const [, tag, userId] = interaction.customId.split(':');
-            if (interaction.user.id !== userId) {
-                await interaction.reply({ content: t(await getGuildLocale(interaction.guildId), 'general.notForYou'), ephemeral: true });
-                return;
-            }
-
-            if (!interaction.guildId) return;
-            const channelId = interaction.values[0];
-            await upsertAuditRoute(interaction.guildId, tag, { channelId, enabled: true });
-            const ui = await buildAuditConfigUi(interaction.guildId, userId, tag);
-            await interaction.update(ui);
-            return;
-        }
-
         // ----- Search Menu Handling -----
         if (interaction.isStringSelectMenu()) {
-            if (interaction.customId.startsWith(HELP_MENU_CUSTOM_ID)) {
-                const locale = await getGuildLocale(interaction.guildId);
-                const [, targetUserId] = interaction.customId.split(':');
-
-                if (targetUserId && targetUserId !== interaction.user.id) {
-                    await interaction.reply({ content: t(locale, 'general.notForYou'), ephemeral: true });
-                    return;
-                }
-
-                const selected = interaction.values[0];
-                const embed = selected === 'all'
-                    ? buildHelpOverviewEmbed(locale)
-                    : buildHelpModuleEmbed(selected, locale);
-
-                await interaction.update({
-                    embeds: [embed],
-                    components: [buildHelpSelectRow(interaction.user.id, locale, selected)],
-                });
-                return;
-            }
-
             const player = useMainPlayer();
             if (!player) return;
 
             if (interaction.customId === 'platform_select') {
-                const locale = await getGuildLocale(interaction.guildId);
                 await interaction.deferUpdate();
 
                 // Extract query from message content: "Found X tracks for "**query**""
                 const content = interaction.message.content;
                 const match = content.match(/\*\*(.*?)\*\*/);
                 if (!match) {
-                    await interaction.followUp({ content: t(locale, 'search.queryExtractFailed'), ephemeral: true });
+                    await interaction.followUp({ content: 'Could not retrieve query from message.', ephemeral: true });
                     return;
                 }
                 const query = match[1];
@@ -183,22 +91,21 @@ export default {
                     });
 
                     if (!searchResult || searchResult.tracks.length === 0) {
-                        await interaction.followUp({ content: t(locale, 'search.noResultsOn', { platform: String(searchEngine) }), ephemeral: true });
+                        await interaction.followUp({ content: `No results found on ${searchEngine}`, ephemeral: true });
                         return;
                     }
                 } catch (error) {
                     logger.error('[Search] Error:', error);
-                    await interaction.followUp({ content: t(locale, 'search.error'), ephemeral: true });
+                    await interaction.followUp({ content: 'Error searching.', ephemeral: true });
                 }
             } else if (interaction.customId === 'track_select') {
-                const locale = await getGuildLocale(interaction.guildId);
                 const url = interaction.values[0];
                 const member = interaction.member as GuildMember;
 
                 logger.info(`[Track Select] User ${interaction.user.tag} selected: ${url}`);
 
                 if (!member.voice.channel) {
-                    await interaction.reply({ content: t(locale, 'general.notVoice'), ephemeral: true });
+                    await interaction.reply({ content: 'You need to be in a Voice Channel!', ephemeral: true });
                     return;
                 }
 
@@ -227,66 +134,18 @@ export default {
                     });
 
                     // Success - delete the search menu or replace with success message
-                    await interaction.editReply({ content: t(locale, 'search.trackAdded', { title: playResult.track.title }), components: [] });
+                    await interaction.editReply({ content: `**${playResult.track.title}** added to queue!`, components: [] });
 
                     logger.info(`[Track Select] Updated interaction reply successfully`);
                 } catch (error) {
                     logger.error('[Track Select] Play Error:', error);
-                    await interaction.followUp({ content: t(locale, 'interactions.playFailed', { error: String(error) }), ephemeral: true });
+                    await interaction.followUp({ content: `Failed to play: ${error}`, ephemeral: true });
                 }
             }
         }
 
         if (interaction.isButton() && interaction.customId === 'cancel_search') {
             await interaction.message.delete();
-            return;
-        }
-
-        if (interaction.isButton() && interaction.customId.startsWith('audit_route_')) {
-            const parts = interaction.customId.split(':');
-            const action = parts[0];
-            const tag = parts[1] || '';
-            const userId = parts[2] || '';
-
-            if (action === 'audit_route_close') {
-                const closeUserId = parts[1] || '';
-                if (interaction.user.id !== closeUserId) {
-                    await interaction.reply({ content: t(await getGuildLocale(interaction.guildId), 'general.notForYou'), ephemeral: true });
-                    return;
-                }
-                await interaction.update({ content: 'Audit config closed.', embeds: [], components: [] });
-                return;
-            }
-
-            if (interaction.user.id !== userId) {
-                await interaction.reply({ content: t(await getGuildLocale(interaction.guildId), 'general.notForYou'), ephemeral: true });
-                return;
-            }
-
-            if (!interaction.guildId) return;
-
-            const route = await getAuditRoute(interaction.guildId, tag);
-
-            if (action === 'audit_route_enable') {
-                if (!route?.channelId) {
-                    await interaction.reply({ content: 'Select a channel first.', ephemeral: true });
-                    return;
-                }
-                await upsertAuditRoute(interaction.guildId, tag, { enabled: true });
-            } else if (action === 'audit_route_disable') {
-                if (!route) {
-                    await interaction.reply({ content: 'Route not set.', ephemeral: true });
-                    return;
-                }
-                await upsertAuditRoute(interaction.guildId, tag, { enabled: false });
-            } else if (action === 'audit_route_clear') {
-                if (route) {
-                    await deleteAuditRoute(interaction.guildId, tag);
-                }
-            }
-
-            const ui = await buildAuditConfigUi(interaction.guildId, userId, tag);
-            await interaction.update(ui);
             return;
         }
 
@@ -300,14 +159,14 @@ export default {
         const player = useMainPlayer();
         if (!player) {
             logger.error('[Button] No player instance found.');
-            return interaction.reply({ content: t(await getGuildLocale(interaction.guildId), 'interactions.playerNotReady'), ephemeral: true });
+            return interaction.reply({ content: 'Player is not ready.', ephemeral: true });
         }
 
         // Retrieve the queue for this guild
         const guildId = interaction.guildId;
         if (!guildId) {
             logger.error('[Button] Interaction missing guildId.');
-            return interaction.reply({ content: t(await getGuildLocale(interaction.guildId), 'general.serverUnknown'), ephemeral: true });
+            return interaction.reply({ content: 'Unable to identify server.', ephemeral: true });
         }
         let queue = useQueue(guildId);
         if (!queue && player.nodes) {
@@ -316,13 +175,13 @@ export default {
         }
         logger.debug(`[Button] GuildId: ${guildId}, Queue exists: ${!!queue}`);
         if (!queue) {
-            return interaction.reply({ content: t(await getGuildLocale(interaction.guildId), 'interactions.queueMissing'), ephemeral: true });
+            return interaction.reply({ content: 'No music queue found for this server!', ephemeral: true });
         }
 
         // Verify the user is in the same voice channel as the bot
         const member = interaction.member as GuildMember;
         if (member.voice.channelId !== interaction.guild?.members.me?.voice.channelId) {
-            return interaction.reply({ content: t(await getGuildLocale(interaction.guildId), 'interactions.sameChannelRequired'), ephemeral: true });
+            return interaction.reply({ content: 'You need to be in the same voice channel as the bot!', ephemeral: true });
         }
 
         // Defer the button update to avoid "this interaction failed" messages
@@ -360,12 +219,11 @@ export default {
                 queue.node.setVolume(Math.min(150, queue.node.volume + 10));
                 break;
             case 'queue':
-                const locale = await getGuildLocale(interaction.guildId);
                 const embed = new EmbedBuilder()
-                    .setTitle(t(locale, 'interactions.queueTitle'))
+                    .setTitle('Current Queue')
                     .setColor('#2f3136');
                 if (queue.tracks?.data?.length === 0) {
-                    embed.setDescription(t(locale, 'interactions.queueEmpty'));
+                    embed.setDescription('Queue is empty');
                 } else {
                     const description = queue.tracks.data
                         .map((t: any, i: number) => `${i + 1}. ${t.title}`)

@@ -30,6 +30,16 @@ const normalizeLocale = (value: unknown) => {
     return null;
 };
 
+const normalizeTimezone = (value: unknown): string | null => {
+    if (typeof value !== 'string') return null;
+    try {
+        Intl.DateTimeFormat(undefined, { timeZone: value });
+        return value;
+    } catch {
+        return null;
+    }
+};
+
 const getBotSettingsClient = () =>
     (prisma as unknown as { botSettings?: BotSettingsClient }).botSettings;
 
@@ -115,6 +125,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const prefix = prefixInput.length > 0 ? prefixInput.slice(0, 5) : null;
     const prefixCommandsEnabled = body.prefixCommandsEnabled === false ? false : true;
     const locale = normalizeLocale(body.locale);
+    const timezone = normalizeTimezone(body.timezone);
 
     if (prefix) {
         await prisma.guild.upsert({
@@ -137,6 +148,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         if (locale) {
             updatePayload.locale = locale;
         }
+        if (timezone) {
+            updatePayload.timezone = timezone;
+        }
 
         const config = await botSettingsClient.upsert({
             where: { guildId },
@@ -150,6 +164,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
                 restoreRolesOnRejoin: Boolean(body.restoreRolesOnRejoin),
                 restoreNicknameOnRejoin: Boolean(body.restoreNicknameOnRejoin),
                 locale: locale ?? 'ru',
+                timezone: timezone ?? 'UTC',
             }
         });
 

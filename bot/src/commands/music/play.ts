@@ -1,8 +1,6 @@
 import { SlashCommandBuilder, GuildMember, ActionRowBuilder, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { Command } from '../../utils/types';
-import { getGuildLocale, t, LocaleCode } from '../../utils/i18n';
 import logger from '../../utils/logger';
-import { prisma } from '../../utils/database';
 
 const command: Command = {
     data: new SlashCommandBuilder()
@@ -14,14 +12,12 @@ const command: Command = {
                 .setRequired(true)
         ) as any,
     execute: async (interaction) => {
-        let locale: LocaleCode = 'ru';
         try {
-            locale = await getGuildLocale(interaction.guildId);
             const member = interaction.member as GuildMember;
             const voiceChannel = member.voice.channel;
 
             if (!voiceChannel) {
-                await interaction.reply({ content: t(locale, 'general.notVoice'), ephemeral: true });
+                await interaction.reply({ content: 'You need to be in a voice channel!', ephemeral: true });
                 return;
             }
 
@@ -30,28 +26,9 @@ const command: Command = {
 
             const player = interaction.client.lavalink.getPlayer(interaction.guildId!);
 
-            let targetVolume = 100;
-            try {
-                const cfg = await prisma.musicConfig.upsert({
-                    where: { guildId: interaction.guildId! },
-                    update: {},
-                    create: {
-                        guildId: interaction.guildId!,
-                        channelMode: 'BLACKLIST',
-                        allowedChannels: JSON.stringify([]),
-                        djMode: false,
-                        djRoles: JSON.stringify([]),
-                        defaultVolume: 50,
-                    },
-                });
-                targetVolume = cfg.defaultVolume ?? 100;
-            } catch (e) {
-                logger.error('Failed to load music config for volume, using default 100', e);
-            }
-
             if (player) {
                 if (player.voiceChannelId !== voiceChannel.id) {
-                    await interaction.editReply(t(locale, 'music.play.sameChannel'));
+                    await interaction.editReply('You need to be in the same voice channel as the bot!');
                     return;
                 }
             } else {
@@ -61,13 +38,13 @@ const command: Command = {
                     textChannelId: interaction.channelId,
                     selfDeaf: true,
                     selfMute: false,
-                    volume: targetVolume,
+                    volume: 100,
                 });
             }
 
             const newPlayer = interaction.client.lavalink.getPlayer(interaction.guildId!);
             if (!newPlayer) {
-                await interaction.editReply(t(locale, 'music.play.failedCreate'));
+                await interaction.editReply('Failed to create player.');
                 return;
             }
 
@@ -81,7 +58,7 @@ const command: Command = {
                 const result = await newPlayer.search({ query: 'ytsearch:' + query }, interaction.user);
 
                 if (result.loadType === 'empty' || !result.tracks.length) {
-                    await interaction.editReply(t(locale, 'search.noResults'));
+                    await interaction.editReply('No results found!');
                     return;
                 }
 
@@ -90,25 +67,28 @@ const command: Command = {
 
                 const platformSelect = new StringSelectMenuBuilder()
                     .setCustomId(`search_platform_${interaction.user.id}`)
-                    .setPlaceholder(t(locale, 'search.platformPlaceholder', { platform: 'YouTube' }))
+                    .setPlaceholder('Площадка: YouTube')
                     .addOptions(
                         new StringSelectMenuOptionBuilder()
                             .setLabel('YouTube')
-                            .setDescription(t(locale, 'search.platformDesc.youtube'))
-                            .setValue('ytsearch:'),
+                            .setDescription('Поиск видео на YouTube')
+                            .setValue('ytsearch:')
+                            .setEmoji('🔴'),
                         new StringSelectMenuOptionBuilder()
                             .setLabel('Spotify')
-                            .setDescription(t(locale, 'search.platformDesc.spotify'))
-                            .setValue('spsearch:'),
+                            .setDescription('Поиск треков на Spotify')
+                            .setValue('spsearch:')
+                            .setEmoji('🟢'),
                         new StringSelectMenuOptionBuilder()
                             .setLabel('SoundCloud')
-                            .setDescription(t(locale, 'search.platformDesc.soundcloud'))
-                            .setValue('scsearch:'),
+                            .setDescription('Поиск на SoundCloud')
+                            .setValue('scsearch:')
+                            .setEmoji('🟠')
                     );
 
                 const trackSelect = new StringSelectMenuBuilder()
                     .setCustomId(`search_track_${interaction.user.id}`)
-                    .setPlaceholder(t(locale, 'search.trackPlaceholder'))
+                    .setPlaceholder('Выберите трек')
                     .addOptions(
                         tracks.map((track, index) => {
                             const duration = track.info.duration ? `[${Math.floor(track.info.duration / 60000)}:${Math.floor((track.info.duration % 60000) / 1000).toString().padStart(2, '0')}]` : '';
@@ -121,12 +101,12 @@ const command: Command = {
 
                 const changeButton = new ButtonBuilder()
                     .setCustomId(`search_change_${interaction.user.id}`)
-                    .setLabel(t(locale, 'search.changeLabel'))
+                    .setLabel('Изменить трек')
                     .setStyle(ButtonStyle.Secondary);
 
                 const cancelButton = new ButtonBuilder()
                     .setCustomId(`search_cancel_${interaction.user.id}`)
-                    .setLabel(t(locale, 'search.cancelLabel'))
+                    .setLabel('Отмена')
                     .setStyle(ButtonStyle.Danger);
 
                 const row1 = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(platformSelect);
@@ -134,7 +114,7 @@ const command: Command = {
                 const row3 = new ActionRowBuilder<ButtonBuilder>().addComponents(changeButton, cancelButton);
 
                 await interaction.editReply({
-                    content: t(locale, 'search.title', { query }),
+                    content: `🎵 Результаты поиска для: **${query}**`,
                     components: [row1, row2, row3]
                 });
 
@@ -149,12 +129,12 @@ const command: Command = {
             const result = await newPlayer.search({ query: query }, interaction.user);
 
             if (result.loadType === 'empty') {
-                await interaction.editReply(t(locale, 'search.noResults'));
+                await interaction.editReply('No results found!');
                 return;
             }
 
             if (result.loadType === 'error') {
-                await interaction.editReply(t(locale, 'music.play.errorLoading'));
+                await interaction.editReply('An error occurred while loading the track.');
                 return;
             }
 
@@ -168,8 +148,8 @@ const command: Command = {
 
                 if (!newPlayer.playing) await newPlayer.play();
 
-                const playlistName = result.pluginInfo?.identifier || result.tracks[0]?.info.title || t(locale, 'music.play.unknownPlaylist');
-                await interaction.editReply(t(locale, 'music.play.playlistAdded', { name: playlistName, count: result.tracks.length }));
+                const playlistName = result.pluginInfo?.identifier || result.tracks[0]?.info.title || 'Unknown Playlist';
+                await interaction.editReply(`Playlist **${playlistName}** added! (${result.tracks.length} tracks)`);
             } else {
                 // Single track or search result
                 const track = result.tracks[0];
@@ -178,15 +158,15 @@ const command: Command = {
 
                 if (!newPlayer.playing) await newPlayer.play();
 
-                await interaction.editReply(t(locale, 'music.play.trackEnqueued', { title: track.info.title }));
+                await interaction.editReply(`**${track.info.title}** enqueued!`);
             }
 
         } catch (error) {
             logger.error('Error executing play command:', error);
             if (interaction.deferred) {
-                await interaction.editReply(t(locale, 'music.play.errorGeneric'));
+                await interaction.editReply('An error occurred while trying to play music.');
             } else {
-                await interaction.reply({ content: t(locale, 'music.play.errorGeneric'), ephemeral: true });
+                await interaction.reply({ content: 'An error occurred while trying to play music.', ephemeral: true });
             }
         }
     },

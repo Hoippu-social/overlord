@@ -1,5 +1,4 @@
-import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
-import { getGuildLocale, t } from '../../utils/i18n';
+import { SlashCommandBuilder, EmbedBuilder, GuildMember } from 'discord.js';
 import { Command } from '../../utils/types';
 
 const command: Command = {
@@ -13,11 +12,10 @@ const command: Command = {
                 .setRequired(false)
         ) as any,
     execute: async (interaction) => {
-        const locale = await getGuildLocale(interaction.guildId);
         const player = interaction.client.lavalink.getPlayer(interaction.guildId!);
 
         if (!player || !player.queue.current) {
-            await interaction.reply({ content: t(locale, 'general.nothingPlaying'), ephemeral: true });
+            await interaction.reply({ content: '❌ Сейчас ничего не играет!', ephemeral: true });
             return;
         }
 
@@ -30,7 +28,7 @@ const command: Command = {
         const totalPages = Math.ceil(tracks.length / pageSize) || 1;
 
         if (page >= totalPages || page < 0) {
-            await interaction.reply({ content: t(locale, 'music.queue.invalidPage', { pages: totalPages }), ephemeral: true });
+            await interaction.reply({ content: `❌ Страница не найдена! Всего страниц: ${totalPages}`, ephemeral: true });
             return;
         }
 
@@ -38,15 +36,17 @@ const command: Command = {
         const endIndex = startIndex + pageSize;
         const pageTracks = tracks.slice(startIndex, endIndex);
 
+        // Format duration
         const formatDuration = (ms: number) => {
             const minutes = Math.floor(ms / 60000);
             const seconds = Math.floor((ms % 60000) / 1000);
             return `${minutes}:${seconds.toString().padStart(2, '0')}`;
         };
 
-        const currentInfo = `**${t(locale, 'music.queue.current')}**
-[${currentTrack!.info.title}](${currentTrack!.info.uri}) | \`${formatDuration(currentTrack!.info.duration || 0)}\``;
+        // Current track info
+        const currentInfo = `🎵 **Сейчас играет:**\n[${currentTrack!.info.title}](${currentTrack!.info.uri}) | \`${formatDuration(currentTrack!.info.duration || 0)}\``;
 
+        // Queue tracks
         let queueInfo = '';
         if (pageTracks.length > 0) {
             queueInfo = pageTracks.map((track, index) => {
@@ -54,34 +54,28 @@ const command: Command = {
                 return `**${position}.** [${track.info.title}](${track.info.uri}) | \`${formatDuration(track.info.duration || 0)}\``;
             }).join('\n');
         } else {
-            queueInfo = t(locale, 'music.queue.empty');
+            queueInfo = '*Очередь пуста*';
         }
 
+        // Total duration
         const totalDuration = tracks.reduce((acc, track) => acc + (track.info.duration || 0), 0);
         const totalFormatted = formatDuration(totalDuration);
 
         const embed = new EmbedBuilder()
             .setColor('#5865F2')
-            .setTitle(t(locale, 'music.queue.title'))
-            .setDescription(`${currentInfo}
-
-**${t(locale, 'music.queue.next')}**
-${queueInfo}`)
+            .setTitle('📋 Очередь воспроизведения')
+            .setDescription(`${currentInfo}\n\n**Следующие треки:**\n${queueInfo}`)
             .setFooter({
-                text: t(locale, 'music.queue.footer', { page: page + 1, pages: totalPages, count: tracks.length, duration: totalFormatted })
+                text: `Страница ${page + 1}/${totalPages} | ${tracks.length} треков | Общая длительность: ${totalFormatted}`
             });
 
+        // Add loop mode info
         if (player.repeatMode !== 'off') {
             const loopModes: Record<string, string> = {
-                track: t(locale, 'music.queue.loop.track'),
-                queue: t(locale, 'music.queue.loop.queue'),
-                off: t(locale, 'music.queue.loop.off'),
+                'track': '🔂 Повтор трека',
+                'queue': '🔁 Повтор очереди'
             };
-            embed.addFields({
-                name: t(locale, 'music.nowplaying.field.loop'),
-                value: loopModes[player.repeatMode] || t(locale, 'music.queue.loop.off'),
-                inline: true,
-            });
+            embed.addFields({ name: 'Режим повтора', value: loopModes[player.repeatMode] || 'Выключен', inline: true });
         }
 
         await interaction.reply({ embeds: [embed] });

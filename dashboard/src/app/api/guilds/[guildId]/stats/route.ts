@@ -161,14 +161,12 @@ export async function GET(
     const isHourly = period === '24h';
 
     const fmt = (d: Date) => {
+        const dd = d.getDate().toString().padStart(2, '0');
+        const mm = (d.getMonth() + 1).toString().padStart(2, '0');
+        const yyyy = d.getFullYear();
+
         if (period === '24h') return d.toISOString().substring(11, 16);
-        if (period === '7d') {
-            const day = d.getDate().toString().padStart(2, '0');
-            const mon = (d.getMonth() + 1).toString().padStart(2, '0');
-            const time = d.toISOString().substring(11, 16);
-            return `${day}.${mon} ${time}`;
-        }
-        return d.toISOString().split('T')[0];
+        return `${dd}.${mm}.${yyyy}`;
     };
 
     // Calculate Date Range
@@ -221,10 +219,24 @@ export async function GET(
                     where: { guildId, date: { gte: startDate } },
                     orderBy: { date: 'asc' }
                 });
+
+                // Group by formatted date to avoid duplicates from different timezone buckets or sync overlap
+                const grouped = new Map<string, any>();
+                for (const d of dailyStats) {
+                    const label = fmt(d.date);
+                    if (grouped.has(label)) {
+                        const existing = grouped.get(label);
+                        existing.messages += d.messages;
+                        existing.voiceSeconds += d.voiceSeconds;
+                    } else {
+                        grouped.set(label, { ...d, label });
+                    }
+                }
+
                 totalMessages = dailyStats.reduce((sum, d) => sum + d.messages, 0);
                 totalVoiceSeconds = dailyStats.reduce((sum, d) => sum + d.voiceSeconds, 0);
-                activityData = dailyStats.map(d => ({
-                    date: fmt(d.date),
+                activityData = Array.from(grouped.values()).map(d => ({
+                    date: d.label,
                     messages: d.messages,
                     voice: Math.floor(d.voiceSeconds / 60) // minutes
                 }));
@@ -259,7 +271,17 @@ export async function GET(
                     orderBy: { date: 'asc' },
                     select: { date: true, messages: true }
                 });
-                lineChart = daily.map(d => ({ date: fmt(d.date), messages: d.messages }));
+
+                const grouped = new Map<string, any>();
+                for (const d of daily) {
+                    const label = fmt(d.date);
+                    if (grouped.has(label)) {
+                        grouped.get(label).messages += d.messages;
+                    } else {
+                        grouped.set(label, { messages: d.messages, date: label });
+                    }
+                }
+                lineChart = Array.from(grouped.values());
             }
 
             if (!isHourly && lineChart.length > 0) {
@@ -330,7 +352,20 @@ export async function GET(
                     orderBy: { date: 'asc' },
                     select: { date: true, voiceSeconds: true }
                 });
-                areaChart = daily.map(d => ({ date: fmt(d.date), voice: Math.floor(d.voiceSeconds / 60) }));
+
+                const grouped = new Map<string, any>();
+                for (const d of daily) {
+                    const label = fmt(d.date);
+                    if (grouped.has(label)) {
+                        grouped.get(label).voiceSeconds += d.voiceSeconds;
+                    } else {
+                        grouped.set(label, { voiceSeconds: d.voiceSeconds, date: label });
+                    }
+                }
+                areaChart = Array.from(grouped.values()).map(d => ({
+                    date: d.date,
+                    voice: Math.floor(d.voiceSeconds / 60)
+                }));
             }
 
             if (!isHourly && areaChart.length > 0) {
@@ -435,11 +470,25 @@ export async function GET(
 
         // 4. Members Data
         else if (type === 'members') {
-            const dailyStats = await statsPrisma.statDaily.findMany({
+            const dailyStatsRaw = await statsPrisma.statDaily.findMany({
                 where: { guildId, date: { gte: startDate } },
                 orderBy: { date: 'asc' },
                 select: { date: true, newMembers: true, leftMembers: true }
             });
+
+            // Group by formatted date to avoid duplicates
+            const grouped = new Map<string, any>();
+            for (const d of dailyStatsRaw) {
+                const label = fmt(d.date);
+                if (grouped.has(label)) {
+                    const e = grouped.get(label);
+                    e.newMembers += d.newMembers;
+                    e.leftMembers += d.leftMembers;
+                } else {
+                    grouped.set(label, { ...d, label });
+                }
+            }
+            const dailyStats = Array.from(grouped.values());
 
             // Get total member count from main Guild table (most accurate real-time value)
             const guildRecord = await prisma.guild.findUnique({ where: { id: guildId }, select: { memberCount: true } });
@@ -448,44 +497,37 @@ export async function GET(
             const joined = dailyStats.reduce((sum, d) => sum + d.newMembers, 0);
             const left = dailyStats.reduce((sum, d) => sum + d.leftMembers, 0);
 
-            // --- Percent change: compare this period vs previous equal period ---
-            const periodMs = now.getTime() - startDate.getTime();
-            const prevStartDate = new Date(startDate.getTime() - periodMs);
-
-            const prevDailyStats = await statsPrisma.statDaily.findMany({
-                where: { guildId, date: { gte: prevStartDate, lt: startDate } },
-                select: { newMembers: true, leftMembers: true }
-            });
-            const prevJoined = prevDailyStats.reduce((sum, d) => sum + d.newMembers, 0);
-            const prevLeft = prevDailyStats.reduce((sum, d) => sum + d.leftMembers, 0);
-
-            const calcTrend = (current: number, previous: number) => {
-                if (previous === 0) return current > 0 ? 100 : 0;
-                return Math.round(((current - previous) / previous) * 100);
-            };
-
-            const joinedTrend = calcTrend(joined, prevJoined);
-            const leftTrend = calcTrend(left, prevLeft);
-            const netChange = joined - left;
-            const prevNetChange = prevJoined - prevLeft;
-            const netTrend = calcTrend(netChange, Math.abs(prevNetChange));
-
-            // Build cumulative growth chart (from currentTotal, backwards)
             let runningTotal = currentTotal;
             const reversedStats = [...dailyStats].reverse();
             const growthData: { date: string; count: number }[] = [];
             for (const d of reversedStats) {
-                growthData.unshift({ date: d.date.toISOString().split('T')[0], count: runningTotal });
+                const label = d.label;
+                growthData.unshift({ date: label, count: runningTotal });
                 runningTotal = Math.max(0, runningTotal - d.newMembers + d.leftMembers);
             }
 
+            // The value of runningTotal here is the member count *before* this period started
+            const initialCount = runningTotal;
+
+            const calcRatio = (val: number, base: number) => {
+                if (base === 0) return val > 0 ? 100 : 0;
+                return Math.round((val / base) * 1000) / 10;
+            };
+
+            const joinedTrend = calcRatio(joined, initialCount);
+            const leftTrend = calcRatio(left, initialCount);
+            const netChange = joined - left;
+            const netTrend = calcRatio(netChange, initialCount);
+
             responseData = {
                 growthChart: growthData,
-                joinLeaveChart: dailyStats.map(d => ({
-                    date: d.date.toISOString().split('T')[0],
-                    joined: d.newMembers,
-                    left: d.leftMembers
-                })),
+                joinLeaveChart: dailyStats.map(d => {
+                    return {
+                        date: d.label,
+                        joined: d.newMembers,
+                        left: d.leftMembers
+                    };
+                }),
                 stats: {
                     total: currentTotal,
                     new: joined,

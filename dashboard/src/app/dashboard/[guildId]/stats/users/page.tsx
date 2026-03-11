@@ -11,6 +11,8 @@ import {
     CalendarCheck, Clock, ChartBar, ArrowRight, MicrophoneStage
 } from "@phosphor-icons/react";
 import { useGuildLocale } from "@/lib/i18n";
+import { usePersistentPeriod } from "@/hooks/usePersistentPeriod";
+import { formatYAxis } from "@/lib/utils";
 import { StatsCard } from "@/components/stats/StatsCard";
 import { ChartContainer } from "@/components/stats/ChartContainer";
 import {
@@ -41,7 +43,10 @@ const strings = {
         msgsByDay: 'Messages by Day',
         voiceByDay: 'Voice by Day',
         period: 'Period',
+        day1: '24 Hours',
+        day3: '3 Days',
         day7: '7 Days',
+        day14: '14 Days',
         day30: '30 Days',
         day90: '90 Days',
         day365: '365 Days',
@@ -73,7 +78,10 @@ const strings = {
         msgsByDay: 'Сообщения по дням',
         voiceByDay: 'Голос по дням',
         period: 'Период',
+        day1: '24 часа',
+        day3: '3 дня',
         day7: '7 дней',
+        day14: '14 дней',
         day30: '30 дней',
         day90: '90 дней',
         day365: '365 дней',
@@ -114,7 +122,7 @@ export default function UserDrilldownPage() {
     const [selectedUserName, setSelectedUserName] = useState('');
     const [selectedUserAvatar, setSelectedUserAvatar] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState('overview');
-    const [period, setPeriod] = useState('30d');
+    const [period, setPeriod] = usePersistentPeriod('7d');
     const [drilldownData, setDrilldownData] = useState<any>(null);
     const [loadingDrilldown, setLoadingDrilldown] = useState(false);
     const [pieTopN, setPieTopN] = useState(10);
@@ -189,6 +197,15 @@ export default function UserDrilldownPage() {
         setDrilldownData(null);
     }, []);
 
+    const formatDate = (dateStr: string) => {
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return dateStr;
+        const dd = d.getDate().toString().padStart(2, '0');
+        const mm = (d.getMonth() + 1).toString().padStart(2, '0');
+        const yyyy = d.getFullYear();
+        return `${dd}.${mm}.${yyyy}`;
+    };
+
     const formatDuration = (seconds: number) => {
         const h = Math.floor(seconds / 3600);
         const m = Math.floor((seconds % 3600) / 60);
@@ -235,7 +252,10 @@ export default function UserDrilldownPage() {
                         startContent={<CalendarCheck className="text-default-400" size={16} />}
                         disallowEmptySelection
                     >
+                        <SelectItem key="24h">{text.day1}</SelectItem>
+                        <SelectItem key="3d">{text.day3}</SelectItem>
                         <SelectItem key="7d">{text.day7}</SelectItem>
+                        <SelectItem key="14d">{text.day14}</SelectItem>
                         <SelectItem key="30d">{text.day30}</SelectItem>
                         <SelectItem key="90d">{text.day90}</SelectItem>
                         <SelectItem key="365d">{text.day365}</SelectItem>
@@ -468,7 +488,7 @@ export default function UserDrilldownPage() {
                                         {loadingDrilldown ? <Skeleton className="h-8 w-full rounded-lg" /> : (
                                             drilldownData?.overview?.mostRecentMessage ? (
                                                 <div>
-                                                    <p className="text-white font-bold">{new Date(drilldownData.overview.mostRecentMessage.date).toLocaleDateString()}</p>
+                                                    <p className="text-white font-bold">{formatDate(drilldownData.overview.mostRecentMessage.date)}</p>
                                                     <p className="text-xs text-default-400">#{drilldownData.overview.mostRecentMessage.channelName} · {timeAgo(drilldownData.overview.mostRecentMessage.date)}</p>
                                                 </div>
                                             ) : <p className="text-default-500 text-sm">—</p>
@@ -483,7 +503,7 @@ export default function UserDrilldownPage() {
                                         {loadingDrilldown ? <Skeleton className="h-8 w-full rounded-lg" /> : (
                                             drilldownData?.overview?.mostRecentVoice ? (
                                                 <div>
-                                                    <p className="text-white font-bold">{new Date(drilldownData.overview.mostRecentVoice.date).toLocaleDateString()}</p>
+                                                    <p className="text-white font-bold">{formatDate(drilldownData.overview.mostRecentVoice.date)}</p>
                                                     <p className="text-xs text-default-400">#{drilldownData.overview.mostRecentVoice.channelName} · {timeAgo(drilldownData.overview.mostRecentVoice.date)}</p>
                                                 </div>
                                             ) : <p className="text-default-500 text-sm">—</p>
@@ -508,7 +528,7 @@ export default function UserDrilldownPage() {
                                         </defs>
                                         <CartesianGrid strokeDasharray="3 3" stroke="#ffffff08" vertical={false} />
                                         <XAxis dataKey="date" stroke="#52525b" fontSize={11} tickLine={false} axisLine={false} dy={10} />
-                                        <YAxis stroke="#52525b" fontSize={12} tickLine={false} axisLine={false} dx={-10} />
+                                        <YAxis stroke="#52525b" fontSize={12} tickLine={false} axisLine={false} dx={-10} width={50} tickFormatter={(v) => formatYAxis(v, locale as 'ru' | 'en')} />
                                         <RechartsTooltip
                                             contentStyle={{
                                                 backgroundColor: 'rgba(24, 24, 27, 0.95)',
@@ -545,18 +565,18 @@ export default function UserDrilldownPage() {
                         <div className="space-y-6">
                             <ChartContainer title={text.voiceByDay} loading={loadingDrilldown} height={300}>
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <AreaChart data={drilldownData?.chart || []} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                                    <BarChart data={drilldownData?.chart || []} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                                         <defs>
-                                            <linearGradient id="userVoiceAreaGrad" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="5%" stopColor="#f97316" stopOpacity={0.5} />
-                                                <stop offset="95%" stopColor="#f97316" stopOpacity={0} />
+                                            <linearGradient id="userVoiceBarGradient" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="0%" stopColor="#f97316" stopOpacity={0.9} />
+                                                <stop offset="100%" stopColor="#f97316" stopOpacity={0.3} />
                                             </linearGradient>
                                         </defs>
                                         <CartesianGrid strokeDasharray="3 3" stroke="#ffffff08" vertical={false} />
                                         <XAxis dataKey="date" stroke="#52525b" fontSize={11} tickLine={false} axisLine={false} dy={10} />
                                         <YAxis
-                                            stroke="#52525b" fontSize={12} tickLine={false} axisLine={false} dx={-10}
-                                            tickFormatter={(v) => `${v}m`}
+                                            stroke="#52525b" fontSize={12} tickLine={false} axisLine={false} dx={-10} width={50}
+                                            tickFormatter={(v) => `${formatYAxis(v, locale as 'ru' | 'en')}m`}
                                         />
                                         <RechartsTooltip
                                             contentStyle={{
@@ -566,10 +586,11 @@ export default function UserDrilldownPage() {
                                                 borderRadius: '12px',
                                             }}
                                             itemStyle={{ color: '#fff' }}
+                                            cursor={{ fill: 'rgba(255,255,255,0.05)' }}
                                             formatter={(val: number) => [`${val} min`, 'Voice']}
                                         />
-                                        <Area type="monotone" dataKey="voiceMinutes" stroke="#f97316" strokeWidth={3} fillOpacity={1} fill="url(#userVoiceAreaGrad)" activeDot={{ r: 6, stroke: '#fff', strokeWidth: 2 }} />
-                                    </AreaChart>
+                                        <Bar dataKey="voiceMinutes" fill="url(#userVoiceBarGradient)" radius={[4, 4, 0, 0]} />
+                                    </BarChart>
                                 </ResponsiveContainer>
                             </ChartContainer>
 
@@ -659,42 +680,33 @@ function ChannelBreakdownSection({
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    {/* Table */}
-                    <div className="overflow-x-auto">
-                        <table className="w-full">
-                            <thead>
-                                <tr className="border-b border-white/5">
-                                    <th className="text-left text-xs text-default-400 font-semibold pb-3 w-8">#</th>
-                                    <th className="text-left text-xs text-default-400 font-semibold pb-3">{nameLabel}</th>
-                                    <th className="text-right text-xs text-default-400 font-semibold pb-3">{countLabel}</th>
-                                    <th className="text-right text-xs text-default-400 font-semibold pb-3 w-16">{percentLabel}</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {channels.slice(0, 15).map((c: any, i: number) => (
-                                    <tr key={c.channelId || i} className="border-b border-white/[0.02] hover:bg-white/[0.02] transition-colors">
-                                        <td className="py-2.5 text-default-400 text-sm font-medium">{c.rank || i + 1}</td>
-                                        <td className="py-2.5">
-                                            <div className="flex items-center gap-2.5">
-                                                <div className="w-6 h-6 rounded bg-cyan-500/10 flex items-center justify-center flex-shrink-0">
-                                                    <Hash size={12} className="text-cyan-400" />
-                                                </div>
-                                                <span className="text-white text-sm font-medium truncate max-w-[180px]">{c.name}</span>
-                                            </div>
-                                        </td>
-                                        <td className="py-2.5 text-right text-white text-sm font-bold">
-                                            {formatValue ? formatValue(c[valueKey]) : c[valueKey]?.toLocaleString()}
-                                        </td>
-                                        <td className="py-2.5 text-right text-default-400 text-sm">{c.percentage}%</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                    {/* List */}
+                    <div className="h-[350px] overflow-y-auto pr-2 custom-scrollbar space-y-3">
+                        {channels.length === 0 ? (
+                            <div className="flex h-full items-center justify-center text-default-500">
+                                No Data
+                            </div>
+                        ) : (
+                            channels.slice(0, 15).map((c: any, i: number) => (
+                                <div key={c.channelId || i} className="flex items-center justify-between p-2 md:p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors">
+                                    <div className="flex items-center gap-2 md:gap-3 overflow-hidden flex-1 min-w-0">
+                                        <div className="flex-shrink-0 w-6 md:w-8 text-center text-default-400 font-medium text-sm">#{c.rank || i + 1}</div>
+                                        <div className="w-8 h-8 rounded-full bg-default-100/10 flex items-center justify-center flex-shrink-0">
+                                            <Hash size={16} className="text-default-400" />
+                                        </div>
+                                        <span className="font-medium truncate text-sm md:text-base flex-1 min-w-0 block text-white">{c.name}</span>
+                                    </div>
+                                    <div className="font-bold font-mono text-primary text-sm md:text-base whitespace-nowrap ml-2 md:ml-4 text-right">
+                                        {formatValue ? formatValue(c[valueKey]) : c[valueKey]?.toLocaleString()}
+                                    </div>
+                                </div>
+                            ))
+                        )}
                     </div>
 
                     {/* Pie Chart */}
-                    <div>
-                        <div className="flex justify-end mb-4">
+                    <div className="flex flex-col h-[350px]">
+                        <div className="flex justify-end mb-2">
                             <ButtonGroup size="sm">
                                 {[3, 5, 10].map(n => (
                                     <Button
@@ -709,39 +721,50 @@ function ChannelBreakdownSection({
                                 ))}
                             </ButtonGroup>
                         </div>
-                        <ResponsiveContainer width="100%" height={300}>
-                            <PieChart>
-                                <Pie
-                                    data={pieData}
-                                    cx="50%"
-                                    cy="50%"
-                                    innerRadius={60}
-                                    outerRadius={110}
-                                    paddingAngle={2}
-                                    dataKey="value"
-                                    nameKey="name"
-                                    stroke="none"
-                                >
-                                    {pieData.map((_: any, i: number) => (
-                                        <Cell key={`cell-${i}`} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                                    ))}
-                                </Pie>
-                                <Legend
-                                    iconType="circle"
-                                    wrapperStyle={{ fontSize: '12px', color: '#a1a1aa' }}
-                                />
-                                <RechartsTooltip
-                                    contentStyle={{
-                                        backgroundColor: 'rgba(24, 24, 27, 0.95)',
-                                        backdropFilter: 'blur(8px)',
-                                        border: '1px solid rgba(255, 255, 255, 0.1)',
-                                        borderRadius: '12px',
-                                    }}
-                                    itemStyle={{ color: '#fff' }}
-                                    formatter={(val: number) => [formatValue ? formatValue(val) : val.toLocaleString(), '']}
-                                />
-                            </PieChart>
-                        </ResponsiveContainer>
+                        <div className="flex-1 min-h-0 relative">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <PieChart>
+                                    <Pie
+                                        data={pieData}
+                                        cx="50%"
+                                        cy="50%"
+                                        innerRadius={60}
+                                        outerRadius={90}
+                                        paddingAngle={4}
+                                        cornerRadius={4}
+                                        dataKey="value"
+                                        nameKey="name"
+                                        stroke="none"
+                                    >
+                                        {pieData.map((_: any, i: number) => (
+                                            <Cell key={`cell-${i}`} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                                        ))}
+                                    </Pie>
+                                    <RechartsTooltip
+                                        contentStyle={{
+                                            backgroundColor: 'rgba(24, 24, 27, 0.95)',
+                                            backdropFilter: 'blur(8px)',
+                                            border: '1px solid rgba(255, 255, 255, 0.1)',
+                                            borderRadius: '12px',
+                                        }}
+                                        itemStyle={{ color: '#fff' }}
+                                        formatter={(val: number) => [formatValue ? formatValue(val) : val.toLocaleString(), '']}
+                                    />
+                                </PieChart>
+                            </ResponsiveContainer>
+                        </div>
+                        {/* Custom Legend */}
+                        <div className="mt-4 overflow-y-auto max-h-[120px] pr-2 custom-scrollbar grid grid-cols-2 gap-2">
+                            {pieData.map((item: any, index: number) => (
+                                <div key={`legend-${index}`} className="flex items-center gap-2 p-2 rounded-lg bg-transparent border border-white/5">
+                                    <div className="w-3 h-3 rounded-full flex-shrink-0 shadow-[0_0_8px_rgba(0,0,0,0.5)]" style={{ backgroundColor: PIE_COLORS[index % PIE_COLORS.length] }} />
+                                    <span className="text-xs truncate flex-1 font-medium text-default-300">{item.name}</span>
+                                    <span className="text-[10px] text-default-500 font-mono">
+                                        {((item.value / Math.max(1, pieData.reduce((a: any, b: any) => a + b.value, 0))) * 100).toFixed(0)}%
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 </div>
             </CardBody>

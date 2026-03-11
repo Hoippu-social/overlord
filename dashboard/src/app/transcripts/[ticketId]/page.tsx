@@ -11,6 +11,7 @@ export default async function TranscriptPage({ params }: Props) {
 
     // Fetch ticket with transcript
     // We cast to any because the schema update might not be applied in the client yet due to file locks
+    // @ts-ignore
     const ticket = await prisma.ticket.findUnique({
         where: { id: parseInt(ticketId) },
         include: {

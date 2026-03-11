@@ -14,7 +14,8 @@ import {
     Button,
     Tooltip,
     Autocomplete,
-    AutocompleteItem
+    AutocompleteItem,
+    Avatar
 } from '@nextui-org/react';
 import {
     Scroll,
@@ -64,7 +65,15 @@ type Route = {
     updatedAt: string;
 };
 
-type Channel = { id: string; name?: string | null };
+type Channel = { id: string; name?: string | null; type?: number | string | null };
+
+type EnrichedUser = {
+    id: string;
+    name: string;
+    username?: string;
+    tag?: string;
+    avatar: string | null;
+};
 
 const TAGS = [
     { value: 'moderation', label: 'Moderation', icon: ShieldCheck },
@@ -227,6 +236,8 @@ export default function AuditPage() {
     const [events, setEvents] = useState<AuditEvent[]>([]);
     const [routes, setRoutes] = useState<Route[]>([]);
     const [channels, setChannels] = useState<Channel[]>([]);
+    const [allChannels, setAllChannels] = useState<Channel[]>([]);
+    const [enrichedUsers, setEnrichedUsers] = useState<Record<string, EnrichedUser>>({});
     const [error, setError] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);
 
@@ -246,23 +257,51 @@ export default function AuditPage() {
 
     const loadData = async () => {
         try {
-            const [evRes, routeRes, channelsRes] = await Promise.all([
+            const [evRes, routeRes, textChRes, voiceChRes] = await Promise.all([
                 fetch(`/api/guilds/${guildId}/audit/events?limit=50`),
                 fetch(`/api/guilds/${guildId}/audit/routes`),
                 fetch(`/api/guilds/${guildId}/text-channels`),
+                fetch(`/api/guilds/${guildId}/channels`),
             ]);
 
-            if (!evRes.ok || !routeRes.ok || !channelsRes.ok) {
-                throw new Error(`Failed: events ${evRes.status}, routes ${routeRes.status}, channels ${channelsRes.status}`);
+            if (!evRes.ok || !routeRes.ok) {
+                throw new Error(`Failed: events ${evRes.status}, routes ${routeRes.status}`);
             }
 
             const evData = await evRes.json();
             const routeData = await routeRes.json();
-            const channelsData = await channelsRes.json();
+            const textChannels: Channel[] = textChRes.ok ? (await textChRes.json()) : [];
+            const voiceChannels: Channel[] = voiceChRes.ok ? (await voiceChRes.json()) : [];
+
+            // Merge all channels for name lookup (text + voice)
+            const merged = new Map<string, Channel>();
+            [...(Array.isArray(textChannels) ? textChannels : []),
+            ...(Array.isArray(voiceChannels) ? voiceChannels : [])].forEach(c => merged.set(c.id, c));
+            const allCh = Array.from(merged.values());
 
             setEvents(evData.events || []);
             setRoutes(routeData.routes || []);
-            setChannels(Array.isArray(channelsData) ? channelsData : []);
+            setChannels(Array.isArray(textChannels) ? textChannels : []);
+            setAllChannels(allCh);
+
+            // Enrich users referenced in events
+            const events: AuditEvent[] = evData.events || [];
+            const userIds = [...new Set(events.flatMap(ev => [ev.actorId, ev.targetId].filter(Boolean) as string[]))];
+            if (userIds.length > 0) {
+                try {
+                    const enrichRes = await fetch(`/api/guilds/${guildId}/enrich`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ userIds }),
+                    });
+                    if (enrichRes.ok) {
+                        const enrichData = await enrichRes.json();
+                        if (enrichData.users) {
+                            setEnrichedUsers(prev => ({ ...prev, ...enrichData.users }));
+                        }
+                    }
+                } catch { /* enrich is best-effort */ }
+            }
 
         } catch (err: any) {
             setError(err.message || 'Failed to load audit data');
@@ -601,42 +640,83 @@ export default function AuditPage() {
 
                                                 {/* Actors Grid */}
                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
-                                                    {ev.actorId && (
-                                                        <div className="bg-[#141519] p-3 rounded-2xl border border-white/5 flex items-center gap-3">
-                                                            <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-default-400">
-                                                                <UserPlus size={16} />
-                                                            </div>
-                                                            <div className="min-w-0">
-                                                                <div className="text-[10px] uppercase font-bold text-default-500 tracking-wider mb-0.5">{text.from}</div>
-                                                                <div className="font-mono text-xs text-white truncate max-w-full" title={ev.actorId}>
-                                                                    {ev.payload?.actorTag || ev.actorId}
+                                                    {ev.actorId && (() => {
+                                                        const user = enrichedUsers[ev.actorId];
+                                                        return (
+                                                            <div className="bg-[#141519] p-3 rounded-2xl border border-white/5 flex items-center gap-3">
+                                                                {user ? (
+                                                                    <Avatar
+                                                                        src={user.avatar || undefined}
+                                                                        name={user.name}
+                                                                        size="sm"
+                                                                        className="w-8 h-8 flex-shrink-0"
+                                                                    />
+                                                                ) : (
+                                                                    <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-default-400 flex-shrink-0">
+                                                                        <UserPlus size={16} />
+                                                                    </div>
+                                                                )}
+                                                                <div className="min-w-0">
+                                                                    <div className="text-[10px] uppercase font-bold text-default-500 tracking-wider mb-0.5">{text.from}</div>
+                                                                    <div className="text-xs text-white truncate max-w-full font-semibold" title={ev.actorId}>
+                                                                        {user?.name || ev.payload?.actorTag || ev.actorId}
+                                                                    </div>
+                                                                    {user && (
+                                                                        <div className="text-[10px] text-default-500 truncate font-mono">
+                                                                            {user.tag || user.username}
+                                                                        </div>
+                                                                    )}
                                                                 </div>
                                                             </div>
-                                                        </div>
-                                                    )}
-                                                    {ev.targetId && (
-                                                        <div className="bg-[#141519] p-3 rounded-2xl border border-white/5 flex items-center gap-3">
-                                                            <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-default-400">
-                                                                <IdentificationBadge size={16} />
-                                                            </div>
-                                                            <div className="min-w-0">
-                                                                <div className="text-[10px] uppercase font-bold text-default-500 tracking-wider mb-0.5">{text.to}</div>
-                                                                <div className="font-mono text-xs text-white truncate max-w-full" title={ev.targetId}>
-                                                                    {ev.payload?.targetTag || ev.targetId}
+                                                        );
+                                                    })()}
+                                                    {ev.targetId && ev.targetId !== ev.actorId && (() => {
+                                                        const user = enrichedUsers[ev.targetId];
+                                                        return (
+                                                            <div className="bg-[#141519] p-3 rounded-2xl border border-white/5 flex items-center gap-3">
+                                                                {user ? (
+                                                                    <Avatar
+                                                                        src={user.avatar || undefined}
+                                                                        name={user.name}
+                                                                        size="sm"
+                                                                        className="w-8 h-8 flex-shrink-0"
+                                                                    />
+                                                                ) : (
+                                                                    <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-default-400 flex-shrink-0">
+                                                                        <IdentificationBadge size={16} />
+                                                                    </div>
+                                                                )}
+                                                                <div className="min-w-0">
+                                                                    <div className="text-[10px] uppercase font-bold text-default-500 tracking-wider mb-0.5">{text.to}</div>
+                                                                    <div className="text-xs text-white truncate max-w-full font-semibold" title={ev.targetId}>
+                                                                        {user?.name || ev.payload?.targetTag || ev.targetId}
+                                                                    </div>
+                                                                    {user && (
+                                                                        <div className="text-[10px] text-default-500 truncate font-mono">
+                                                                            {user.tag || user.username}
+                                                                        </div>
+                                                                    )}
                                                                 </div>
                                                             </div>
-                                                        </div>
-                                                    )}
+                                                        );
+                                                    })()}
                                                 </div>
 
-                                                {ev.channelId && (
-                                                    <div className="flex items-center gap-2 mb-4 px-3 py-2 bg-primary/5 rounded-xl w-fit border border-primary/10">
-                                                        <Hash size={14} className="text-primary" />
-                                                        <a href={`https://discord.com/channels/${guildId}/${ev.channelId}`} target="_blank" rel="noreferrer" className="text-xs font-bold text-primary hover:underline">
-                                                            #{channels.find(c => c.id === ev.channelId)?.name || ev.channelId}
-                                                        </a>
-                                                    </div>
-                                                )}
+                                                {ev.channelId && (() => {
+                                                    const ch = allChannels.find(c => c.id === ev.channelId);
+                                                    const isVoice = ch?.type === 2 || ch?.type === 'voice';
+                                                    return (
+                                                        <div className="flex items-center gap-2 mb-4 px-3 py-2 bg-primary/5 rounded-xl w-fit border border-primary/10">
+                                                            {isVoice
+                                                                ? <SpeakerHigh size={14} className="text-primary" />
+                                                                : <Hash size={14} className="text-primary" />
+                                                            }
+                                                            <a href={`https://discord.com/channels/${guildId}/${ev.channelId}`} target="_blank" rel="noreferrer" className="text-xs font-bold text-primary hover:underline">
+                                                                {ch?.name || ev.channelId}
+                                                            </a>
+                                                        </div>
+                                                    );
+                                                })()}
 
                                                 {/* Content Diff */}
                                                 {(ev.payload?.contentBefore || ev.payload?.contentAfter) && (

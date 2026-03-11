@@ -13,22 +13,31 @@ import {
     SelectItem,
     Chip,
     Divider,
-    Tooltip
+    Tooltip,
+    Tabs,
+    Tab
 } from '@nextui-org/react';
 import {
     Ticket,
     Gear,
-    Plus,
     Warning,
     ChartBar,
     Scroll,
     CheckCircle,
     XCircle,
     Article,
-    TrendUp
+    TrendUp,
+    Clock,
+    CalendarCheck,
+    ThumbsUp,
+    ThumbsDown,
+    HandPeace
 } from '@phosphor-icons/react';
 import { useGuildLocale } from '@/lib/i18n';
 import CategoryModal, { CategoryData } from '@/components/tickets/CategoryModal';
+import { StatsCard } from '@/components/stats/StatsCard';
+import { usePersistentPeriod } from '@/hooks/usePersistentPeriod';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
 type TicketConfig = {
     enabled: boolean;
@@ -45,7 +54,6 @@ type TicketCategory = {
     name: string;
     channelId: string | null;
     stats: TicketCategoryStats;
-    // Add other fields needed for CategoryData
     saveHistory: boolean;
     mentionAgents: boolean;
     allowUserClose: boolean;
@@ -66,6 +74,8 @@ const MESSAGES = {
     en: {
         title: "Tickets",
         subtitle: "Manage support tickets and settings.",
+        overview: "Dashboard",
+        settings: "Configuration",
         loggingTitle: "Logging",
         loggingDesc: "Store transcripts and events in a separate channel.",
         logChannelLabel: "Log Channel",
@@ -84,14 +94,34 @@ const MESSAGES = {
         save: "Save",
         saved: "Saved",
         auditLogWarn: "Please select a channel to enable logging.",
-        soon: "Soon"
+        soon: "Soon",
+        openTickets: "Created Tickets",
+        unsolvedTickets: "Unsolved Tickets",
+        resolvedTickets: "Solved Tickets",
+        avgResolution: "Avg First Time Reply",
+        ticketsActivity: "Average Tickets Created",
+        ticketsByCategory: "Ticket By Categories",
+        customerSatisfaction: "Customer Satisfaction",
+        dateDay1: "24 Hours",
+        dateDay3: "3 Days",
+        dateDay7: "7 Days",
+        dateDay14: "14 Days",
+        dateDay30: "30 Days",
+        dateMonth3: "90 Days",
+        dateYear1: "365 Days",
+        positive: "Positive",
+        neutral: "Neutral",
+        negative: "Negative",
+        noData: "Empty"
     },
     ru: {
         title: "Тикеты",
         subtitle: "Управление системой поддержки.",
+        overview: "Обзор",
+        settings: "Настройки",
         loggingTitle: "Логирование",
         loggingDesc: "Сохранение транскриптов и событий в канал.",
-        logChannelLabel: "Канал логов",
+        logChannelLabel: "Канал для логов",
         logChannelPlaceholder: "Выберите канал...",
         adminToolsTitle: "Инструменты",
         transcripts: "Транскрипты",
@@ -100,16 +130,36 @@ const MESSAGES = {
         statisticsDesc: "Эффективность агентов.",
         categoriesTitle: "Категории",
         categoriesDesc: "Темы обращений для пользователей.",
-        createCategory: "Создать категорию",
-        activeTickets: "Активно",
+        createCategory: "Создать раздел",
+        activeTickets: "Открыто",
         totalTickets: "Всего",
         edit: "Настроить",
         save: "Сохранить",
         saved: "Сохранено",
         auditLogWarn: "Выберите канал для включения логов.",
-        soon: "Скоро"
+        soon: "Скоро",
+        openTickets: "Создано тикетов",
+        unsolvedTickets: "Нерешенные",
+        resolvedTickets: "Решенные",
+        avgResolution: "Среднее время",
+        ticketsActivity: "Активность обращений",
+        ticketsByCategory: "Тикеты по категориям",
+        customerSatisfaction: "Удовлетворенность",
+        dateDay1: "24 часа",
+        dateDay3: "3 дня",
+        dateDay7: "7 дней",
+        dateDay14: "14 дней",
+        dateDay30: "30 дней",
+        dateMonth3: "90 дней",
+        dateYear1: "365 дней",
+        positive: "Позитивно",
+        neutral: "Нейтрально",
+        negative: "Негативно",
+        noData: "Пусто"
     }
 };
+
+const PIE_COLORS = ['#34C759', '#FF9F0A', '#AF52DE', '#FF3B30', '#5AC8FA', '#FFCC00'];
 
 export default function TicketsPage() {
     const { guildId } = useParams<{ guildId: string }>();
@@ -121,6 +171,12 @@ export default function TicketsPage() {
     const [config, setConfig] = useState<TicketConfig | null>(null);
     const [categories, setCategories] = useState<TicketCategory[]>([]);
     const [channels, setChannels] = useState<{ text: ChannelOption[], categories: ChannelOption[] }>({ text: [], categories: [] });
+
+    // Stats State
+    const [globalStats, setGlobalStats] = useState<any>({ open: 0, onHold: 0, closed: 0, total: 0, avgResolutionMins: 0, ratings: { positive: 0, neutral: 0, negative: 0, total: 0 }, categoryPieData: [] });
+    const [activityData, setActivityData] = useState<any[]>([]);
+
+    const [period, setPeriod] = usePersistentPeriod('7d');
     const [savingConfig, setSavingConfig] = useState(false);
 
     // Modal State
@@ -132,7 +188,7 @@ export default function TicketsPage() {
     const fetchData = async () => {
         setLoading(true);
         try {
-            const res = await fetch(`/api/guilds/${guildId}/tickets`);
+            const res = await fetch(`/api/guilds/${guildId}/tickets?period=${period}`);
             const data = await res.json();
             if (res.ok) {
                 setConfig(data.config || { enabled: true, logChannelId: null });
@@ -141,6 +197,8 @@ export default function TicketsPage() {
                     text: data.channels?.text || [],
                     categories: data.channels?.categories || []
                 });
+                if (data.globalStats) setGlobalStats(data.globalStats);
+                if (data.activityData) setActivityData(data.activityData);
             }
         } catch (e) {
             console.error(e);
@@ -151,7 +209,7 @@ export default function TicketsPage() {
 
     useEffect(() => {
         if (guildId) fetchData();
-    }, [guildId]);
+    }, [guildId, period]);
 
     // Handlers
     const handleConfigUpdate = async (updates: Partial<TicketConfig>) => {
@@ -186,27 +244,11 @@ export default function TicketsPage() {
     const handleSaveCategory = async (data: Partial<CategoryData>) => {
         setSavingCategory(true);
         try {
-            // Need API endpoint for UPDATE category: PUT /api/guilds/[id]/tickets?categoryId=... 
-            // Or specific endpoint.
-            // My route currently only has POST (Create) and PUT (Config).
-            // I need to add DELETE and PATCH/PUT for specific category logic.
-            // Wait, my PUT handle in `route.ts` is for CONFIG.
-            // I need a new route for managing Categories. /api/guilds/[id]/tickets/[categoryId] via separate file or query param.
-            // Or assume POST handles update if ID is present? No, standard is POST create.
-            // Let's assume for now I only have CREATE (POST) implemented in backend.
-            // I need to implement Update in Backend. I will just do CREATE for now if id is missing, and log error for update.
-            // Actually, I should fix the backend route to handle Category Update.
-
             const isEdit = !!editingCategory;
             let url = `/api/guilds/${guildId}/tickets`;
             let method = 'POST';
 
             if (isEdit) {
-                // I haven't implemented /categories/[id] route yet.
-                // I should pass action in body or query?
-                // Best practice: Create new route /api/guilds/[id]/tickets/[categoryId]/route.ts
-                // For now, I'll just use POST and if ID exists, backend handles UPSERT? No.
-                // I will assume only CREATE works for now and prompt user I need to add Update logic.
                 alert("Editing implementation pending Backend Update. Only creation logic is connected.");
                 setIsModalOpen(false);
                 setSavingCategory(false);
@@ -241,182 +283,381 @@ export default function TicketsPage() {
     }
 
     return (
-        <div className="space-y-8 pb-10 animate-fade-in min-h-screen">
+        <div className="space-y-6 pb-10 animate-fade-in min-h-screen">
             {/* Header */}
-            <div className="flex items-center gap-5">
-                <div className="w-16 h-16 rounded-[24px] bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 flex items-center justify-center text-white shadow-xl border border-white/5 flex-shrink-0">
-                    <Ticket size={32} weight="fill" className="text-violet-400" />
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 border border-violet-500/10 flex items-center justify-center backdrop-blur-sm shadow-xl flex-shrink-0">
+                        <Ticket size={32} weight="fill" className="text-violet-500 drop-shadow-lg" />
+                    </div>
+                    <div>
+                        <h1 className="text-3xl font-black text-white tracking-tight">
+                            {t.title}
+                        </h1>
+                        <p className="text-default-400 font-medium">{t.subtitle}</p>
+                    </div>
                 </div>
-                <div>
-                    <h1 className="text-4xl font-extrabold tracking-tight bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent">
-                        {t.title}
-                    </h1>
-                    <p className="text-default-500 text-lg">{t.subtitle}</p>
+
+                <div className="flex items-center gap-3 bg-[#18181b]/40 p-1.5 rounded-2xl border border-white/5 backdrop-blur-md w-full md:w-auto">
+                    <Select
+                        labelPlacement="outside"
+                        selectedKeys={[period]}
+                        onChange={(e) => setPeriod(e.target.value)}
+                        className="flex-1 md:w-40"
+                        classNames={{
+                            trigger: "bg-transparent shadow-none hover:bg-white/5 border-0 min-h-10 h-10 data-[focus=true]:bg-white/5 justify-between",
+                            value: "text-small font-medium group-data-[has-value=true]:text-white",
+                            popoverContent: "bg-[#18181b] border border-white/10 dark"
+                        }}
+                        startContent={<CalendarCheck className="text-default-400" size={16} />}
+                        disallowEmptySelection
+                    >
+                        <SelectItem key="24h">{t.dateDay1}</SelectItem>
+                        <SelectItem key="3d">{t.dateDay3}</SelectItem>
+                        <SelectItem key="7d">{t.dateDay7}</SelectItem>
+                        <SelectItem key="14d">{t.dateDay14}</SelectItem>
+                        <SelectItem key="30d">{t.dateDay30}</SelectItem>
+                        <SelectItem key="90d">{t.dateMonth3}</SelectItem>
+                        <SelectItem key="365d">{t.dateYear1}</SelectItem>
+                    </Select>
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-                {/* Left Column: Logging & Admin */}
-                <div className="space-y-8">
-                    {/* Logging Section */}
-                    <Card className="bg-[#181A20] border border-white/5 shadow-xl rounded-[32px]">
-                        <CardBody className="p-6 space-y-6">
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                    <div className="p-3 rounded-xl bg-orange-500/10 text-orange-500">
-                                        <Scroll size={24} weight="fill" />
-                                    </div>
-                                    <div>
-                                        <h3 className="text-lg font-bold text-white">{t.loggingTitle}</h3>
-                                        <p className="text-tiny text-default-500">{t.loggingDesc}</p>
-                                    </div>
+            <Tabs
+                aria-label="Options"
+                color="primary"
+                variant="solid"
+                classNames={{
+                    tabList: "bg-[#18181b]/60 border border-white/5 p-1 rounded-2xl backdrop-blur-md",
+                    cursor: "bg-primary shadow-lg",
+                    tab: "h-10 font-semibold",
+                    tabContent: "group-data-[selected=true]:text-white text-default-400"
+                }}
+            >
+                <Tab
+                    key="dashboard"
+                    title={
+                        <div className="flex items-center space-x-2">
+                            <ChartBar size={20} />
+                            <span>{t.overview}</span>
+                        </div>
+                    }
+                >
+                    <div className="mt-6 space-y-6">
+                        {/* 4 Stats Cards */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                            <StatsCard
+                                title={t.openTickets}
+                                value={globalStats.total}
+                                loading={loading}
+                                icon={<Ticket size={24} weight="fill" />}
+                            />
+                            <StatsCard
+                                title={t.unsolvedTickets}
+                                value={globalStats.open + globalStats.onHold}
+                                loading={loading}
+                                icon={<Warning size={24} weight="fill" />}
+                            />
+                            <StatsCard
+                                title={t.resolvedTickets}
+                                value={globalStats.closed}
+                                loading={loading}
+                                icon={<CheckCircle size={24} weight="fill" />}
+                            />
+                            <StatsCard
+                                title={t.avgResolution}
+                                value={`${globalStats.avgResolutionMins} min`}
+                                loading={loading}
+                                icon={<Clock size={24} weight="fill" />}
+                            />
+                        </div>
+
+                        {/* Mid Row: Activity Chart */}
+                        <Card className="bg-[#18181b]/60 backdrop-blur-md border border-white/5 shadow-lg rounded-2xl">
+                            <CardBody className="p-6">
+                                <h3 className="text-lg font-bold text-white mb-6">{t.ticketsActivity}</h3>
+                                <div className="h-[300px] w-full">
+                                    {loading ? (
+                                        <div className="flex items-center justify-center h-full">
+                                            <Spinner color="primary" />
+                                        </div>
+                                    ) : (
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <BarChart data={activityData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                                                <CartesianGrid strokeDasharray="3 3" stroke="#ffffff08" vertical={false} />
+                                                <XAxis
+                                                    dataKey="date"
+                                                    stroke="#52525b"
+                                                    fontSize={12}
+                                                    tickLine={false}
+                                                    axisLine={false}
+                                                    dy={10}
+                                                />
+                                                <YAxis
+                                                    stroke="#52525b"
+                                                    fontSize={12}
+                                                    tickLine={false}
+                                                    axisLine={false}
+                                                />
+                                                <RechartsTooltip
+                                                    contentStyle={{
+                                                        backgroundColor: 'rgba(24, 24, 27, 0.9)',
+                                                        backdropFilter: 'blur(8px)',
+                                                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                                                        borderRadius: '12px',
+                                                        boxShadow: '0 10px 30px -10px rgba(0,0,0,0.5)'
+                                                    }}
+                                                    itemStyle={{ color: '#fff' }}
+                                                    labelStyle={{ color: '#a1a1aa', marginBottom: '8px' }}
+                                                    cursor={{ fill: 'rgba(255,255,255,0.05)' }}
+                                                />
+                                                <Bar dataKey="created" name={t.openTickets} fill="#8B5CF6" radius={[4, 4, 0, 0]} />
+                                                <Bar dataKey="solved" name={t.resolvedTickets} fill="#10B981" radius={[4, 4, 0, 0]} />
+                                            </BarChart>
+                                        </ResponsiveContainer>
+                                    )}
                                 </div>
-                                <Switch
-                                    isSelected={config?.enabled}
-                                    onValueChange={(v) => handleConfigUpdate({ enabled: v })}
-                                    classNames={{
-                                        wrapper: "group-data-[selected=true]:bg-orange-500"
-                                    }}
-                                />
-                            </div>
+                            </CardBody>
+                        </Card>
 
-                            <div className="space-y-2">
-                                <Select
-                                    label={t.logChannelLabel}
-                                    placeholder={t.logChannelPlaceholder}
-                                    selectedKeys={config?.logChannelId ? [config.logChannelId] : []}
-                                    onSelectionChange={(keys) => handleConfigUpdate({ logChannelId: Array.from(keys)[0] as string })}
-                                    items={channels.text}
-                                    isDisabled={!config?.enabled}
-                                    classNames={{
-                                        trigger: "bg-[#0A0B0E] border border-white/5 h-12 rounded-xl",
-                                        popoverContent: "bg-[#181A20] border border-white/10"
-                                    }}
-                                    renderValue={(items) => items.map(item => <span key={item.key} className="text-white font-medium">{item.textValue}</span>)}
+                        {/* Bottom Row: Category Pie & Satisfaction */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            <Card className="bg-[#18181b]/60 backdrop-blur-md border border-white/5 shadow-lg rounded-2xl">
+                                <CardBody className="p-6 flex flex-col md:flex-row items-center gap-8">
+                                    <div className="w-full md:w-1/2">
+                                        <h3 className="text-lg font-bold text-white mb-6">{t.ticketsByCategory}</h3>
+                                        <div className="h-[250px] w-full">
+                                            {loading ? (
+                                                <div className="flex items-center justify-center h-full"><Spinner /></div>
+                                            ) : globalStats.categoryPieData.length > 0 ? (
+                                                <ResponsiveContainer width="100%" height="100%">
+                                                    <PieChart>
+                                                        <Pie
+                                                            data={globalStats.categoryPieData}
+                                                            cx="50%"
+                                                            cy="50%"
+                                                            innerRadius={60}
+                                                            outerRadius={80}
+                                                            paddingAngle={5}
+                                                            dataKey="value"
+                                                        >
+                                                            {globalStats.categoryPieData.map((entry: any, index: number) => (
+                                                                <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                                                            ))}
+                                                        </Pie>
+                                                        <RechartsTooltip
+                                                            contentStyle={{
+                                                                backgroundColor: 'rgba(24, 24, 27, 0.9)',
+                                                                backdropFilter: 'blur(8px)',
+                                                                border: '1px solid rgba(255, 255, 255, 0.1)',
+                                                                borderRadius: '12px',
+                                                            }}
+                                                            itemStyle={{ color: '#fff' }}
+                                                        />
+                                                    </PieChart>
+                                                </ResponsiveContainer>
+                                            ) : (
+                                                <div className="flex items-center justify-center h-full text-default-400">{t.noData}</div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Pie Chart Legend */}
+                                    <div className="w-full md:w-1/2 space-y-3">
+                                        {!loading && globalStats.categoryPieData.map((entry: any, index: number) => (
+                                            <div key={index} className="flex items-center justify-between p-2 rounded-lg bg-white/5">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: PIE_COLORS[index % PIE_COLORS.length] }} />
+                                                    <span className="text-sm font-medium text-white">{entry.name}</span>
+                                                </div>
+                                                <span className="text-sm text-default-400">{entry.value}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </CardBody>
+                            </Card>
+
+                            <Card className="bg-[#18181b]/60 backdrop-blur-md border border-white/5 shadow-lg rounded-2xl">
+                                <CardBody className="p-6">
+                                    <h3 className="text-lg font-bold text-white mb-6">{t.customerSatisfaction}</h3>
+
+                                    <div className="flex items-center justify-between mb-8">
+                                        <div>
+                                            <p className="text-default-400 text-sm">{t.totalTickets}</p>
+                                            <p className="text-3xl font-black text-white">{globalStats.ratings.total}</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-6">
+                                        {/* Positive */}
+                                        <div>
+                                            <div className="flex justify-between items-center mb-2">
+                                                <div className="flex items-center gap-2 text-emerald-500">
+                                                    <ThumbsUp size={18} weight="fill" />
+                                                    <span className="font-semibold text-sm">{t.positive}</span>
+                                                </div>
+                                                <span className="font-bold text-emerald-500">
+                                                    {globalStats.ratings.total > 0 ? Math.round((globalStats.ratings.positive / globalStats.ratings.total) * 100) : 0}%
+                                                </span>
+                                            </div>
+                                            <div className="w-full h-2 rounded-full bg-emerald-500/10 overflow-hidden">
+                                                <div
+                                                    className="h-full bg-emerald-500 rounded-full"
+                                                    style={{ width: `${globalStats.ratings.total > 0 ? (globalStats.ratings.positive / globalStats.ratings.total) * 100 : 0}%` }}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {/* Neutral */}
+                                        <div>
+                                            <div className="flex justify-between items-center mb-2">
+                                                <div className="flex items-center gap-2 text-amber-500">
+                                                    <HandPeace size={18} weight="fill" />
+                                                    <span className="font-semibold text-sm">{t.neutral}</span>
+                                                </div>
+                                                <span className="font-bold text-amber-500">
+                                                    {globalStats.ratings.total > 0 ? Math.round((globalStats.ratings.neutral / globalStats.ratings.total) * 100) : 0}%
+                                                </span>
+                                            </div>
+                                            <div className="w-full h-2 rounded-full bg-amber-500/10 overflow-hidden">
+                                                <div
+                                                    className="h-full bg-amber-500 rounded-full"
+                                                    style={{ width: `${globalStats.ratings.total > 0 ? (globalStats.ratings.neutral / globalStats.ratings.total) * 100 : 0}%` }}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {/* Negative */}
+                                        <div>
+                                            <div className="flex justify-between items-center mb-2">
+                                                <div className="flex items-center gap-2 text-rose-500">
+                                                    <ThumbsDown size={18} weight="fill" />
+                                                    <span className="font-semibold text-sm">{t.negative}</span>
+                                                </div>
+                                                <span className="font-bold text-rose-500">
+                                                    {globalStats.ratings.total > 0 ? Math.round((globalStats.ratings.negative / globalStats.ratings.total) * 100) : 0}%
+                                                </span>
+                                            </div>
+                                            <div className="w-full h-2 rounded-full bg-rose-500/10 overflow-hidden">
+                                                <div
+                                                    className="h-full bg-rose-500 rounded-full"
+                                                    style={{ width: `${globalStats.ratings.total > 0 ? (globalStats.ratings.negative / globalStats.ratings.total) * 100 : 0}%` }}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </CardBody>
+                            </Card>
+                        </div>
+                    </div>
+                </Tab>
+
+                <Tab
+                    key="settings"
+                    title={
+                        <div className="flex items-center space-x-2">
+                            <Gear size={20} />
+                            <span>{t.settings}</span>
+                        </div>
+                    }
+                >
+                    <div className="mt-6 grid grid-cols-1 lg:grid-cols-4 gap-8">
+                        <Card className="lg:col-span-3 bg-[#18181b]/60 backdrop-blur-md border border-white/5 shadow-lg rounded-2xl">
+                            <CardBody className="p-6 space-y-6">
+                                {/* Logging */}
+                                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 p-4 rounded-2xl bg-white/5 border border-white/5">
+                                    <div className="flex items-center gap-3">
+                                        <Switch
+                                            isSelected={config?.enabled}
+                                            onValueChange={(v) => handleConfigUpdate({ enabled: v })}
+                                            classNames={{
+                                                wrapper: "group-data-[selected=true]:bg-primary"
+                                            }}
+                                        />
+                                        <span className="font-bold text-white">{t.logChannelLabel}</span>
+                                    </div>
+
+                                    <Select
+                                        placeholder={t.logChannelPlaceholder}
+                                        selectedKeys={config?.logChannelId ? [config.logChannelId] : []}
+                                        onSelectionChange={(keys) => handleConfigUpdate({ logChannelId: Array.from(keys)[0] as string })}
+                                        items={channels.text}
+                                        isDisabled={!config?.enabled}
+                                        className="w-full md:w-64"
+                                        classNames={{
+                                            trigger: "bg-[#0A0B0E] border border-white/5 h-12 rounded-xl",
+                                            popoverContent: "bg-[#181A20] border border-white/10"
+                                        }}
+                                        renderValue={(items) => items.map(item => <span key={item.key} className="text-white font-medium">#{item.textValue}</span>)}
+                                    >
+                                        {(item) => <SelectItem key={item.id} textValue={item.name} classNames={{ base: "data-[hover=true]:bg-white/5 text-default-400 data-[hover=true]:text-white" }}>#{item.name}</SelectItem>}
+                                    </Select>
+                                </div>
+
+                                {/* Categories List */}
+                                <div className="space-y-4">
+                                    {categories.map((cat) => (
+                                        <div key={cat.id} className="flex items-center justify-between p-4 rounded-2xl border border-white/5 bg-[#0A0B0E] hover:border-white/10 transition-colors">
+                                            <div className="flex flex-col">
+                                                <div className="font-bold text-lg text-white mb-1">Раздел #{cat.name}</div>
+                                                <div className="text-sm text-default-500">
+                                                    {t.totalTickets}: <span className="text-white font-medium">{cat.stats?.total || 0}</span> ; {t.activeTickets}: <span className="text-white font-medium">{cat.stats?.active || 0}</span>
+                                                </div>
+                                            </div>
+                                            <Button isIconOnly size="sm" variant="flat" color="primary" className="bg-primary/10 text-primary" onPress={() => openEditModal(cat)}>
+                                                <Gear size={20} weight="fill" />
+                                            </Button>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {/* Create Button */}
+                                <Button
+                                    color="primary"
+                                    variant="flat"
+                                    onPress={openCreateModal}
+                                    className="w-full h-12 rounded-xl bg-primary/10 text-primary font-semibold text-base hover:bg-primary/20 transition-colors"
                                 >
-                                    {(item) => <SelectItem key={item.id} textValue={item.name} classNames={{ base: "data-[hover=true]:bg-white/5 text-default-400 data-[hover=true]:text-white" }}>{item.name}</SelectItem>}
-                                </Select>
-                                {config?.enabled && !config?.logChannelId && (
-                                    <div className="flex items-center gap-2 text-warning text-xs px-2">
-                                        <Warning weight="fill" />
-                                        {t.auditLogWarn}
-                                    </div>
-                                )}
-                            </div>
-                        </CardBody>
-                    </Card>
+                                    {t.createCategory}
+                                </Button>
+                            </CardBody>
+                        </Card>
 
-                    {/* Admin Tools */}
-                    <div className="space-y-4">
-                        <h3 className="text-xl font-bold text-white pl-2">{t.adminToolsTitle}</h3>
-                        <div className="grid grid-cols-2 gap-4">
-                            <Card
-                                isPressable
-                                onPress={() => router.push(`/dashboard/${guildId}/tickets/transcripts`)}
-                                className="bg-[#181A20] border border-white/5 shadow-lg hover:border-violet-500/50 transition-colors"
-                            >
-                                <CardBody className="p-4 flex flex-col items-center text-center gap-3">
-                                    <div className="p-3 rounded-full bg-violet-500/10 text-violet-400">
-                                        <Article size={28} weight="fill" />
-                                    </div>
-                                    <div>
-                                        <div className="font-bold text-white">{t.transcripts}</div>
-                                        <div className="text-tiny text-default-500">{t.transcriptsDesc}</div>
-                                    </div>
-                                </CardBody>
-                            </Card>
-
-                            <Card
-                                isPressable
-                                onPress={() => router.push(`/dashboard/${guildId}/tickets/stats`)}
-                                className="bg-[#181A20] border border-white/5 shadow-lg hover:border-violet-500/50 transition-colors"
-                            >
-                                <CardBody className="p-4 flex flex-col items-center text-center gap-3">
-                                    <div className="p-3 rounded-full bg-fuchsia-500/10 text-fuchsia-400">
-                                        <TrendUp size={28} weight="fill" />
-                                    </div>
-                                    <div>
-                                        <div className="font-bold text-white">{t.statistics}</div>
-                                        <div className="text-tiny text-default-500">{t.statisticsDesc}</div>
-                                    </div>
-                                </CardBody>
+                        <div className="lg:col-span-1 space-y-8">
+                            <Card className="bg-[#18181b]/60 backdrop-blur-md border border-white/5 shadow-lg rounded-2xl min-h-[200px] flex flex-col p-6">
+                                <h3 className="text-lg font-bold text-white mb-4 text-center">{t.adminToolsTitle}</h3>
+                                <div className="space-y-3 flex flex-col h-full justify-center">
+                                    <Button
+                                        variant="flat"
+                                        color="primary"
+                                        className="w-full bg-primary/10 text-primary justify-start font-semibold h-11 rounded-xl hover:bg-primary/20 transition-colors"
+                                        startContent={<Article size={20} weight="fill" />}
+                                        onPress={() => router.push(`/dashboard/${guildId}/tickets/transcripts`)}
+                                    >
+                                        {t.transcripts}
+                                    </Button>
+                                    <Button
+                                        variant="flat"
+                                        color="primary"
+                                        className="w-full bg-primary/10 text-primary justify-start font-semibold h-11 rounded-xl hover:bg-primary/20 transition-colors"
+                                        startContent={<TrendUp size={20} weight="fill" />}
+                                        onPress={() => router.push(`/dashboard/${guildId}/tickets/stats`)}
+                                    >
+                                        {t.statistics}
+                                    </Button>
+                                </div>
                             </Card>
                         </div>
                     </div>
-                </div>
-
-                {/* Right Column: Categories (Span 2) */}
-                <div className="xl:col-span-2 space-y-6">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <h3 className="text-xl font-bold text-white">{t.categoriesTitle}</h3>
-                            <p className="text-default-500 text-sm">{t.categoriesDesc}</p>
-                        </div>
-                        <Button
-                            color="primary"
-                            startContent={<Plus weight="bold" />}
-                            onPress={openCreateModal}
-                            isLoading={false}
-                            className="font-bold shadow-lg shadow-primary/20"
-                        >
-                            {t.createCategory}
-                        </Button>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {categories.map((cat) => (
-                            <Card key={cat.id} className="bg-[#181A20] border border-white/5 shadow-lg group hover:border-white/10 transition-colors">
-                                <CardBody className="p-5">
-                                    <div className="flex justify-between items-start mb-4">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 rounded-lg bg-default-100 flex items-center justify-center text-default-500 group-hover:bg-primary/10 group-hover:text-primary transition-colors">
-                                                <Ticket size={24} weight="fill" />
-                                            </div>
-                                            <div>
-                                                <div className="font-bold text-lg text-white group-hover:text-primary transition-colors">{cat.name}</div>
-                                                <div className="text-tiny text-default-500">{cat.channelId ? 'Linked' : 'No Channel'}</div>
-                                            </div>
-                                        </div>
-                                        <Button isIconOnly size="sm" variant="light" onPress={() => openEditModal(cat)}>
-                                            <Gear size={20} className="text-default-400" />
-                                        </Button>
-                                    </div>
-
-                                    <Divider className="bg-white/5 mb-4" />
-
-                                    <div className="flex justify-between items-center text-sm">
-                                        <div className="flex gap-4">
-                                            <div className="flex flex-col">
-                                                <span className="text-default-500 text-xs uppercase font-bold">{t.activeTickets}</span>
-                                                <span className="text-white font-bold text-lg">{cat.stats?.active || 0}</span>
-                                            </div>
-                                            <div className="flex flex-col">
-                                                <span className="text-default-500 text-xs uppercase font-bold">{t.totalTickets}</span>
-                                                <span className="text-white font-bold text-lg">{cat.stats?.total || 0}</span>
-                                            </div>
-                                        </div>
-                                        <Chip
-                                            size="sm"
-                                            variant="flat"
-                                            color={cat.stats?.total > 0 ? "success" : "default"}
-                                            classNames={{ base: "bg-white/5 text-default-500 font-bold" }}
-                                        >
-                                            Active
-                                        </Chip>
-                                    </div>
-                                </CardBody>
-                            </Card>
-                        ))}
-                    </div>
-                </div>
-            </div>
+                </Tab>
+            </Tabs>
 
             <CategoryModal
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
                 category={editingCategory as any}
                 onSave={handleSaveCategory}
-                channels={channels.categories} // Pass categories map
+                channels={channels.categories}
                 saving={savingCategory}
             />
         </div>

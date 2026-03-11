@@ -217,10 +217,10 @@ export default function SettingsPage({ params }: { params: Promise<{ guildId: st
                 `}>
                     <div className="relative flex items-center justify-center">
                         <div className={`absolute w-3 h-3 rounded-full animate-ping ${stats.botStatus === 'ONLINE' ? 'bg-emerald-500' :
-                                stats.botStatus === 'OFFLINE' ? 'bg-rose-500' : 'bg-amber-500'
+                            stats.botStatus === 'OFFLINE' ? 'bg-rose-500' : 'bg-amber-500'
                             } opacity-75`} />
                         <div className={`relative w-2.5 h-2.5 rounded-full ${stats.botStatus === 'ONLINE' ? 'bg-emerald-500' :
-                                stats.botStatus === 'OFFLINE' ? 'bg-rose-500' : 'bg-amber-500'
+                            stats.botStatus === 'OFFLINE' ? 'bg-rose-500' : 'bg-amber-500'
                             }`} />
                     </div>
                     <span className="font-bold text-sm uppercase tracking-wider">
@@ -242,8 +242,8 @@ export default function SettingsPage({ params }: { params: Promise<{ guildId: st
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <Button
                             className={`h-24 text-lg font-bold rounded-[24px] border border-white/5 shadow-lg relative overflow-hidden group transition-all duration-300 ${stats.botStatus === 'OFFLINE'
-                                    ? 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 hover:scale-[1.02] hover:shadow-emerald-500/10'
-                                    : 'bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 hover:scale-[1.02] hover:shadow-rose-500/10'
+                                ? 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 hover:scale-[1.02] hover:shadow-emerald-500/10'
+                                : 'bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 hover:scale-[1.02] hover:shadow-rose-500/10'
                                 }`}
                             onPress={() => handleAction(stats.botStatus === 'OFFLINE' ? 'start' : 'stop')}
                             isLoading={loading}
@@ -295,6 +295,7 @@ export default function SettingsPage({ params }: { params: Promise<{ guildId: st
                                 <div key={i} className="flex items-center justify-between p-4 rounded-[20px] bg-white/[0.02] border border-white/5">
                                     <div className="flex items-center gap-3">
                                         <div className={`p-2 rounded-lg ${mod.active ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
+                                            {/* @ts-ignore */}
                                             {React.cloneElement(mod.icon as React.ReactElement, { size: 20 })}
                                         </div>
                                         <span className="font-bold text-default-200">{mod.label}</span>

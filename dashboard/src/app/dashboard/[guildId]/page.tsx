@@ -285,12 +285,12 @@ export default function HubPage({ params }: { params: Promise<{ guildId: string 
                     </div>
                 </div>
 
-                <div className="flex items-center gap-3 bg-[#181A20]/50 p-1.5 rounded-2xl border border-white/5 shadow-2xl">
+                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3 bg-[#181A20]/50 p-1.5 rounded-2xl border border-white/5 shadow-2xl w-full md:w-auto">
                     <Button
                         as={Link}
                         href="/dashboard"
                         variant="flat"
-                        className="bg-[#181A20] border border-white/5 text-default-400 font-bold rounded-xl h-11 px-4 hover:bg-white/5 transition-all"
+                        className="bg-[#181A20] border border-white/5 text-default-400 font-bold rounded-xl h-11 px-4 hover:bg-white/5 transition-all text-sm whitespace-nowrap"
                         startContent={<Globe size={20} weight="fill" />}
                     >
                         {text.modules.serverSelection}
@@ -326,11 +326,11 @@ export default function HubPage({ params }: { params: Promise<{ guildId: string 
                         })}
                     </ButtonGroup>
 
-                    <div className="w-px h-6 bg-white/5 mx-1" />
+                    <div className="hidden sm:block w-px h-6 bg-white/5 mx-1" />
 
-                    <Link href={`/dashboard/${guildId}/settings`}>
+                    <Link href={`/dashboard/${guildId}/settings`} className="w-full sm:w-auto flex-1">
                         <div className={`
-                            h-11 px-4 rounded-xl flex items-center gap-3 border border-white/5 shadow-lg transition-all hover:scale-105 active:scale-95
+                            h-11 px-4 rounded-xl flex items-center justify-center gap-3 border border-white/5 shadow-lg transition-all hover:scale-105 active:scale-95 whitespace-nowrap
                             ${systemStats?.botStatus === 'ONLINE' ? 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20' :
                                 systemStats?.botStatus === 'OFFLINE' ? 'bg-rose-500/10 text-rose-400 hover:bg-rose-500/20' : 'bg-amber-500/10 text-amber-400'}
                         `}>

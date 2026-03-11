@@ -14,6 +14,8 @@ import {
 } from "@phosphor-icons/react";
 import { useGuildLocale } from "@/lib/i18n";
 import { useStats } from "@/hooks/useStats";
+import { usePersistentPeriod } from "@/hooks/usePersistentPeriod";
+import { formatYAxis } from "@/lib/utils";
 import { StatsCard } from "@/components/stats/StatsCard";
 import { ChartContainer } from "@/components/stats/ChartContainer";
 import { HistoricalSyncModal } from "@/components/stats/HistoricalSyncModal";
@@ -29,6 +31,7 @@ const strings = {
         day1: '24 Hours',
         day3: '3 Days',
         day7: '7 Days',
+        day14: '14 Days',
         day30: '30 Days',
         month3: '90 Days',
         year1: '365 Days',
@@ -51,6 +54,7 @@ const strings = {
         day1: '24 часа',
         day3: '3 дня',
         day7: '7 дней',
+        day14: '14 дней',
         day30: '30 дней',
         month3: '90 дней',
         year1: '365 дней',
@@ -73,8 +77,8 @@ export default function StatsOverview() {
     const { locale } = useGuildLocale(guildId);
     const text = strings[locale];
 
-    // Manage state locally for period to pass to hook
-    const [period, setPeriod] = React.useState('7d');
+    // Manage state via custom hook to persist in URL
+    const [period, setPeriod] = usePersistentPeriod('7d');
     const [syncModalOpen, setSyncModalOpen] = React.useState(false);
 
     // Use the custom hook
@@ -87,11 +91,17 @@ export default function StatsOverview() {
         return 30;
     };
 
-    const activityData = (data?.activityData?.length ? data.activityData : Array.from({ length: 7 }, (_, i) => ({
-        date: new Date(Date.now() - (6 - i) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        messages: 0,
-        voice: 0
-    })));
+    const activityData = (data?.activityData?.length ? data.activityData : Array.from({ length: 7 }, (_, i) => {
+        const d = new Date(Date.now() - (6 - i) * 24 * 60 * 60 * 1000);
+        const dd = d.getDate().toString().padStart(2, '0');
+        const mm = (d.getMonth() + 1).toString().padStart(2, '0');
+        const yyyy = d.getFullYear();
+        return {
+            date: `${dd}.${mm}.${yyyy}`,
+            messages: 0,
+            voice: 0
+        };
+    }));
     const cards = data?.cards || { totalMessages: 0, totalVoice: 0, newMembers: 0 };
 
     return (
@@ -139,6 +149,7 @@ export default function StatsOverview() {
                         <SelectItem key="24h">{text.day1}</SelectItem>
                         <SelectItem key="3d">{text.day3}</SelectItem>
                         <SelectItem key="7d">{text.day7}</SelectItem>
+                        <SelectItem key="14d">{text.day14}</SelectItem>
                         <SelectItem key="30d">{text.day30}</SelectItem>
                         <SelectItem key="90d">{text.month3}</SelectItem>
                         <SelectItem key="365d">{text.year1}</SelectItem>
@@ -184,7 +195,7 @@ export default function StatsOverview() {
                 height={400}
             >
                 <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={activityData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <AreaChart data={activityData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
                         <defs>
                             <linearGradient id="colorMessages" x1="0" y1="0" x2="0" y2="1">
                                 <stop offset="5%" stopColor="#8B5CF6" stopOpacity={0.4} />
@@ -209,7 +220,8 @@ export default function StatsOverview() {
                             fontSize={12}
                             tickLine={false}
                             axisLine={false}
-                            dx={-10}
+                            width={50}
+                            tickFormatter={(value) => formatYAxis(value, locale as 'ru' | 'en')}
                         />
                         <Tooltip
                             contentStyle={{

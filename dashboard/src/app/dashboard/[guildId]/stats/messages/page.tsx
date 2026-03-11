@@ -13,6 +13,8 @@ import {
 } from "@phosphor-icons/react";
 import { useGuildLocale } from "@/lib/i18n";
 import { useStats } from "@/hooks/useStats";
+import { usePersistentPeriod } from "@/hooks/usePersistentPeriod";
+import { formatYAxis } from "@/lib/utils";
 import { StatsCard } from "@/components/stats/StatsCard";
 import { ChartContainer } from "@/components/stats/ChartContainer";
 import { StatsTopWidget } from "@/components/stats/StatsTopWidget";
@@ -33,6 +35,7 @@ const strings = {
         day1: '24 Hours',
         day3: '3 Days',
         day7: '7 Days',
+        day14: '14 Days',
         day30: '30 Days',
         month3: '90 Days',
         year1: '365 Days',
@@ -59,6 +62,7 @@ const strings = {
         day1: '24 часа',
         day3: '3 дня',
         day7: '7 дней',
+        day14: '14 дней',
         day30: '30 дней',
         month3: '90 дней',
         year1: '365 дней',
@@ -78,7 +82,7 @@ export default function MessagesPage() {
     const { locale } = useGuildLocale(guildId);
     const text = strings[locale];
 
-    const [period, setPeriod] = useState('7d');
+    const [period, setPeriod] = usePersistentPeriod('7d');
     const { data, loading, refresh } = useStats({ guildId, type: 'messages', period });
     const [syncing, setSyncing] = useState(false);
 
@@ -180,6 +184,7 @@ export default function MessagesPage() {
                         <SelectItem key="24h">{text.day1}</SelectItem>
                         <SelectItem key="3d">{text.day3}</SelectItem>
                         <SelectItem key="7d">{text.day7}</SelectItem>
+                        <SelectItem key="14d">{text.day14}</SelectItem>
                         <SelectItem key="30d">{text.day30}</SelectItem>
                         <SelectItem key="90d">{text.month3}</SelectItem>
                         <SelectItem key="365d">{text.year1}</SelectItem>
@@ -224,7 +229,7 @@ export default function MessagesPage() {
                     height={350}
                 >
                     <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={lineChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                        <LineChart data={lineChartData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
                             <defs>
                                 <linearGradient id="lineColor" x1="0" y1="0" x2="1" y2="0">
                                     <stop offset="0%" stopColor="#8B5CF6" />
@@ -233,7 +238,7 @@ export default function MessagesPage() {
                             </defs>
                             <CartesianGrid strokeDasharray="3 3" stroke="#ffffff08" vertical={false} />
                             <XAxis dataKey="date" stroke="#52525b" fontSize={12} tickLine={false} axisLine={false} dy={10} />
-                            <YAxis stroke="#52525b" fontSize={12} tickLine={false} axisLine={false} dx={-10} />
+                            <YAxis stroke="#52525b" fontSize={12} tickLine={false} axisLine={false} width={50} tickFormatter={(value) => formatYAxis(value, locale as 'ru' | 'en')} />
                             <RechartsTooltip
                                 contentStyle={{
                                     backgroundColor: 'rgba(24, 24, 27, 0.9)',

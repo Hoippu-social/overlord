@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { Card, CardBody, Button, Input, Switch, Select, SelectItem, SelectedItems, ButtonGroup, Checkbox, Chip, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Divider } from "@nextui-org/react";
-import { Keyboard, CheckCircle, Prohibit, ShieldCheck, UserCircle, Translate, ArrowClockwise } from "@phosphor-icons/react";
+import { Keyboard, CheckCircle, Prohibit, ShieldCheck, UserCircle, Translate, ArrowClockwise, Clock } from "@phosphor-icons/react";
 import { DEFAULT_LOCALE, LocaleCode, normalizeLocale, useGuildLocale } from "@/lib/i18n";
 
 interface Role {
@@ -76,6 +76,26 @@ const normalizeChannelMode = (value: unknown) => {
     return lowered === 'whitelist' ? 'whitelist' : 'blacklist';
 };
 
+const TIMEZONE_OPTIONS = [
+    { key: 'UTC', label: 'UTC (±0:00)' },
+    { key: 'Europe/London', label: 'London (GMT/BST)' },
+    { key: 'Europe/Berlin', label: 'Berlin (CET/CEST)' },
+    { key: 'Europe/Kyiv', label: 'Kyiv (EET/EEST)' },
+    { key: 'Europe/Moscow', label: 'Moscow (MSK)' },
+    { key: 'Europe/Istanbul', label: 'Istanbul (TRT)' },
+    { key: 'Asia/Dubai', label: 'Dubai (GST)' },
+    { key: 'Asia/Kolkata', label: 'India (IST)' },
+    { key: 'Asia/Shanghai', label: 'China (CST)' },
+    { key: 'Asia/Tokyo', label: 'Tokyo (JST)' },
+    { key: 'Australia/Sydney', label: 'Sydney (AEST)' },
+    { key: 'Pacific/Auckland', label: 'Auckland (NZST)' },
+    { key: 'America/New_York', label: 'New York (EST/EDT)' },
+    { key: 'America/Chicago', label: 'Chicago (CST/CDT)' },
+    { key: 'America/Denver', label: 'Denver (MST/MDT)' },
+    { key: 'America/Los_Angeles', label: 'Los Angeles (PST/PDT)' },
+    { key: 'America/Sao_Paulo', label: 'São Paulo (BRT)' },
+];
+
 const strings = {
     en: {
         pageTitle: 'Server settings',
@@ -123,6 +143,9 @@ const strings = {
         saveSettings: 'Save Settings',
         saving: 'Saving...',
         resetDefaults: 'Reset Defaults',
+        timezoneTitle: 'Timezone',
+        timezoneDesc: 'Set server timezone for statistics. Affects daily/hourly chart bucketing.',
+        timezoneLabel: 'Select timezone',
     },
     ru: {
         pageTitle: 'Настройки сервера',
@@ -170,6 +193,9 @@ const strings = {
         saveSettings: 'Сохранить настройки',
         saving: 'Сохранение...',
         resetDefaults: 'Сбросить по умолчанию',
+        timezoneTitle: 'Часовой пояс',
+        timezoneDesc: 'Часовой пояс сервера для статистики. Влияет на группировку данных по дням/часам.',
+        timezoneLabel: 'Выберите часовой пояс',
     },
 } as const;
 
@@ -192,6 +218,7 @@ export default function ServerSettingsPage({ params }: { params: Promise<{ guild
     const [adminRoles, setAdminRoles] = useState<Set<string>>(new Set([]));
     const [restoreRolesOnRejoin, setRestoreRolesOnRejoin] = useState(false);
     const [restoreNicknameOnRejoin, setRestoreNicknameOnRejoin] = useState(false);
+    const [selectedTimezone, setSelectedTimezone] = useState('UTC');
     const [settingsLoading, setSettingsLoading] = useState(false);
     const [settingsError, setSettingsError] = useState<string | null>(null);
     const [settingsWarning, setSettingsWarning] = useState<string | null>(null);
@@ -250,6 +277,7 @@ export default function ServerSettingsPage({ params }: { params: Promise<{ guild
                 setRestoreRolesOnRejoin(Boolean(config?.restoreRolesOnRejoin));
                 setRestoreNicknameOnRejoin(Boolean(config?.restoreNicknameOnRejoin));
                 setSelectedLocale(configLocale);
+                setSelectedTimezone(config?.timezone ?? 'UTC');
 
                 const hasAdminRoles = config?.adminRoles !== null && config?.adminRoles !== undefined;
                 const adminRolesFromConfig = hasAdminRoles ? parseJsonArray(config?.adminRoles) : null;
@@ -272,7 +300,7 @@ export default function ServerSettingsPage({ params }: { params: Promise<{ guild
         if (initialLoaded) {
             setIsDirty(true);
         }
-    }, [prefix, prefixCommandsEnabled, channelMode, selectedTextChannels, adminRoles, restoreRolesOnRejoin, restoreNicknameOnRejoin, selectedLocale]);
+    }, [prefix, prefixCommandsEnabled, channelMode, selectedTextChannels, adminRoles, restoreRolesOnRejoin, restoreNicknameOnRejoin, selectedLocale, selectedTimezone]);
 
     const handleSaveSettings = async () => {
         if (!guildId) return;
@@ -296,6 +324,7 @@ export default function ServerSettingsPage({ params }: { params: Promise<{ guild
                     restoreRolesOnRejoin,
                     restoreNicknameOnRejoin,
                     locale: selectedLocale,
+                    timezone: selectedTimezone,
                 })
             });
 
@@ -325,6 +354,7 @@ export default function ServerSettingsPage({ params }: { params: Promise<{ guild
         setRestoreRolesOnRejoin(false);
         setRestoreNicknameOnRejoin(false);
         setSelectedLocale(DEFAULT_LOCALE);
+        setSelectedTimezone('UTC');
     };
 
     return (
@@ -449,6 +479,55 @@ export default function ServerSettingsPage({ params }: { params: Promise<{ guild
                                         <span className="text-base font-medium">English</span>
                                     </div>
                                 </SelectItem>
+                            </Select>
+                        </div>
+
+                        <Divider className="bg-white/5" />
+
+                        {/* Timezone Section */}
+                        <div className="space-y-6">
+                            <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 rounded-2xl bg-teal-500/10 flex items-center justify-center text-teal-500 shadow-inner-lg">
+                                    <Clock size={24} weight="fill" />
+                                </div>
+                                <div>
+                                    <h3 className="text-xl font-bold text-white mb-1">{text.timezoneTitle}</h3>
+                                    <p className="text-default-500 text-sm">{text.timezoneDesc}</p>
+                                </div>
+                            </div>
+
+                            <Select
+                                aria-label={text.timezoneLabel}
+                                selectedKeys={new Set([selectedTimezone])}
+                                onSelectionChange={(keys) => {
+                                    const [value] = Array.from(keys) as string[];
+                                    if (value) setSelectedTimezone(value);
+                                }}
+                                isDisabled={settingsLoading}
+                                classNames={{
+                                    trigger: "bg-[#0A0B0E] border border-white/5 min-h-[64px] rounded-2xl data-[hover=true]:bg-[#0A0B0E] data-[hover=true]:border-white/10 transition-all",
+                                    value: "text-lg font-medium pl-2",
+                                    popoverContent: "bg-[#181A20] border border-white/10 rounded-2xl shadow-2xl max-h-[300px]",
+                                    listbox: "bg-transparent p-2 gap-1"
+                                }}
+                                renderValue={(items) => items.map(item => {
+                                    const option = TIMEZONE_OPTIONS.find(o => o.key === item.key);
+                                    return (
+                                        <div key={item.key} className="flex items-center gap-3">
+                                            <Clock size={20} weight="fill" className="text-teal-500" />
+                                            <span className="text-white">{option?.label || item.key}</span>
+                                        </div>
+                                    );
+                                })}
+                            >
+                                {TIMEZONE_OPTIONS.map(tz => (
+                                    <SelectItem key={tz.key} textValue={tz.label} className="rounded-xl data-[hover=true]:bg-white/5">
+                                        <div className="flex items-center gap-3">
+                                            <Clock size={16} weight="regular" className="text-default-400" />
+                                            <span className="text-base font-medium">{tz.label}</span>
+                                        </div>
+                                    </SelectItem>
+                                ))}
                             </Select>
                         </div>
                     </CardBody>

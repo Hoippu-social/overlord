@@ -12,17 +12,13 @@ import {
 } from "@phosphor-icons/react";
 import { useGuildLocale } from "@/lib/i18n";
 import { useStats } from "@/hooks/useStats";
+import { usePersistentPeriod } from "@/hooks/usePersistentPeriod";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { StatsCard } from "@/components/stats/StatsCard";
 import { ChartContainer } from "@/components/stats/ChartContainer";
 
 import { StatsTopWidget, COLORS } from "@/components/stats/StatsTopWidget";
 
-const formatSeconds = (seconds: number) => {
-    const h = Math.floor(seconds / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    return `${h}h ${m}m`;
-};
 
 
 
@@ -36,11 +32,14 @@ const strings = {
         day1: '24 Hours',
         day3: '3 Days',
         day7: '7 Days',
+        day14: '14 Days',
         day30: '30 Days',
         month3: '90 Days',
         year1: '365 Days',
         totalPlaytime: 'Total Playtime',
         topGame: 'Top Game',
+        hours: 'h',
+        minutes: 'm',
     },
     ru: {
         title: 'Активности',
@@ -51,11 +50,14 @@ const strings = {
         day1: '24 часа',
         day3: '3 дня',
         day7: '7 дней',
+        day14: '14 дней',
         day30: '30 дней',
         month3: '90 дней',
         year1: '365 дней',
         totalPlaytime: 'Всего наиграно',
         topGame: 'Топ игра',
+        hours: 'ч',
+        minutes: 'мин',
     },
 } as const;
 
@@ -67,9 +69,15 @@ export default function ActivitiesPage() {
     const text = strings[locale];
     const isMobile = useMediaQuery('(max-width: 768px)');
 
-    const [period, setPeriod] = useState('7d');
+    const [period, setPeriod] = usePersistentPeriod('7d');
     const { data, loading, refresh } = useStats({ guildId, type: 'activities', period });
     const [syncing, setSyncing] = useState(false);
+
+    const formatSeconds = (seconds: number) => {
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        return `${h}${text.hours} ${m}${text.minutes}`;
+    };
 
     const handleSync = async () => {
         setSyncing(true);
@@ -143,6 +151,7 @@ export default function ActivitiesPage() {
                         <SelectItem key="24h">{text.day1}</SelectItem>
                         <SelectItem key="3d">{text.day3}</SelectItem>
                         <SelectItem key="7d">{text.day7}</SelectItem>
+                        <SelectItem key="14d">{text.day14}</SelectItem>
                         <SelectItem key="30d">{text.day30}</SelectItem>
                         <SelectItem key="90d">{text.month3}</SelectItem>
                         <SelectItem key="365d">{text.year1}</SelectItem>
@@ -154,7 +163,7 @@ export default function ActivitiesPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <StatsCard
                     title={text.totalPlaytime}
-                    value={`${totalHours}h`}
+                    value={`${totalHours}${text.hours}`}
                     icon={<Clock size={24} weight="fill" />}
                     loading={loading}
                     className="border-cyan-500/20"
@@ -196,7 +205,7 @@ export default function ActivitiesPage() {
                                                             {activity.name}
                                                         </div>
                                                         <div className="text-xs text-default-400 font-mono">
-                                                            {hours}h {mins}m
+                                                            {hours}{text.hours} {mins}{text.minutes}
                                                         </div>
                                                     </div>
                                                 </div>

@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, Suspense } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import {
     SquaresFour,
     ChatsTeardrop,
@@ -13,7 +13,7 @@ import {
     Gear,
     GameController
 } from "@phosphor-icons/react";
-import { cn, Tooltip } from "@nextui-org/react";
+import { cn } from "@nextui-org/react";
 import { useGuildLocale } from "@/lib/i18n";
 import { useSession } from "next-auth/react";
 import { BOT_OWNER_ID } from "@/lib/constants";
@@ -45,13 +45,13 @@ interface StatsNavProps {
     guildId: string;
 }
 
-export function StatsNav({ guildId }: StatsNavProps) {
+function StatsNavContent({ guildId }: StatsNavProps) {
     const pathname = usePathname();
+    const searchParams = useSearchParams();
     const { locale } = useGuildLocale(guildId);
     const text = strings[locale];
 
-    // Hover state for expansion
-    const [isHovered, setIsHovered] = useState(false);
+    const currentPeriod = searchParams.get('period');
     const { data: session } = useSession();
     const isOwner = (session?.user as any)?.id === BOT_OWNER_ID || (session?.user as any)?.role === 'admin';
 
@@ -70,10 +70,12 @@ export function StatsNav({ guildId }: StatsNavProps) {
         <div className="flex flex-wrap items-center gap-2 mb-2 w-full overflow-x-auto scrollbar-hide pb-2">
             {items.map((item) => {
                 const isActive = pathname === item.href;
+                const href = currentPeriod ? `${item.href}?period=${currentPeriod}` : item.href;
+
                 return (
                     <Link
                         key={item.key}
-                        href={item.href}
+                        href={href}
                         className={cn(
                             "flex items-center gap-2 px-4 py-2.5 rounded-2xl transition-all duration-300 border backdrop-blur-md shrink-0",
                             isActive
@@ -91,5 +93,13 @@ export function StatsNav({ guildId }: StatsNavProps) {
                 );
             })}
         </div>
+    );
+}
+
+export function StatsNav(props: StatsNavProps) {
+    return (
+        <Suspense fallback={<div className="h-12 w-full animate-pulse bg-white/5 rounded-2xl mb-2" />}>
+            <StatsNavContent {...props} />
+        </Suspense>
     );
 }

@@ -68,7 +68,7 @@ export async function POST(
 
         const getHourlyEntry = (date: Date) => {
             const d = new Date(date);
-            d.setMinutes(0, 0, 0, 0);
+            d.setMinutes(0, 0, 0);
             const key = d.toISOString();
             if (!hourlyStats.has(key)) hourlyStats.set(key, { messages: 0, voice: 0, joined: 0, left: 0 });
             return hourlyStats.get(key)!;

@@ -78,6 +78,7 @@ export async function GET(
         case '24h': startDate.setDate(now.getDate() - 1); break;
         case '3d': startDate.setDate(now.getDate() - 3); break;
         case '7d': startDate.setDate(now.getDate() - 7); break;
+        case '14d': startDate.setDate(now.getDate() - 14); break;
         case '30d': startDate.setDate(now.getDate() - 30); break;
         case '90d': startDate.setDate(now.getDate() - 90); break;
         case '365d': startDate.setFullYear(now.getFullYear() - 1); break;
@@ -129,8 +130,11 @@ export async function GET(
 
         // --- MODE 2: User Drilldown ---
         const fmt = (d: Date) => {
-            if (period === '24h') return d.toISOString().substring(11, 16);
-            return d.toISOString().split('T')[0];
+            if (period === '24h') return d.toISOString().substring(11, 13) + ':00';
+            const dd = d.getDate().toString().padStart(2, '0');
+            const mm = (d.getMonth() + 1).toString().padStart(2, '0');
+            const yyyy = d.getFullYear();
+            return `${dd}.${mm}.${yyyy}`;
         };
 
         // Enrich user info
@@ -208,6 +212,17 @@ export async function GET(
             allMsgs.sort((a: any, b: any) => a.createdAt.getTime() - b.createdAt.getTime());
 
             const dailyMap = new Map<string, number>();
+
+            // Pre-fill empty dates
+            let curr = new Date(startDate);
+            if (period === '24h') curr.setMinutes(0, 0, 0);
+            else curr.setHours(0, 0, 0, 0);
+            while (curr <= now) {
+                dailyMap.set(fmt(curr), 0);
+                if (period === '24h') curr.setHours(curr.getHours() + 1);
+                else curr.setDate(curr.getDate() + 1);
+            }
+
             for (const msg of allMsgs) {
                 const key = fmt(msg.createdAt);
                 dailyMap.set(key, (dailyMap.get(key) || 0) + 1);
@@ -237,6 +252,17 @@ export async function GET(
             allVoice.sort((a: any, b: any) => a.joinedAt.getTime() - b.joinedAt.getTime());
 
             const dailyMap = new Map<string, number>();
+
+            // Pre-fill empty dates
+            let curr = new Date(startDate);
+            if (period === '24h') curr.setMinutes(0, 0, 0);
+            else curr.setHours(0, 0, 0, 0);
+            while (curr <= now) {
+                dailyMap.set(fmt(curr), 0);
+                if (period === '24h') curr.setHours(curr.getHours() + 1);
+                else curr.setDate(curr.getDate() + 1);
+            }
+
             for (const v of allVoice) {
                 const dur = v.duration || (v.leftAt ? Math.floor((v.leftAt.getTime() - v.joinedAt.getTime()) / 1000) : 0);
                 const key = fmt(v.joinedAt);

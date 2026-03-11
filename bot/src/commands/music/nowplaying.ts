@@ -1,5 +1,4 @@
-import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
-import { getGuildLocale, t } from '../../utils/i18n';
+import { SlashCommandBuilder, EmbedBuilder, GuildMember } from 'discord.js';
 import { Command } from '../../utils/types';
 
 const command: Command = {
@@ -7,69 +6,64 @@ const command: Command = {
         .setName('nowplaying')
         .setDescription('Shows the currently playing track'),
     execute: async (interaction) => {
-        const locale = await getGuildLocale(interaction.guildId);
         const player = interaction.client.lavalink.getPlayer(interaction.guildId!);
 
         if (!player || !player.queue.current) {
-            await interaction.reply({ content: t(locale, 'general.nothingPlaying'), ephemeral: true });
+            await interaction.reply({ content: '❌ Сейчас ничего не играет!', ephemeral: true });
             return;
         }
 
         const track = player.queue.current;
 
+        // Format duration
         const formatDuration = (ms: number) => {
             const minutes = Math.floor(ms / 60000);
             const seconds = Math.floor((ms % 60000) / 1000);
             return `${minutes}:${seconds.toString().padStart(2, '0')}`;
         };
 
+        // Progress bar
         const position = player.position || 0;
         const duration = track.info.duration || 0;
         const progress = duration > 0 ? Math.floor((position / duration) * 20) : 0;
-        const progressBar = '='.repeat(progress) + '-'.repeat(20 - progress);
-
-        const loopModes: Record<string, string> = {
-            track: t(locale, 'music.nowplaying.loop.track'),
-            queue: t(locale, 'music.nowplaying.loop.queue'),
-            off: t(locale, 'music.nowplaying.loop.off'),
-        };
+        const progressBar = '▓'.repeat(progress) + '░'.repeat(20 - progress);
 
         const embed = new EmbedBuilder()
             .setColor('#5865F2')
-            .setAuthor({ name: t(locale, 'music.nowplaying.title') })
+            .setAuthor({ name: '🎵 Сейчас играет' })
             .setTitle(track.info.title)
             .setURL(track.info.uri || '')
             .addFields(
-                { name: t(locale, 'music.nowplaying.field.author'), value: track.info.author || t(locale, 'general.unknown'), inline: true },
-                { name: t(locale, 'music.nowplaying.field.progress'), value: `\`${formatDuration(position)}\` / \`${formatDuration(duration)}\``, inline: true },
-                { name: t(locale, 'music.nowplaying.field.volume'), value: `${player.volume}%`, inline: true },
+                { name: 'Автор', value: track.info.author || 'Неизвестен', inline: true },
+                { name: 'Длительность', value: `\`${formatDuration(position)}\` / \`${formatDuration(duration)}\``, inline: true },
+                { name: 'Громкость', value: `${player.volume}%`, inline: true }
             )
             .setDescription(`\`${progressBar}\``)
-            .setFooter({ text: `${t(locale, 'music.nowplaying.requester')}: ${track.requester || t(locale, 'general.unknown')}` });
+            .setFooter({ text: `Заказал: ${track.requester || 'Неизвестно'}` });
 
+        // Add thumbnail if available
         if (track.info.artworkUrl) {
             embed.setThumbnail(track.info.artworkUrl);
         }
 
+        // Add queue info
         const queueSize = player.queue.tracks.length;
         if (queueSize > 0) {
-            embed.addFields({
-                name: t(locale, 'music.nowplaying.field.queue'),
-                value: t(locale, 'music.nowplaying.queueCount', { count: queueSize }),
-                inline: true,
-            });
+            embed.addFields({ name: 'В очереди', value: `${queueSize} треков`, inline: true });
         }
 
+        // Add loop mode
         if (player.repeatMode !== 'off') {
-            embed.addFields({
-                name: t(locale, 'music.nowplaying.field.loop'),
-                value: loopModes[player.repeatMode] || t(locale, 'music.nowplaying.loop.off'),
-                inline: true,
-            });
+            const loopModes: Record<string, string> = {
+                'track': '🔂 Трек',
+                'queue': '🔁 Очередь'
+            };
+            embed.addFields({ name: 'Повтор', value: loopModes[player.repeatMode] || 'Выкл', inline: true });
         }
 
+        // Add pause status
         if (player.paused) {
-            embed.addFields({ name: t(locale, 'music.nowplaying.field.paused'), value: t(locale, 'music.nowplaying.paused'), inline: true });
+            embed.addFields({ name: 'Статус', value: '⏸️ На паузе', inline: true });
         }
 
         await interaction.reply({ embeds: [embed] });
