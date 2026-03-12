@@ -80,8 +80,6 @@ export default {
                     accessGroup: command.accessGroup,
                     accessKey: command.accessKey ?? interaction.commandName,
                     requiredAccessLevel: command.requiredAccessLevel,
-                    channelId: interaction.channelId,
-                    parentChannelId: interaction.channel && 'parentId' in interaction.channel ? interaction.channel.parentId : null,
                 });
 
                 if (!allowed) {

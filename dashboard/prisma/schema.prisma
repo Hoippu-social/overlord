@@ -89,7 +89,6 @@ model ModerationConfig {
   ignoredRoles        String?
   ignoredUsers        String?
   commandOnlyChannels String?
-  commandRules        String?
   aiProvider          String?
   aiModel             String?
   aiDefaultThreshold  Int      @default(80)

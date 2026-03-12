@@ -19,8 +19,6 @@ const command: Command = {
                 .setName('mine')
                 .setDescription('Show your recent appeal tickets')
         ),
-    accessGroup: 'moderation',
-    accessKey: 'appeal',
     async execute(interaction) {
         if (!interaction.guild) {
             await interaction.reply({ content: 'Guild only.', ephemeral: true });

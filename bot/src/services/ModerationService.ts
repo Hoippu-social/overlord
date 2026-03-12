@@ -7,7 +7,6 @@ import {
     GuildMember,
     Message,
     PermissionFlagsBits,
-    PermissionResolvable,
     Snowflake,
     TextBasedChannel,
     User,
@@ -71,151 +70,6 @@ export function parseJsonObject<T = Record<string, unknown>>(value: string | nul
     } catch {
         return null;
     }
-}
-
-type CommandRuleMode = 'WHITELIST' | 'BLACKLIST';
-
-type CommandRuleConfig = {
-    commandKey: string;
-    enabled: boolean;
-    roleMode: CommandRuleMode;
-    roleIds: string[];
-    channelMode: CommandRuleMode;
-    channelIds: string[];
-    requiredAccessLevel: number | null;
-};
-
-export type CommandAccessOptions = {
-    accessGroup?: string;
-    accessKey?: string;
-    requiredAccessLevel?: number;
-    channelId?: string | null;
-    parentChannelId?: string | null;
-};
-
-type ModeratorAccessContext = {
-    member: GuildMember;
-    hasOverrideAccess: boolean;
-    adminRoleIds: Set<string>;
-    roleIds: Set<string>;
-    bindingLevel: number;
-    commandRules: CommandRuleConfig[];
-    grants: Array<{
-        roleId: string;
-        scopeType: 'GROUP' | 'COMMAND';
-        scopeKey: string;
-        effect: 'ALLOW' | 'DENY';
-    }>;
-};
-
-const DEFAULT_COMMAND_ACCESS_LEVELS: Record<string, number> = {
-    appeals: 70,
-    ban: 85,
-    case: 35,
-    cases: 35,
-    clear: 55,
-    kick: 65,
-    lock: 55,
-    mute: 55,
-    note: 30,
-    slowmode: 55,
-    tempban: 80,
-    timeout: 60,
-    unban: 80,
-    unlock: 55,
-    unmute: 55,
-    untimeout: 60,
-    unwarn: 60,
-    voicekick: 45,
-    voicemove: 45,
-    warn: 45,
-    warnings: 35,
-};
-
-function getDefaultCommandRule(commandKey: string): CommandRuleConfig | null {
-    if (!(commandKey in DEFAULT_COMMAND_ACCESS_LEVELS)) {
-        return null;
-    }
-
-    return {
-        commandKey,
-        enabled: true,
-        roleMode: 'WHITELIST',
-        roleIds: [],
-        channelMode: 'WHITELIST',
-        channelIds: [],
-        requiredAccessLevel: DEFAULT_COMMAND_ACCESS_LEVELS[commandKey],
-    };
-}
-
-function parseCommandRules(value: string | null | undefined): CommandRuleConfig[] {
-    if (!value) return [];
-
-    try {
-        const parsed = JSON.parse(value);
-        if (!Array.isArray(parsed)) return [];
-
-        return parsed
-            .map((rule) => {
-                if (!rule || typeof rule !== 'object') {
-                    return null;
-                }
-
-                const entry = rule as Record<string, unknown>;
-                if (typeof entry.commandKey !== 'string' || !entry.commandKey.trim()) {
-                    return null;
-                }
-
-                return {
-                    commandKey: entry.commandKey.trim(),
-                    enabled: entry.enabled !== false,
-                    roleMode: entry.roleMode === 'WHITELIST' ? 'WHITELIST' : 'BLACKLIST',
-                    roleIds: Array.isArray(entry.roleIds) ? entry.roleIds.filter((item): item is string => typeof item === 'string' && Boolean(item)) : [],
-                    channelMode: entry.channelMode === 'WHITELIST' ? 'WHITELIST' : 'BLACKLIST',
-                    channelIds: Array.isArray(entry.channelIds) ? entry.channelIds.filter((item): item is string => typeof item === 'string' && Boolean(item)) : [],
-                    requiredAccessLevel:
-                        typeof entry.requiredAccessLevel === 'number' && Number.isFinite(entry.requiredAccessLevel)
-                            ? Math.max(0, Math.min(100, Math.round(entry.requiredAccessLevel)))
-                            : null,
-                };
-            })
-            .filter((rule): rule is CommandRuleConfig => Boolean(rule));
-    } catch {
-        return [];
-    }
-}
-
-function evaluateCommandRule(rule: CommandRuleConfig, context: {
-    roleIds: Set<string>;
-    bindingLevel: number;
-    channelId?: string | null;
-    parentChannelId?: string | null;
-}) {
-    const checks: boolean[] = [];
-
-    if (rule.roleIds.length > 0) {
-        const hasMatchingRole = rule.roleIds.some((roleId) => context.roleIds.has(roleId));
-        checks.push(rule.roleMode === 'WHITELIST' ? hasMatchingRole : !hasMatchingRole);
-    }
-
-    if (rule.channelIds.length > 0) {
-        const activeChannelIds = new Set<string>();
-        if (context.channelId) activeChannelIds.add(context.channelId);
-        if (context.parentChannelId) activeChannelIds.add(context.parentChannelId);
-
-        const hasMatchingChannel = rule.channelIds.some((channelId) => activeChannelIds.has(channelId));
-        checks.push(rule.channelMode === 'WHITELIST' ? hasMatchingChannel : !hasMatchingChannel);
-    }
-
-    if (rule.requiredAccessLevel !== null) {
-        checks.push(context.bindingLevel >= rule.requiredAccessLevel);
-    }
-
-    if (!checks.length) {
-        return null;
-    }
-
-    return checks.every(Boolean);
 }
 
 export function isMissingModerationTableError(error: unknown) {
@@ -296,108 +150,6 @@ export async function createModerationCase(input: {
     });
 }
 
-type ModerationResolutionType = 'manual' | 'expired' | 'appeal_review' | 'pardon';
-
-type ModerationCaseResolutionRecord = {
-    id: number;
-    status: string;
-    expiresAt: Date | null;
-    metadata: string | null;
-};
-
-function parseModerationCaseMetadata(value: string | null | undefined) {
-    return parseJsonObject<Record<string, unknown>>(value) ?? {};
-}
-
-function hasResolutionMetadata(value: string | null | undefined) {
-    const metadata = parseModerationCaseMetadata(value);
-    const resolution = metadata.resolution;
-    return Boolean(resolution && typeof resolution === 'object' && !Array.isArray(resolution));
-}
-
-function buildResolutionMetadata(
-    value: string | null | undefined,
-    resolution: {
-        type: ModerationResolutionType;
-        actorUserId?: string | null;
-        reason?: string | null;
-    }
-) {
-    const metadata = parseModerationCaseMetadata(value);
-
-    return {
-        ...metadata,
-        resolution: {
-            type: resolution.type,
-            actorUserId: resolution.actorUserId ?? null,
-            reason: resolution.reason ?? null,
-            resolvedAt: new Date().toISOString(),
-        },
-    };
-}
-
-export async function resolveModerationCase(options: {
-    moderationCase: ModerationCaseResolutionRecord;
-    nextStatus: 'CLEARED' | 'EXPIRED';
-    resolutionType: ModerationResolutionType;
-    actorUserId?: string | null;
-    reason?: string | null;
-}) {
-    return prisma.moderationCase.update({
-        where: { id: options.moderationCase.id },
-        data: {
-            status: options.nextStatus,
-            metadata: JSON.stringify(
-                buildResolutionMetadata(options.moderationCase.metadata, {
-                    type: options.resolutionType,
-                    actorUserId: options.actorUserId,
-                    reason: options.reason,
-                })
-            ),
-        },
-    });
-}
-
-async function findLatestResolvableCase(options: {
-    guildId: string;
-    targetUserId: string;
-    actionTypes: string[];
-    errorMessage: string;
-    allowLegacyBanFallback?: boolean;
-}) {
-    const activeCase = await prisma.moderationCase.findFirst({
-        where: {
-            guildId: options.guildId,
-            targetUserId: options.targetUserId,
-            actionType: { in: options.actionTypes },
-            status: 'ACTIVE',
-        },
-        orderBy: [{ createdAt: 'desc' }, { caseNumber: 'desc' }],
-    });
-
-    if (activeCase) {
-        return activeCase;
-    }
-
-    if (options.allowLegacyBanFallback && options.actionTypes.includes('BAN')) {
-        const legacyBanCase = await prisma.moderationCase.findFirst({
-            where: {
-                guildId: options.guildId,
-                targetUserId: options.targetUserId,
-                actionType: 'BAN',
-                status: 'CLEARED',
-            },
-            orderBy: [{ createdAt: 'desc' }, { caseNumber: 'desc' }],
-        });
-
-        if (legacyBanCase && !hasResolutionMetadata(legacyBanCase.metadata)) {
-            return legacyBanCase;
-        }
-    }
-
-    throw new Error(options.errorMessage);
-}
-
 export async function getActiveWarnings(guildId: string, targetUserId: string) {
     return prisma.moderationCase.findMany({
         where: {
@@ -419,16 +171,20 @@ export async function clearWarningCase(guildId: string, actorUserId: string, cas
         throw new Error('Warning case not found.');
     }
 
-    if (warningCase.status !== 'ACTIVE') {
-        throw new Error(`Warning case #${caseNumber} is already ${warningCase.status.toLowerCase()}.`);
-    }
+    await prisma.moderationCase.update({
+        where: { id: warningCase.id },
+        data: { status: 'CLEARED' },
+    });
 
-    return resolveModerationCase({
-        moderationCase: warningCase,
-        nextStatus: 'CLEARED',
-        resolutionType: 'manual',
+    return createModerationCase({
+        guildId,
+        actionType: 'UNWARN',
+        source: 'manual',
         actorUserId,
+        targetUserId: warningCase.targetUserId,
         reason: reason ?? `Warning #${caseNumber} cleared`,
+        relatedCaseId: warningCase.id,
+        status: 'CLEARED',
     });
 }
 
@@ -504,20 +260,15 @@ export async function untimeoutMember(options: {
     actorUserId: string;
     reason?: string | null;
 }) {
-    const moderationCase = await findLatestResolvableCase({
-        guildId: options.member.guild.id,
-        targetUserId: options.member.id,
-        actionTypes: ['TIMEOUT'],
-        errorMessage: 'Active timeout case not found.',
-    });
-
     await options.member.timeout(null, options.reason ?? undefined);
-    return resolveModerationCase({
-        moderationCase,
-        nextStatus: 'CLEARED',
-        resolutionType: 'manual',
+    return createModerationCase({
+        guildId: options.member.guild.id,
+        actionType: 'UNTIMEOUT',
+        source: 'manual',
         actorUserId: options.actorUserId,
-        reason: options.reason ?? 'Timeout removed manually',
+        targetUserId: options.member.id,
+        reason: options.reason,
+        status: 'CLEARED',
     });
 }
 
@@ -558,7 +309,7 @@ export async function banUser(options: {
         actorUserId: options.actorUserId,
         targetUserId: targetId,
         reason: options.reason,
-        status: 'ACTIVE',
+        status: 'CLEARED',
         metadata: options.deleteMessageSeconds ? { deleteMessageSeconds: options.deleteMessageSeconds } : null,
     });
 }
@@ -600,28 +351,21 @@ export async function unbanUser(options: {
     actorUserId: string;
     reason?: string | null;
 }) {
-    const moderationCase = await findLatestResolvableCase({
-        guildId: options.guild.id,
-        targetUserId: options.targetUserId,
-        actionTypes: ['BAN', 'TEMPBAN'],
-        errorMessage: 'Active ban case not found.',
-        allowLegacyBanFallback: true,
-    });
-
     await options.guild.bans.remove(options.targetUserId, options.reason ?? undefined);
-    return resolveModerationCase({
-        moderationCase,
-        nextStatus: 'CLEARED',
-        resolutionType: 'manual',
+    return createModerationCase({
+        guildId: options.guild.id,
+        actionType: 'UNBAN',
+        source: 'manual',
         actorUserId: options.actorUserId,
-        reason: options.reason ?? 'Ban removed manually',
+        targetUserId: options.targetUserId,
+        reason: options.reason,
+        status: 'CLEARED',
     });
 }
 
 export async function muteMember(options: {
     member: GuildMember;
     actorUserId: string;
-    durationMinutes?: number;
     reason?: string | null;
 }) {
     const config = await ensureModerationConfig(options.member.guild.id);
@@ -635,7 +379,6 @@ export async function muteMember(options: {
     }
 
     await options.member.roles.add(muteRole, options.reason ?? undefined);
-    const expiresAt = options.durationMinutes ? new Date(Date.now() + options.durationMinutes * 60_000) : null;
     return createModerationCase({
         guildId: options.member.guild.id,
         actionType: 'MUTE',
@@ -643,8 +386,6 @@ export async function muteMember(options: {
         actorUserId: options.actorUserId,
         targetUserId: options.member.id,
         reason: options.reason,
-        expiresAt,
-        metadata: options.durationMinutes ? { durationMinutes: options.durationMinutes } : null,
     });
 }
 
@@ -663,20 +404,15 @@ export async function unmuteMember(options: {
         throw new Error('Mute role does not exist.');
     }
 
-    const moderationCase = await findLatestResolvableCase({
-        guildId: options.member.guild.id,
-        targetUserId: options.member.id,
-        actionTypes: ['MUTE'],
-        errorMessage: 'Active mute case not found.',
-    });
-
     await options.member.roles.remove(muteRole, options.reason ?? undefined);
-    return resolveModerationCase({
-        moderationCase,
-        nextStatus: 'CLEARED',
-        resolutionType: 'manual',
+    return createModerationCase({
+        guildId: options.member.guild.id,
+        actionType: 'UNMUTE',
+        source: 'manual',
         actorUserId: options.actorUserId,
-        reason: options.reason ?? 'Mute removed manually',
+        targetUserId: options.member.id,
+        reason: options.reason,
+        status: 'CLEARED',
     });
 }
 
@@ -954,140 +690,58 @@ async function deleteMessages(channel: ModerationTextChannel, messages: Message[
     };
 }
 
-const hasModeratorOverrideAccess = (member: GuildMember) =>
-    member.permissions.has(PermissionFlagsBits.Administrator)
-    || member.permissions.has(PermissionFlagsBits.ManageGuild)
-    || member.guild.ownerId === member.id;
-
-export const hasGuildPermissionAccess = (member: GuildMember, permission: PermissionResolvable) =>
-    member.guild.ownerId === member.id || member.permissions.has(permission);
-
-async function buildModeratorAccessContext(guildId: string, member: GuildMember): Promise<ModeratorAccessContext> {
-    if (hasModeratorOverrideAccess(member)) {
-        return {
-            member,
-            hasOverrideAccess: true,
-            adminRoleIds: new Set<string>(),
-            roleIds: new Set(member.roles.cache.keys()),
-            bindingLevel: 0,
-            commandRules: [],
-            grants: [],
-        };
+export async function ensureModeratorAccess(guildId: string, member: GuildMember, options: {
+    accessGroup?: string;
+    accessKey?: string;
+    requiredAccessLevel?: number;
+}) {
+    if (member.permissions.has(PermissionFlagsBits.Administrator) || member.permissions.has(PermissionFlagsBits.ManageGuild) || member.guild.ownerId === member.id) {
+        return true;
     }
 
-    const [botSettings, moderationConfig, bindings, grants] = await Promise.all([
+    const [botSettings, bindings, grants] = await Promise.all([
         prisma.botSettings.findUnique({
             where: { guildId },
             select: { adminRoles: true },
-        }),
-        prisma.moderationConfig.findUnique({
-            where: { guildId },
-            select: { commandRules: true },
         }),
         prisma.moderationRoleBinding.findMany({
             where: { guildId, enabled: true },
         }),
         prisma.moderationCommandGrant.findMany({
-            where: { guildId },
+            where: {
+                guildId,
+                OR: [
+                    options.accessKey ? { scopeType: 'COMMAND', scopeKey: options.accessKey } : undefined,
+                    options.accessGroup ? { scopeType: 'GROUP', scopeKey: options.accessGroup } : undefined,
+                ].filter(Boolean) as any,
+            },
         }),
     ]);
 
+    const adminRoles = new Set(parseJsonArray(botSettings?.adminRoles));
+    if (member.roles.cache.some((role) => adminRoles.has(role.id))) {
+        return true;
+    }
+
     const roleIds = new Set(member.roles.cache.keys());
+    const bindingLevel = bindings
+        .filter((binding) => roleIds.has(binding.roleId))
+        .reduce((max, binding) => Math.max(max, binding.accessLevel), 0);
 
-    return {
-        member,
-        hasOverrideAccess: false,
-        adminRoleIds: new Set(parseJsonArray(botSettings?.adminRoles)),
-        roleIds,
-        bindingLevel: bindings
-            .filter((binding) => roleIds.has(binding.roleId))
-            .reduce((max, binding) => Math.max(max, binding.accessLevel), 0),
-        commandRules: parseCommandRules(moderationConfig?.commandRules),
-        grants: grants.map((grant) => ({
-            roleId: grant.roleId,
-            scopeType: grant.scopeType as 'GROUP' | 'COMMAND',
-            scopeKey: grant.scopeKey,
-            effect: grant.effect as 'ALLOW' | 'DENY',
-        })),
-    };
-}
-
-function evaluateModeratorAccess(context: ModeratorAccessContext, options: CommandAccessOptions) {
-    if (context.hasOverrideAccess) {
-        return true;
-    }
-
-    if (context.member.roles.cache.some((role) => context.adminRoleIds.has(role.id))) {
-        return true;
-    }
-
-    const matchingGrants = context.grants.filter((grant) => context.roleIds.has(grant.roleId));
-    const groupGrants = matchingGrants.filter((grant) =>
-        grant.scopeType === 'GROUP' && (!options.accessGroup || grant.scopeKey === options.accessGroup));
-    const commandGrants = matchingGrants.filter((grant) =>
-        grant.scopeType === 'COMMAND' && (!options.accessKey || grant.scopeKey === options.accessKey));
-    const savedCommandRule = options.accessKey
-        ? context.commandRules.find((rule) => rule.commandKey === options.accessKey)
-        : null;
-    const defaultCommandRule = options.accessKey ? getDefaultCommandRule(options.accessKey) : null;
-    const commandRule = savedCommandRule
-        ? {
-            ...(defaultCommandRule ?? savedCommandRule),
-            ...savedCommandRule,
-            requiredAccessLevel: savedCommandRule.requiredAccessLevel ?? defaultCommandRule?.requiredAccessLevel ?? null,
-        }
-        : defaultCommandRule;
-
-    if (savedCommandRule && !savedCommandRule.enabled) {
+    const matchingGrants = grants.filter((grant) => roleIds.has(grant.roleId));
+    if (matchingGrants.some((grant) => grant.effect === 'DENY')) {
         return false;
     }
 
-    const commandRuleDecision = commandRule
-        ? evaluateCommandRule(commandRule, {
-            roleIds: context.roleIds,
-            bindingLevel: context.bindingLevel,
-            channelId: options.channelId,
-            parentChannelId: options.parentChannelId,
-        })
-        : null;
-
-    if (commandRuleDecision === false) {
-        return false;
-    }
-
-    if (
-        groupGrants.some((grant) => grant.effect === 'DENY') ||
-        commandGrants.some((grant) => grant.effect === 'DENY')
-    ) {
-        return false;
-    }
-
-    if (commandRuleDecision === true) {
+    if (matchingGrants.some((grant) => grant.effect === 'ALLOW')) {
         return true;
     }
 
-    if (
-        groupGrants.some((grant) => grant.effect === 'ALLOW') ||
-        commandGrants.some((grant) => grant.effect === 'ALLOW')
-    ) {
-        return true;
+    if (options.requiredAccessLevel !== undefined) {
+        return bindingLevel >= options.requiredAccessLevel;
     }
 
-    if (typeof options.requiredAccessLevel === 'number') {
-        return context.bindingLevel >= options.requiredAccessLevel;
-    }
-
-    return true;
-}
-
-export async function createModeratorAccessEvaluator(guildId: string, member: GuildMember) {
-    const context = await buildModeratorAccessContext(guildId, member);
-    return (options: CommandAccessOptions) => evaluateModeratorAccess(context, options);
-}
-
-export async function ensureModeratorAccess(guildId: string, member: GuildMember, options: CommandAccessOptions) {
-    const evaluate = await createModeratorAccessEvaluator(guildId, member);
-    return evaluate(options);
+    return false;
 }
 
 export async function replyWithCases(interaction: ChatInputCommandInteraction, guildId: string, targetUserId: string, take = 10) {

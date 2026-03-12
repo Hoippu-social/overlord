@@ -4,78 +4,10 @@ import { getAuthToken } from '@/lib/auth';
 import { canAccessGuild } from '@/lib/discordAccess';
 
 const REVERSAL_ACTIONS = new Set(['UNWARN', 'UNTIMEOUT', 'UNMUTE', 'UNBAN', 'NOTE_CLEAR']);
-const RESOLUTION_TYPES = new Set(['manual', 'appeal_review', 'pardon']);
-const DASHBOARD_API_PORT = Number.parseInt(process.env.DASHBOARD_API_PORT || '3002', 10);
-const DASHBOARD_API_KEY = process.env.DASHBOARD_API_KEY || '';
-
-type EnrichedUser = {
-    id: string;
-    name: string;
-    username: string;
-    tag: string;
-    avatar: string | null;
-    globalName?: string | null;
-    roleName?: string | null;
-    roleColor?: number | null;
-};
 
 function average(values: number[]) {
     if (!values.length) return null;
     return values.reduce((sum, value) => sum + value, 0) / values.length;
-}
-
-function parseResolutionType(value: string | null) {
-    if (!value) {
-        return null;
-    }
-
-    try {
-        const parsed = JSON.parse(value);
-        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-            return null;
-        }
-
-        const resolution = (parsed as Record<string, unknown>).resolution;
-        if (!resolution || typeof resolution !== 'object' || Array.isArray(resolution)) {
-            return null;
-        }
-
-        const type = (resolution as Record<string, unknown>).type;
-        return typeof type === 'string' ? type : null;
-    } catch {
-        return null;
-    }
-}
-
-async function fetchEnrichedUsers(guildId: string, userIds: string[]) {
-    if (!userIds.length) {
-        return new Map<string, EnrichedUser>();
-    }
-
-    try {
-        const response = await fetch(`http://127.0.0.1:${DASHBOARD_API_PORT}/api/enrich`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                ...(DASHBOARD_API_KEY ? { 'x-dashboard-key': DASHBOARD_API_KEY } : {}),
-            },
-            body: JSON.stringify({ guildId, userIds, channelIds: [] }),
-            cache: 'no-store',
-        });
-
-        if (!response.ok) {
-            return new Map<string, EnrichedUser>();
-        }
-
-        const data = await response.json();
-        const users = data?.users && typeof data.users === 'object' ? data.users : {};
-        return new Map<string, EnrichedUser>(
-            Object.entries(users)
-                .filter((entry): entry is [string, EnrichedUser] => Boolean(entry[0]) && Boolean(entry[1])),
-        );
-    } catch {
-        return new Map<string, EnrichedUser>();
-    }
 }
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ guildId: string }> }) {
@@ -109,7 +41,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
                     status: true,
                     source: true,
                     createdAt: true,
-                    metadata: true,
                 },
             }),
             prisma.aiModerationIncident.findMany({
@@ -140,28 +71,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
             }),
         ]);
 
-        const relatedAppealTickets = await prisma.appealTicket.findMany({
-            where: {
-                guildId,
-                createdAt: { gte: fromDate },
-                moderationCase: {
-                    actorUserId: { not: null },
-                },
-            },
-            select: {
-                status: true,
-                moderationCase: {
-                    select: {
-                        actorUserId: true,
-                    },
-                },
-            },
-        });
-
         const actorMap = new Map<string, {
             moderatorId: string;
             totalActions: number;
-            activeCases: number;
             warns: number;
             timeouts: number;
             bans: number;
@@ -173,8 +85,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
             appealsReviewed: number;
             acceptedAppeals: number;
             rejectedAppeals: number;
-            relatedAppealTickets: number;
-            activeRelatedAppealTickets: number;
             avgAiReviewMinutes: number | null;
             avgAppealReviewHours: number | null;
             aiReviewDurations: number[];
@@ -187,7 +97,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
             const created = {
                 moderatorId,
                 totalActions: 0,
-                activeCases: 0,
                 warns: 0,
                 timeouts: 0,
                 bans: 0,
@@ -199,8 +108,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
                 appealsReviewed: 0,
                 acceptedAppeals: 0,
                 rejectedAppeals: 0,
-                relatedAppealTickets: 0,
-                activeRelatedAppealTickets: 0,
                 avgAiReviewMinutes: null,
                 avgAppealReviewHours: null,
                 aiReviewDurations: [] as number[],
@@ -213,11 +120,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         for (const moderationCase of cases) {
             if (!moderationCase.actorUserId) continue;
             const bucket = getBucket(moderationCase.actorUserId);
-            const resolutionType = parseResolutionType(moderationCase.metadata);
             bucket.totalActions += 1;
-            if (moderationCase.status === 'ACTIVE') {
-                bucket.activeCases += 1;
-            }
 
             switch (moderationCase.actionType) {
                 case 'WARN':
@@ -240,11 +143,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
                     break;
             }
 
-            if (
-                REVERSAL_ACTIONS.has(moderationCase.actionType)
-                || moderationCase.status === 'REVERTED'
-                || (resolutionType !== null && RESOLUTION_TYPES.has(resolutionType))
-            ) {
+            if (REVERSAL_ACTIONS.has(moderationCase.actionType) || moderationCase.status === 'REVERTED') {
                 bucket.reversals += 1;
             }
         }
@@ -276,23 +175,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
             }
         }
 
-        for (const ticket of relatedAppealTickets) {
-            const moderatorId = ticket.moderationCase.actorUserId;
-            if (!moderatorId) continue;
-
-            const bucket = getBucket(moderatorId);
-            bucket.relatedAppealTickets += 1;
-
-            if (ticket.status === 'OPEN' || ticket.status === 'IN_REVIEW') {
-                bucket.activeRelatedAppealTickets += 1;
-            }
-        }
-
         const moderators = Array.from(actorMap.values())
             .map((bucket) => ({
                 moderatorId: bucket.moderatorId,
                 totalActions: bucket.totalActions,
-                activeCases: bucket.activeCases,
                 warns: bucket.warns,
                 timeouts: bucket.timeouts,
                 bans: bucket.bans,
@@ -305,17 +191,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
                 appealsReviewed: bucket.appealsReviewed,
                 acceptedAppeals: bucket.acceptedAppeals,
                 rejectedAppeals: bucket.rejectedAppeals,
-                relatedAppealTickets: bucket.relatedAppealTickets,
-                activeRelatedAppealTickets: bucket.activeRelatedAppealTickets,
                 avgAiReviewMinutes: average(bucket.aiReviewDurations),
                 avgAppealReviewHours: average(bucket.appealReviewDurations),
             }))
             .sort((left, right) => right.totalActions - left.totalActions || right.aiReviews - left.aiReviews);
-
-        const enrichedUsers = await fetchEnrichedUsers(
-            guildId,
-            Array.from(new Set(moderators.map((bucket) => bucket.moderatorId).filter(Boolean))),
-        );
 
         return NextResponse.json({
             windowDays,
@@ -325,10 +204,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
                 totalAppealReviews: appeals.length,
                 uniqueModerators: moderators.length,
             },
-            moderators: moderators.map((moderator) => ({
-                ...moderator,
-                moderatorProfile: enrichedUsers.get(moderator.moderatorId) ?? null,
-            })),
+            moderators,
         });
     } catch (error) {
         console.error('Failed to load moderation analytics:', error);
