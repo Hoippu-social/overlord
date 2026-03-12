@@ -1,7 +1,8 @@
 import http from 'http';
 import { Client } from 'discord.js';
 import logger from './logger';
-import { prisma } from './database';
+import { prisma, statsPrisma } from './database';
+import { reviewAppealTicket } from '../services/AppealService';
 
 const PORT = Number.parseInt(process.env.DASHBOARD_API_PORT || '3002', 10);
 const API_KEY = process.env.DASHBOARD_API_KEY || '';
@@ -255,7 +256,7 @@ export function startDashboardApi(client: Client): http.Server {
                 if (tag) where.tag = tag;
                 if (beforeId) where.id = { lt: beforeId };
 
-                const rows = await prisma.auditLogEvent.findMany({
+                const rows = await statsPrisma.auditLogEvent.findMany({
                     where,
                     orderBy: { id: 'desc' },
                     take: limit,
@@ -297,7 +298,7 @@ export function startDashboardApi(client: Client): http.Server {
                 if (authorId) where.authorId = authorId;
                 if (beforeId) where.id = { lt: beforeId };
 
-                const rows = await prisma.messageEvent.findMany({
+                const rows = await statsPrisma.messageEvent.findMany({
                     where,
                     orderBy: { id: 'desc' },
                     take: limit,
@@ -375,6 +376,61 @@ export function startDashboardApi(client: Client): http.Server {
 
 
             // /api/enrich — resolve user/channel info from Discord cache
+            if (url.pathname === '/api/appeals/review') {
+                if (req.method !== 'POST') {
+                    res.writeHead(405);
+                    res.end('Method Not Allowed');
+                    return;
+                }
+
+                const raw = await readBody(req);
+                const body = raw ? JSON.parse(raw) : {};
+                const guildId = typeof body.guildId === 'string' ? body.guildId : '';
+                const reviewerId = typeof body.reviewerId === 'string' ? body.reviewerId.trim() : '';
+                const ticketId = Number(body.ticketId);
+                const note = typeof body.note === 'string' && body.note.trim().length ? body.note.trim() : null;
+                const decision = typeof body.decision === 'string' ? body.decision.trim().toUpperCase() : '';
+
+                if (!guildId || !reviewerId || !Number.isInteger(ticketId) || ticketId < 1 || !decision) {
+                    res.writeHead(400);
+                    res.end('guildId, reviewerId, ticketId and decision are required');
+                    return;
+                }
+
+                if (!['IN_REVIEW', 'ACCEPTED', 'REJECTED', 'PARDONED'].includes(decision)) {
+                    res.writeHead(400);
+                    res.end('Invalid decision');
+                    return;
+                }
+
+                const guild = client.guilds.cache.get(guildId) || await client.guilds.fetch(guildId).catch(() => null);
+                if (!guild) {
+                    res.writeHead(404);
+                    res.end('Guild not found');
+                    return;
+                }
+
+                try {
+                    const ticket = await reviewAppealTicket({
+                        guild,
+                        ticketId,
+                        reviewerId,
+                        decision: decision as 'IN_REVIEW' | 'ACCEPTED' | 'REJECTED' | 'PARDONED',
+                        note,
+                        client,
+                    });
+
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ ok: true, ticket }));
+                    return;
+                } catch (error) {
+                    const message = error instanceof Error ? error.message : 'Failed to review appeal ticket';
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ ok: false, error: message }));
+                    return;
+                }
+            }
+
             if (url.pathname === '/api/enrich') {
                 if (req.method !== 'POST') {
                     res.writeHead(405);
@@ -527,6 +583,77 @@ export function startDashboardApi(client: Client): http.Server {
 
                 res.writeHead(400);
                 res.end('Invalid type');
+                return;
+            }
+
+            // /api/stats/historical-sync — collect historical messages from Discord channels
+            if (url.pathname === '/api/stats/historical-sync') {
+                const { HistoricalSyncService } = await import('../services/HistoricalSyncService');
+
+                if (req.method === 'GET') {
+                    const guildId = url.searchParams.get('guildId') || '';
+                    if (!guildId) {
+                        res.writeHead(400);
+                        res.end('guildId is required');
+                        return;
+                    }
+                    const running = HistoricalSyncService.isSyncRunning(guildId);
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ ok: true, running }));
+                    return;
+                }
+
+                if (req.method === 'POST') {
+                    const raw = await readBody(req);
+                    const body = raw ? JSON.parse(raw) : {};
+                    const guildId = typeof body.guildId === 'string' ? body.guildId : '';
+                    const days = Math.min(Number(body.days) || 90, 90);
+
+                    if (!guildId) {
+                        res.writeHead(400);
+                        res.end('guildId is required');
+                        return;
+                    }
+
+                    // SSE stream for progress
+                    res.writeHead(200, {
+                        'Content-Type': 'text/event-stream',
+                        'Cache-Control': 'no-cache',
+                        'Connection': 'keep-alive',
+                    });
+
+                    const sendEvent = (data: any) => {
+                        try { res.write(`data: ${JSON.stringify(data)}\n\n`); } catch { }
+                    };
+
+                    // Heartbeat to keep connection alive during long syncs
+                    const heartbeat = setInterval(() => {
+                        try { res.write(': heartbeat\n\n'); } catch { }
+                    }, 15_000);
+
+                    try {
+                        logger.info(`[HistoricalSync] Starting for guild ${guildId}, ${days} days`);
+                        const result = await HistoricalSyncService.collectHistoricalData(
+                            client,
+                            guildId,
+                            days,
+                            (progress) => sendEvent({ type: 'progress', ...progress })
+                        );
+                        logger.info(`[HistoricalSync] Done: ${result.messagesCollected} new messages`);
+                        sendEvent({ type: 'complete', ...result });
+                    } catch (error) {
+                        logger.error('[HistoricalSync] Error:', error);
+                        sendEvent({ type: 'error', error: error instanceof Error ? error.message : 'Unknown error' });
+                    } finally {
+                        clearInterval(heartbeat);
+                    }
+
+                    res.end();
+                    return;
+                }
+
+                res.writeHead(405);
+                res.end('Method Not Allowed');
                 return;
             }
 

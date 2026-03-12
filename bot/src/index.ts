@@ -4,10 +4,15 @@ import fs from 'fs';
 import path from 'path';
 import logger from './utils/logger';
 import { connectDB, prisma } from './utils/database';
+import { startDashboardApi } from './utils/dashboardApi';
 import { loadCommands } from './handlers/commandHandler';
 import { loadEvents } from './handlers/eventHandler';
 import { LavalinkManager } from 'lavalink-client';
 import { initializeLavalink } from './utils/LavalinkManager';
+import { StatsService } from './services/StatsService';
+import { handleAiModerationButton, isAiModerationButton } from './services/AiModerationService';
+import { ModerationLifecycleService } from './services/ModerationLifecycleService';
+import { RetentionService } from './services/RetentionService';
 
 declare module 'discord.js' {
     interface Client {
@@ -20,13 +25,16 @@ dotenv.config();
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildPresences,
         GatewayIntentBits.GuildVoiceStates,
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.GuildMembers,
+        GatewayIntentBits.MessageContent,
     ],
     partials: [
         Partials.Channel,
         Partials.GuildMember,
+        Partials.Message,
     ],
     presence: {
         status: 'online',
@@ -59,6 +67,9 @@ const cleanup = () => {
 
 process.on('SIGINT', async () => {
     logger.info('Received SIGINT, shutting down gracefully...');
+    StatsService.shutdown();
+    ModerationLifecycleService.stop();
+    RetentionService.stop();
     cleanup();
     client.destroy();
     process.exit(0);
@@ -66,9 +77,32 @@ process.on('SIGINT', async () => {
 
 process.on('SIGTERM', async () => {
     logger.info('Received SIGTERM, shutting down gracefully...');
+    StatsService.shutdown();
+    ModerationLifecycleService.stop();
+    RetentionService.stop();
     cleanup();
     client.destroy();
     process.exit(0);
+});
+
+// Prevent Lavalink WebSocket errors from crashing the process
+process.on('uncaughtException', (error) => {
+    const msg = error.message ?? '';
+    if (
+        msg.includes('Lavalink') ||
+        msg.includes('/v4/info') ||
+        msg.includes('not connected') ||
+        msg.includes('ECONNREFUSED')
+    ) {
+        logger.warn('[Process] Non-fatal Lavalink error (server may not be running yet):', msg);
+    } else {
+        logger.error('[Process] Uncaught exception:', error);
+        process.exit(1);
+    }
+});
+
+process.on('unhandledRejection', (reason) => {
+    logger.error('[Process] Unhandled rejection:', reason);
 });
 
 async function main() {
@@ -131,7 +165,7 @@ client.on('interactionCreate', async (interaction) => {
             const tracks = result.tracks.slice(0, 10);
 
             const platformSelect = new StringSelectMenuBuilder()
-                .setCustomId(`search_platform_${interaction.user.id}`)
+                .setCustomId(`search_platform_${interaction.user.id} `)
                 .setPlaceholder('Площадка: ' + (selectedPrefix === 'ytsearch:' ? 'YouTube' : selectedPrefix === 'spsearch:' ? 'Spotify' : 'SoundCloud'))
                 .addOptions(
                     new StringSelectMenuOptionBuilder()
@@ -152,25 +186,25 @@ client.on('interactionCreate', async (interaction) => {
                 );
 
             const trackSelect = new StringSelectMenuBuilder()
-                .setCustomId(`search_track_${interaction.user.id}`)
+                .setCustomId(`search_track_${interaction.user.id} `)
                 .setPlaceholder('Выберите трек')
                 .addOptions(
                     tracks.map((track, index) => {
                         const duration = track.info.duration ? `[${Math.floor(track.info.duration / 60000)}:${Math.floor((track.info.duration % 60000) / 1000).toString().padStart(2, '0')}]` : '';
                         return new StringSelectMenuOptionBuilder()
-                            .setLabel(`${track.info.title.substring(0, 85)}`)
-                            .setDescription(`${track.info.author} ${duration}`.substring(0, 100))
+                            .setLabel(`${track.info.title.substring(0, 85)} `)
+                            .setDescription(`${track.info.author} ${duration} `.substring(0, 100))
                             .setValue(index.toString());
                     })
                 );
 
             const changeButton = new ButtonBuilder()
-                .setCustomId(`search_change_${interaction.user.id}`)
+                .setCustomId(`search_change_${interaction.user.id} `)
                 .setLabel('Изменить трек')
                 .setStyle(ButtonStyle.Secondary);
 
             const cancelButton = new ButtonBuilder()
-                .setCustomId(`search_cancel_${interaction.user.id}`)
+                .setCustomId(`search_cancel_${interaction.user.id} `)
                 .setLabel('Отмена')
                 .setStyle(ButtonStyle.Danger);
 
@@ -179,7 +213,7 @@ client.on('interactionCreate', async (interaction) => {
             const row3 = new ActionRowBuilder<ButtonBuilder>().addComponents(changeButton, cancelButton);
 
             await interaction.editReply({
-                content: `🎵 Результаты поиска для: **${newQuery}**`,
+                content: `🎵 Результаты поиска для: ** ${newQuery}** `,
                 components: [row1, row2, row3]
             });
 
@@ -228,7 +262,7 @@ client.on('interactionCreate', async (interaction) => {
 
             // Recreate platform select
             const platformSelect = new StringSelectMenuBuilder()
-                .setCustomId(`search_platform_${interaction.user.id}`)
+                .setCustomId(`search_platform_${interaction.user.id} `)
                 .setPlaceholder('Выбранная площадка: ' + (prefix === 'ytsearch:' ? 'YouTube' : prefix === 'spsearch:' ? 'Spotify' : 'SoundCloud'))
                 .addOptions(
                     new StringSelectMenuOptionBuilder()
@@ -249,26 +283,26 @@ client.on('interactionCreate', async (interaction) => {
                 );
 
             const trackSelect = new StringSelectMenuBuilder()
-                .setCustomId(`search_track_${interaction.user.id}`)
+                .setCustomId(`search_track_${interaction.user.id} `)
                 .setPlaceholder('Выберите трек')
                 .addOptions(
                     tracks.map((track, index) => {
                         const duration = track.info.duration ? `[${Math.floor(track.info.duration / 60000)}:${Math.floor((track.info.duration % 60000) / 1000).toString().padStart(2, '0')}]` : '';
                         return new StringSelectMenuOptionBuilder()
-                            .setLabel(`${track.info.title.substring(0, 85)}`)
-                            .setDescription(`${track.info.author} ${duration}`.substring(0, 100))
+                            .setLabel(`${track.info.title.substring(0, 85)} `)
+                            .setDescription(`${track.info.author} ${duration} `.substring(0, 100))
                             .setValue(index.toString());
                     })
                 );
 
             const { ButtonBuilder, ButtonStyle } = await import('discord.js');
             const changeButton = new ButtonBuilder()
-                .setCustomId(`search_change_${interaction.user.id}`)
+                .setCustomId(`search_change_${interaction.user.id} `)
                 .setLabel('Изменить трек')
                 .setStyle(ButtonStyle.Secondary);
 
             const cancelButton = new ButtonBuilder()
-                .setCustomId(`search_cancel_${interaction.user.id}`)
+                .setCustomId(`search_cancel_${interaction.user.id} `)
                 .setLabel('Отмена')
                 .setStyle(ButtonStyle.Danger);
 
@@ -277,7 +311,7 @@ client.on('interactionCreate', async (interaction) => {
             const row3 = new ActionRowBuilder<any>().addComponents(changeButton, cancelButton);
 
             await interaction.editReply({
-                content: `🎵 Результаты поиска для: **${pendingSearch}**`,
+                content: `🎵 Результаты поиска для: ** ${pendingSearch}** `,
                 components: [row1, row2, row3]
             });
 
@@ -323,7 +357,7 @@ client.on('interactionCreate', async (interaction) => {
             if (!player.playing) await player.play();
 
             await interaction.editReply({
-                content: `✅ **${track.info.title}** добавлен в очередь!`,
+                content: `✅ ** ${track.info.title}** добавлен в очередь!`,
                 components: []
             });
 
@@ -337,6 +371,11 @@ client.on('interactionCreate', async (interaction) => {
     if (!interaction.isButton()) return;
 
     const customId = interaction.customId;
+
+    if (isAiModerationButton(customId)) {
+        await handleAiModerationButton(interaction);
+        return;
+    }
 
     // Handle search menu buttons
     if (customId.startsWith('search_cancel_')) {
@@ -377,7 +416,7 @@ client.on('interactionCreate', async (interaction) => {
 
         // Show Modal for new search query
         const modal = new ModalBuilder()
-            .setCustomId(`search_modal_${interaction.user.id}`)
+            .setCustomId(`search_modal_${interaction.user.id} `)
             .setTitle('Изменение запроса');
 
         const queryInput = new TextInputBuilder()
@@ -444,8 +483,8 @@ client.on('interactionCreate', async (interaction) => {
 
         case 'player_queue':
             // Show queue ephemeral
-            const tracks = player.queue.tracks.slice(0, 10).map((t, i) => `${i + 1}. ${t.info.title}`).join('\n');
-            await interaction.followUp({ content: `**Queue:**\n${tracks || 'Empty'}`, ephemeral: true });
+            const tracks = player.queue.tracks.slice(0, 10).map((t, i) => `${i + 1}. ${t.info.title} `).join('\n');
+            await interaction.followUp({ content: `** Queue:**\n${tracks || 'Empty'} `, ephemeral: true });
             return; // Don't update message for queue check
     }
 
@@ -454,7 +493,7 @@ client.on('interactionCreate', async (interaction) => {
 });
 
 client.once('ready', async () => {
-    logger.info(`Logged in as ${client.user?.tag}!`);
+    logger.info(`Logged in as ${client.user?.tag} !`);
     // Initialize Lavalink Client with user data
     client.lavalink.init({
         id: client.user!.id,
@@ -514,7 +553,7 @@ async function syncGuildData(guild: any) {
             });
         }
     } catch (error) {
-        logger.error(`Failed to sync guild ${guild.name} (${guild.id}):`, error);
+        logger.error(`Failed to sync guild ${guild.name} (${guild.id}): `, error);
     }
 }
 

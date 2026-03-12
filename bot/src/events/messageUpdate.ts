@@ -1,4 +1,6 @@
 import { Events, Message } from 'discord.js';
+import { processMessageForAiModeration } from '../services/AiModerationService';
+import { processCustomRulesForAutomod, processMessageForAutomod } from '../services/AutomodService';
 import logger from '../utils/logger';
 import { prisma } from '../utils/database';
 import { logAuditEvent } from '../utils/auditLog';
@@ -76,5 +78,17 @@ export default {
             },
             severity: 'INFO',
         });
+
+        if (!newMessage.author?.bot && after && after.trim().length) {
+            await processMessageForAutomod(newMessage).catch((error) => {
+                logger.warn(`[Automod] Failed to process edited message ${newMessage.id}: ${error}`);
+            });
+            await processCustomRulesForAutomod(newMessage).catch((error) => {
+                logger.warn(`[Automod] Failed custom-rule recheck for edited message ${newMessage.id}: ${error}`);
+            });
+            await processMessageForAiModeration(newMessage, 'update').catch((error) => {
+                logger.warn(`[AI Moderation] Failed to process edited message ${newMessage.id}: ${error}`);
+            });
+        }
     },
 };

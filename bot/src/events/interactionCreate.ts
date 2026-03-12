@@ -14,6 +14,29 @@ export default {
                 return;
             }
 
+            if ((command.accessGroup || command.accessKey || command.requiredAccessLevel !== undefined) && interaction.guildId && interaction.guild) {
+                const { ensureModeratorAccess } = await import('../services/ModerationService');
+                const member = interaction.member instanceof GuildMember
+                    ? interaction.member
+                    : await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
+
+                if (!member) {
+                    await interaction.reply({ content: 'Unable to resolve your guild member state.', ephemeral: true });
+                    return;
+                }
+
+                const allowed = await ensureModeratorAccess(interaction.guildId, member, {
+                    accessGroup: command.accessGroup,
+                    accessKey: command.accessKey ?? interaction.commandName,
+                    requiredAccessLevel: command.requiredAccessLevel,
+                });
+
+                if (!allowed) {
+                    await interaction.reply({ content: 'You do not have access to this moderation command.', ephemeral: true });
+                    return;
+                }
+            }
+
             // Music Command Restrictions
             const musicCommands = ['play', 'skip', 'stop', 'pause', 'resume', 'queue', 'volume', 'loop', 'shuffle', 'nowplaying'];
             if (musicCommands.includes(interaction.commandName) && interaction.guildId) {

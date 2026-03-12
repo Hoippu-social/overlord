@@ -34,6 +34,7 @@ model Guild {
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
   botSettings       BotSettings?
+  moderationConfig  ModerationConfig?
   musicConfig       MusicConfig?
   nowPlaying        MusicNowPlaying?
   tempVoiceConfig   TempVoiceConfig?
@@ -76,6 +77,238 @@ model Warning {
   user        User     @relation(fields: [userId], references: [id])
   moderatorId String
   createdAt   DateTime @default(now())
+}
+
+model ModerationConfig {
+  id                  Int      @id @default(autoincrement())
+  guildId             String   @unique
+  guild               Guild    @relation(fields: [guildId], references: [id])
+  muteRoleId          String?
+  ignoredChannels     String?
+  ignoredRoles        String?
+  ignoredUsers        String?
+  commandOnlyChannels String?
+  aiProvider          String?
+  aiModel             String?
+  aiDefaultThreshold  Int      @default(80)
+  aiScanEdits         Boolean  @default(true)
+  aiIncludedChannels  String?
+  aiExcludedChannels  String?
+  aiExemptRoles       String?
+  aiExemptUsers       String?
+  aiCustomPolicyPrompt String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+model ModerationRoleBinding {
+  id          Int      @id @default(autoincrement())
+  guildId     String
+  roleId      String
+  title       String
+  accessLevel Int      @default(50)
+  enabled     Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([guildId, roleId])
+  @@index([guildId, sortOrder])
+}
+
+model ModerationCase {
+  id            Int                  @id @default(autoincrement())
+  guildId       String
+  caseNumber    Int
+  actionType    String
+  source        String
+  actorUserId   String?
+  targetUserId  String
+  reason        String?
+  status        String               @default("ACTIVE")
+  expiresAt     DateTime?
+  relatedCaseId Int?
+  metadata      String?
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+  notes         ModerationCaseNote[]
+  appeals       AppealTicket[]
+
+  @@unique([guildId, caseNumber])
+  @@index([guildId, targetUserId, createdAt])
+  @@index([guildId, actionType, createdAt])
+}
+
+model AppealConfig {
+  id                Int      @id @default(autoincrement())
+  guildId           String   @unique
+  enabled           Boolean  @default(false)
+  appealChannelId   String?
+  pardonLogChannelId String?
+  allowUserAppeals  Boolean  @default(true)
+  allowDirectPardon Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model AppealTicket {
+  id             Int            @id @default(autoincrement())
+  guildId        String
+  caseId         Int
+  caseNumber     Int
+  userId         String
+  appealType     String         @default("APPEAL")
+  status         String         @default("OPEN")
+  message        String
+  resolutionNote String?
+  reviewerId     String?
+  reviewedAt     DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  moderationCase ModerationCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([guildId, status, createdAt])
+  @@index([guildId, userId, createdAt])
+  @@index([caseId, createdAt])
+}
+
+model RetentionPolicy {
+  id        Int      @id @default(autoincrement())
+  guildId   String
+  category  String
+  strategy  String   @default("KEEP")
+  ttlDays   Int?
+  enabled   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([guildId, category])
+  @@index([guildId, enabled])
+}
+
+model ModerationCaseNote {
+  id          Int            @id @default(autoincrement())
+  guildId     String
+  caseId      Int
+  actorUserId String
+  note        String
+  createdAt   DateTime       @default(now())
+  moderationCase ModerationCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([guildId, createdAt])
+  @@index([caseId, createdAt])
+}
+
+model ModerationCommandGrant {
+  id        Int      @id @default(autoincrement())
+  guildId   String
+  roleId    String
+  scopeType String
+  scopeKey  String
+  effect    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([guildId, roleId, scopeType, scopeKey])
+  @@index([guildId, scopeType, scopeKey])
+}
+
+model AutomodRuleConfig {
+  id        Int      @id @default(autoincrement())
+  guildId   String
+  ruleKey   String
+  enabled   Boolean  @default(false)
+  config    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([guildId, ruleKey])
+}
+
+model AutomodCustomRule {
+  id           Int      @id @default(autoincrement())
+  guildId      String
+  name         String
+  ruleType     String   @default("regex")
+  pattern      String
+  enabled      Boolean  @default(true)
+  action       String   @default("DELETE")
+  strikeWeight Int      @default(1)
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([guildId, enabled])
+}
+
+model AutomodSanctionStep {
+  id               Int      @id @default(autoincrement())
+  guildId          String
+  triggerStrikeCount Int
+  actionType       String
+  durationMinutes  Int?
+  enabled          Boolean  @default(true)
+  sortOrder        Int      @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([guildId, triggerStrikeCount, actionType])
+  @@index([guildId, sortOrder])
+}
+
+model AiModerationConfig {
+  id                Int      @id @default(autoincrement())
+  guildId           String   @unique
+  enabled           Boolean  @default(false)
+  provider          String?
+  model             String?
+  defaultThreshold  Int      @default(80)
+  scanEdits         Boolean  @default(true)
+  includedChannels  String?
+  excludedChannels  String?
+  exemptRoles       String?
+  exemptUsers       String?
+  customPolicyPrompt String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([guildId, enabled])
+}
+
+model AiModerationCategoryRule {
+  id        Int      @id @default(autoincrement())
+  guildId   String
+  category  String
+  enabled   Boolean  @default(false)
+  threshold Int      @default(80)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([guildId, category])
+  @@index([guildId, sortOrder])
+}
+
+model AiModerationIncident {
+  id         Int      @id @default(autoincrement())
+  guildId    String
+  messageId  String
+  channelId  String
+  authorId   String
+  excerpt    String
+  summary    String?
+  categories String?
+  provider   String?
+  model      String?
+  confidence Int?
+  status     String   @default("OPEN")
+  reviewerId String?
+  reviewedAt DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([guildId, messageId])
+  @@index([guildId, status, createdAt])
 }
 
 model TempVoiceConfig {

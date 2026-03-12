@@ -20,4 +20,7 @@ export interface Command<TInteraction extends AnyCommandInteraction = ChatInputC
     data: CommandData;
     execute: (interaction: TInteraction) => Promise<void>;
     hidden?: boolean;
+    accessGroup?: string;
+    accessKey?: string;
+    requiredAccessLevel?: number;
 }

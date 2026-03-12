@@ -19,6 +19,9 @@ const MAX_PREVIEW = 1000;
 
 const TAG_COLORS: Record<string, number> = {
     moderation: 0xed4245, // Red
+    automod: 0xf1c40f,    // Amber
+    ai_moderation: 0x1abc9c, // Teal
+    appeals: 0x3498db, // Blue
     member: 0x5865f2,     // Blurple
     message: 0xfee75c,    // Yellow
     channel: 0xeb459f,    // Pink
