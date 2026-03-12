@@ -2,7 +2,6 @@ import http from 'http';
 import { Client } from 'discord.js';
 import logger from './logger';
 import { prisma, statsPrisma } from './database';
-import { reviewAppealTicket } from '../services/AppealService';
 
 const PORT = Number.parseInt(process.env.DASHBOARD_API_PORT || '3002', 10);
 const API_KEY = process.env.DASHBOARD_API_KEY || '';

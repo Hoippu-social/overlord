@@ -9,8 +9,6 @@ import { prisma, statsPrisma } from '../utils/database';
 import { StatsService } from '../services/StatsService';
 import { RollupService } from '../services/RollupService';
 import { BackupService } from '../services/BackupService';
-import { ModerationLifecycleService } from '../services/ModerationLifecycleService';
-import { RetentionService } from '../services/RetentionService';
 
 export default {
     name: Events.ClientReady,
@@ -55,9 +53,6 @@ export default {
         RollupService.init(client);
         await BackupService.checkAndBackupOnStartup();
         logger.info('[Stats] StatsService, RollupService, BackupService initialized');
-
-        ModerationLifecycleService.init(client);
-        RetentionService.init(client);
 
         // Log Bot Start
         try {

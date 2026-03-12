@@ -10,9 +10,6 @@ import { loadEvents } from './handlers/eventHandler';
 import { LavalinkManager } from 'lavalink-client';
 import { initializeLavalink } from './utils/LavalinkManager';
 import { StatsService } from './services/StatsService';
-import { handleAiModerationButton, isAiModerationButton } from './services/AiModerationService';
-import { ModerationLifecycleService } from './services/ModerationLifecycleService';
-import { RetentionService } from './services/RetentionService';
 
 declare module 'discord.js' {
     interface Client {
@@ -68,8 +65,6 @@ const cleanup = () => {
 process.on('SIGINT', async () => {
     logger.info('Received SIGINT, shutting down gracefully...');
     StatsService.shutdown();
-    ModerationLifecycleService.stop();
-    RetentionService.stop();
     cleanup();
     client.destroy();
     process.exit(0);
@@ -78,8 +73,6 @@ process.on('SIGINT', async () => {
 process.on('SIGTERM', async () => {
     logger.info('Received SIGTERM, shutting down gracefully...');
     StatsService.shutdown();
-    ModerationLifecycleService.stop();
-    RetentionService.stop();
     cleanup();
     client.destroy();
     process.exit(0);

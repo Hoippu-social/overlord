@@ -65,10 +65,6 @@ export default {
                     message.createdAt
                 );
             }
-
-            await processMessageForAutomod(message);
-            await processCustomRulesForAutomod(message);
-            await processMessageForAiModeration(message, 'create');
         } catch (error) {
             console.error('[Event:MessageCreate] Error tracking stats:', error);
         }

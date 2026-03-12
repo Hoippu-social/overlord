@@ -6,8 +6,7 @@ import { useParams } from 'next/navigation';
 import {
     ChatsTeardrop,
     MicrophoneStage,
-    TrendDown,
-    TrendUp,
+    UsersThree,
 } from "@phosphor-icons/react";
 
 import { useStats } from "@/hooks/useStats";
@@ -41,7 +40,7 @@ const strings = {
         memberChange: 'Change',
         messagesDesc: 'sent in text channels',
         voiceDesc: 'spent in voice channels',
-        memberChangeDesc: 'member count change for the period',
+        membersDesc: 'joined the server',
         synced: 'Synced',
         activityChart: 'Server Activity',
         activityChartDesc: 'Messages & Voice over time',
@@ -67,7 +66,7 @@ const strings = {
         memberChange: 'Изменение',
         messagesDesc: 'отправлено в текстовых каналах',
         voiceDesc: 'проведено в голосовых каналах',
-        memberChangeDesc: 'изменение числа участников за период',
+        membersDesc: 'присоединилось к серверу',
         synced: 'Синхронизировано',
         activityChart: 'Активность сервера',
         activityChartDesc: 'Сообщения и голос за всё время',
@@ -103,12 +102,7 @@ export default function StatsOverview() {
         }));
     }, [data?.activityData, guildTimezone]);
 
-    const cards = data?.cards || { totalMessages: 0, totalVoiceSeconds: 0, memberChange: 0 };
-    const memberChange = Number(cards.memberChange || 0);
-    const memberChangeLabel = memberChange > 0
-        ? `+${formatLocaleNumber(memberChange, locale)}`
-        : formatLocaleNumber(memberChange, locale);
-    const isMemberChangePositive = memberChange >= 0;
+    const cards = data?.cards || { totalMessages: 0, totalVoiceSeconds: 0, newMembers: 0 };
 
     return (
         <div className="space-y-6 animate-fade-in">
@@ -138,12 +132,12 @@ export default function StatsOverview() {
                     accentColor="var(--color-primary-1)"
                 />
                 <StatsCard
-                    title={text.memberChange}
-                    value={memberChangeLabel}
-                    description={text.memberChangeDesc}
-                    icon={isMemberChangePositive ? <TrendUp size={20} weight="fill" /> : <TrendDown size={20} weight="fill" />}
+                    title={text.newMembers}
+                    value={formatLocaleNumber(cards.newMembers, locale)}
+                    description={text.membersDesc}
+                    icon={<UsersThree size={20} weight="fill" />}
                     loading={loading}
-                    accentColor={isMemberChangePositive ? "var(--color-success)" : "var(--color-danger)"}
+                    accentColor="var(--color-warning)"
                 />
             </div>
 
