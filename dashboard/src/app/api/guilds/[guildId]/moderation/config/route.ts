@@ -82,6 +82,18 @@ const parseJsonObject = (value: unknown) => {
     }
 };
 
+const parseJsonValue = (value: unknown) => {
+    if (typeof value !== 'string') {
+        return null;
+    }
+
+    try {
+        return JSON.parse(value);
+    } catch {
+        return null;
+    }
+};
+
 const normalizeStringArray = (value: unknown) => {
     if (!Array.isArray(value)) {
         return [];
@@ -122,6 +134,37 @@ const normalizeNullableString = (value: unknown) => {
     return trimmed.length ? trimmed : null;
 };
 
+const normalizeCommandRuleMode = (value: unknown) =>
+    value === 'WHITELIST' ? 'WHITELIST' : 'BLACKLIST';
+
+const normalizeCommandRules = (value: unknown) => {
+    if (!Array.isArray(value)) {
+        return [];
+    }
+
+    return value
+        .map((rule) => {
+            const commandKey = normalizeNullableString((rule as any)?.commandKey);
+            if (!commandKey) {
+                return null;
+            }
+
+            return {
+                commandKey,
+                enabled: normalizeBoolean((rule as any)?.enabled, true),
+                roleMode: normalizeCommandRuleMode((rule as any)?.roleMode),
+                roleIds: normalizeStringArray((rule as any)?.roleIds),
+                channelMode: normalizeCommandRuleMode((rule as any)?.channelMode),
+                channelIds: normalizeStringArray((rule as any)?.channelIds),
+                requiredAccessLevel:
+                    (rule as any)?.requiredAccessLevel === null || (rule as any)?.requiredAccessLevel === undefined || (rule as any)?.requiredAccessLevel === ''
+                        ? null
+                        : normalizeInteger((rule as any)?.requiredAccessLevel, 50, 0, 100),
+            };
+        })
+        .filter(Boolean);
+};
+
 const parseGuildPayload = (value: string | null) => {
     if (!value) return [];
 
@@ -134,6 +177,37 @@ const parseGuildPayload = (value: string | null) => {
 };
 
 const textChannelTypes = new Set([0, 5, 11, 12, 'text', 'announcement', 'public_thread', 'private_thread', 'forum']);
+const categoryChannelTypes = new Set([4, 'category', 'GUILD_CATEGORY']);
+
+const sortRolesByServerOrder = (left: { position: number }, right: { position: number }) =>
+    right.position - left.position;
+
+const sortChannelsByServerOrder = (
+    left: { position: number; parentId: string | null; isCategory: boolean },
+    right: { position: number; parentId: string | null; isCategory: boolean },
+    categoryMap: Map<string, number>,
+) => {
+    const leftGroupPosition = left.isCategory
+        ? left.position
+        : left.parentId
+            ? (categoryMap.get(left.parentId) ?? left.position)
+            : left.position;
+    const rightGroupPosition = right.isCategory
+        ? right.position
+        : right.parentId
+            ? (categoryMap.get(right.parentId) ?? right.position)
+            : right.position;
+
+    if (leftGroupPosition !== rightGroupPosition) {
+        return leftGroupPosition - rightGroupPosition;
+    }
+
+    if (left.isCategory !== right.isCategory) {
+        return left.isCategory ? -1 : 1;
+    }
+
+    return left.position - right.position;
+};
 
 async function ensureModerationDefaults(guildId: string) {
     await prisma.guild.upsert({
@@ -262,23 +336,40 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
                 }),
             ]);
 
-        const roles = parseGuildPayload(guild?.roles ?? null).map((role) => ({
-            id: String(role.id ?? ''),
-            name: String(role.name ?? 'Unknown role'),
-            color: role.color ?? '#000000',
-            position: Number(role.position ?? 0),
-        }));
+        const roles = parseGuildPayload(guild?.roles ?? null)
+            .map((role) => ({
+                id: String(role.id ?? ''),
+                name: String(role.name ?? 'Unknown role'),
+                color: role.color ?? '#000000',
+                position: Number(role.position ?? 0),
+            }))
+            .sort(sortRolesByServerOrder);
 
-        const channels = parseGuildPayload(guild?.channels ?? null)
-            .filter((channel) => textChannelTypes.has(channel.type))
+        const rawChannels = parseGuildPayload(guild?.channels ?? null);
+        const categoryEntries = rawChannels
+            .filter((channel) => categoryChannelTypes.has(channel?.type))
+            .map((channel) => ({
+                id: String(channel.id ?? ''),
+                name: String(channel.name ?? 'Category'),
+                position: Number(channel.position ?? 0),
+            }));
+        const categoryPositions = new Map(categoryEntries.map((channel) => [channel.id, channel.position]));
+        const categoryNames = new Map(categoryEntries.map((channel) => [channel.id, channel.name]));
+
+        const channels = rawChannels
+            .filter((channel) => textChannelTypes.has(channel.type) || categoryChannelTypes.has(channel.type))
             .map((channel) => ({
                 id: String(channel.id ?? ''),
                 name: String(channel.name ?? 'unknown-channel'),
                 type: channel.type,
                 position: Number(channel.position ?? 0),
                 parentId: channel.parentId ? String(channel.parentId) : null,
+                isCategory: categoryChannelTypes.has(channel.type),
+                categoryName: categoryChannelTypes.has(channel.type)
+                    ? null
+                    : (channel.parentId ? (categoryNames.get(String(channel.parentId)) ?? null) : null),
             }))
-            .sort((left, right) => left.position - right.position);
+            .sort((left, right) => sortChannelsByServerOrder(left, right, categoryPositions));
 
         return NextResponse.json({
             roles,
@@ -290,8 +381,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
                     ignoredRoles: parseJsonArray(config.ignoredRoles),
                     ignoredUsers: parseJsonArray(config.ignoredUsers),
                     commandOnlyChannels: parseJsonArray(config.commandOnlyChannels),
+                    commandRules: normalizeCommandRules(parseJsonValue(config.commandRules)),
                 }
                 : null,
+            commandRules: normalizeCommandRules(parseJsonValue(config?.commandRules)),
             roleBindings,
             commandGrants,
             automodRules: automodRules.map((rule) => ({
@@ -348,6 +441,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         const moderationConfig = body?.moderationConfig ?? {};
         const roleBindings = Array.isArray(body?.roleBindings) ? body.roleBindings : [];
         const commandGrants = Array.isArray(body?.commandGrants) ? body.commandGrants : [];
+        const commandRules = normalizeCommandRules(body?.commandRules ?? moderationConfig.commandRules);
         const automodRules = Array.isArray(body?.automodRules) ? body.automodRules : [];
         const customRules = Array.isArray(body?.customRules) ? body.customRules : [];
         const sanctionSteps = Array.isArray(body?.sanctionSteps) ? body.sanctionSteps : [];
@@ -365,6 +459,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
                     ignoredRoles: JSON.stringify(normalizeStringArray(moderationConfig.ignoredRoles)),
                     ignoredUsers: JSON.stringify(normalizeStringArray(moderationConfig.ignoredUsers)),
                     commandOnlyChannels: JSON.stringify(normalizeStringArray(moderationConfig.commandOnlyChannels)),
+                    commandRules: JSON.stringify(commandRules),
                 },
                 create: {
                     guildId,
@@ -373,6 +468,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
                     ignoredRoles: JSON.stringify(normalizeStringArray(moderationConfig.ignoredRoles)),
                     ignoredUsers: JSON.stringify(normalizeStringArray(moderationConfig.ignoredUsers)),
                     commandOnlyChannels: JSON.stringify(normalizeStringArray(moderationConfig.commandOnlyChannels)),
+                    commandRules: JSON.stringify(commandRules),
                 },
             });
 

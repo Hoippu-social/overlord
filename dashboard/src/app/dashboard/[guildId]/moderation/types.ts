@@ -1,0 +1,262 @@
+export type RoleOption = { id: string; name: string; color?: string | number; position?: number; };
+export type ChannelOption = { id: string; name: string; type?: number | string; position?: number; parentId?: string | null; isCategory?: boolean; categoryName?: string | null; };
+
+export type ModerationConfig = {
+    muteRoleId: string;
+    ignoredChannels: string[];
+    ignoredRoles: string[];
+    ignoredUsers: string[];
+    commandOnlyChannels: string[];
+};
+
+export type RoleBinding = {
+    roleId: string;
+    title: string;
+    accessLevel: number;
+    enabled: boolean;
+    sortOrder: number;
+};
+
+export type CommandRuleMode = 'WHITELIST' | 'BLACKLIST';
+
+export type CommandGrant = {
+    roleId: string;
+    scopeType: 'COMMAND' | 'GROUP';
+    scopeKey: string;
+    effect: 'ALLOW' | 'DENY';
+};
+
+export type CommandRule = {
+    commandKey: string;
+    enabled: boolean;
+    roleMode: CommandRuleMode;
+    roleIds: string[];
+    channelMode: CommandRuleMode;
+    channelIds: string[];
+    requiredAccessLevel: number | null;
+};
+
+export type AutomodRule = {
+    ruleKey: string;
+    enabled: boolean;
+    configText: string;
+};
+
+export type CustomRule = {
+    name: string;
+    ruleType: string;
+    pattern: string;
+    enabled: boolean;
+    action: string;
+    strikeWeight: number;
+    notes: string;
+};
+
+export type SanctionStep = {
+    triggerStrikeCount: number;
+    actionType: string;
+    durationMinutes: number | null;
+    enabled: boolean;
+    sortOrder: number;
+};
+
+export type AiConfig = {
+    enabled: boolean;
+    provider: string;
+    model: string;
+    defaultThreshold: number;
+    scanEdits: boolean;
+    includedChannels: string[];
+    excludedChannels: string[];
+    exemptRoles: string[];
+    exemptUsers: string[];
+    customPolicyPrompt: string;
+};
+
+export type AiCategoryRule = {
+    category: string;
+    enabled: boolean;
+    threshold: number;
+    sortOrder: number;
+};
+
+export type AppealConfig = {
+    enabled: boolean;
+    appealChannelId: string;
+    pardonLogChannelId: string;
+    allowUserAppeals: boolean;
+    allowDirectPardon: boolean;
+};
+
+export type RetentionPolicy = {
+    category: string;
+    strategy: string;
+    ttlDays: number | null;
+    enabled: boolean;
+};
+
+export type ConfigState = {
+    roles: RoleOption[];
+    channels: ChannelOption[];
+    moderationConfig: ModerationConfig;
+    roleBindings: RoleBinding[];
+    commandGrants: CommandGrant[];
+    commandRules: CommandRule[];
+    automodRules: AutomodRule[];
+    customRules: CustomRule[];
+    sanctionSteps: SanctionStep[];
+    aiConfig: AiConfig;
+    aiCategories: AiCategoryRule[];
+    appealConfig: AppealConfig;
+    retentionPolicies: RetentionPolicy[];
+};
+
+// -- Cases & Incidents & Appeals
+
+export type CaseNote = {
+    id: number;
+    actorUserId: string;
+    note: string;
+    createdAt: string;
+};
+
+export type ModerationCase = {
+    id: number;
+    caseNumber: number;
+    actionType: string;
+    status: string;
+    source: string;
+    actorUserId: string | null;
+    targetUserId: string;
+    reason: string | null;
+    createdAt: string;
+    expiresAt?: string | null;
+    relatedCaseId?: number | null;
+    relatedCase?: {
+        id: number;
+        caseNumber: number;
+        actionType: string;
+        status: string;
+    } | null;
+    linkedCases?: Array<{
+        id: number;
+        caseNumber: number;
+        actionType: string;
+        status: string;
+        source: string;
+        targetUserId: string;
+        actorUserId: string | null;
+        createdAt: string;
+        relatedCaseId?: number | null;
+    }>;
+    metadata?: Record<string, unknown> | null;
+    notes?: CaseNote[];
+};
+
+export type CasesState = {
+    summary: {
+        total: number;
+        active: number;
+        warnings: number;
+        timed: number;
+    };
+    cases: ModerationCase[];
+};
+
+export type AiIncidentCategory = {
+    category: string;
+    score: number;
+};
+
+export type AiIncident = {
+    id: number;
+    messageId: string;
+    channelId: string;
+    authorId: string;
+    excerpt: string | null;
+    summary: string | null;
+    categories: AiIncidentCategory[];
+    provider: string | null;
+    model: string | null;
+    confidence: number | null;
+    status: string;
+    reviewerId?: string | null;
+    reviewedAt?: string | null;
+    createdAt: string;
+};
+
+export type AiIncidentState = {
+    summary: {
+        total: number;
+        open: number;
+        falsePositive: number;
+        confirmed: number;
+    };
+    incidents: AiIncident[];
+};
+
+export type AppealTicket = {
+    id: number;
+    caseId: number;
+    caseNumber: number;
+    userId: string;
+    appealType: string;
+    status: string;
+    message: string;
+    resolutionNote?: string | null;
+    reviewerId?: string | null;
+    reviewedAt?: string | null;
+    createdAt: string;
+    moderationCase: {
+        id: number;
+        caseNumber: number;
+        actionType: string;
+        status: string;
+        targetUserId: string;
+    };
+};
+
+export type AppealTicketState = {
+    summary: {
+        total: number;
+        open: number;
+        inReview: number;
+        accepted: number;
+        rejected: number;
+    };
+    tickets: AppealTicket[];
+};
+
+export type AppealReviewDecision = 'IN_REVIEW' | 'ACCEPTED' | 'REJECTED' | 'PARDONED';
+
+// -- Analytics
+
+export type ModeratorAnalyticsRow = {
+    moderatorId: string;
+    totalActions: number;
+    warns: number;
+    timeouts: number;
+    bans: number;
+    mutes: number;
+    kicks: number;
+    reversals: number;
+    aiReviews: number;
+    falsePositives: number;
+    falsePositiveRate: number;
+    appealsReviewed: number;
+    acceptedAppeals: number;
+    rejectedAppeals: number;
+    avgAiReviewMinutes: number | null;
+    avgAppealReviewHours: number | null;
+};
+
+export type AnalyticsState = {
+    windowDays: number;
+    summary: {
+        totalModeratorActions: number;
+        totalAiReviews: number;
+        totalAppealReviews: number;
+        uniqueModerators: number;
+    };
+    moderators: ModeratorAnalyticsRow[];
+};

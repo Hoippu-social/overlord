@@ -253,6 +253,8 @@ export async function handleAiModerationButton(interaction: ButtonInteraction) {
         accessGroup: 'moderation',
         accessKey: 'ai_review',
         requiredAccessLevel: 50,
+        channelId: interaction.channelId,
+        parentChannelId: interaction.channel && 'parentId' in interaction.channel ? interaction.channel.parentId : null,
     }).catch(() => false);
 
     if (!allowed) {

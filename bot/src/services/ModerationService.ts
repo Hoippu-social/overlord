@@ -72,6 +72,128 @@ export function parseJsonObject<T = Record<string, unknown>>(value: string | nul
     }
 }
 
+type CommandRuleMode = 'WHITELIST' | 'BLACKLIST';
+
+type CommandRuleConfig = {
+    commandKey: string;
+    enabled: boolean;
+    roleMode: CommandRuleMode;
+    roleIds: string[];
+    channelMode: CommandRuleMode;
+    channelIds: string[];
+    requiredAccessLevel: number | null;
+};
+
+const DEFAULT_COMMAND_ACCESS_LEVELS: Record<string, number> = {
+    appeals: 70,
+    ban: 85,
+    case: 35,
+    cases: 35,
+    clear: 55,
+    kick: 65,
+    lock: 55,
+    mute: 55,
+    note: 30,
+    slowmode: 55,
+    tempban: 80,
+    timeout: 60,
+    unban: 80,
+    unlock: 55,
+    unmute: 55,
+    untimeout: 60,
+    unwarn: 60,
+    voicekick: 45,
+    voicemove: 45,
+    warn: 45,
+    warnings: 35,
+};
+
+function getDefaultCommandRule(commandKey: string): CommandRuleConfig | null {
+    if (!(commandKey in DEFAULT_COMMAND_ACCESS_LEVELS)) {
+        return null;
+    }
+
+    return {
+        commandKey,
+        enabled: true,
+        roleMode: 'WHITELIST',
+        roleIds: [],
+        channelMode: 'WHITELIST',
+        channelIds: [],
+        requiredAccessLevel: DEFAULT_COMMAND_ACCESS_LEVELS[commandKey],
+    };
+}
+
+function parseCommandRules(value: string | null | undefined): CommandRuleConfig[] {
+    if (!value) return [];
+
+    try {
+        const parsed = JSON.parse(value);
+        if (!Array.isArray(parsed)) return [];
+
+        return parsed
+            .map((rule) => {
+                if (!rule || typeof rule !== 'object') {
+                    return null;
+                }
+
+                const entry = rule as Record<string, unknown>;
+                if (typeof entry.commandKey !== 'string' || !entry.commandKey.trim()) {
+                    return null;
+                }
+
+                return {
+                    commandKey: entry.commandKey.trim(),
+                    enabled: entry.enabled !== false,
+                    roleMode: entry.roleMode === 'WHITELIST' ? 'WHITELIST' : 'BLACKLIST',
+                    roleIds: Array.isArray(entry.roleIds) ? entry.roleIds.filter((item): item is string => typeof item === 'string' && Boolean(item)) : [],
+                    channelMode: entry.channelMode === 'WHITELIST' ? 'WHITELIST' : 'BLACKLIST',
+                    channelIds: Array.isArray(entry.channelIds) ? entry.channelIds.filter((item): item is string => typeof item === 'string' && Boolean(item)) : [],
+                    requiredAccessLevel:
+                        typeof entry.requiredAccessLevel === 'number' && Number.isFinite(entry.requiredAccessLevel)
+                            ? Math.max(0, Math.min(100, Math.round(entry.requiredAccessLevel)))
+                            : null,
+                };
+            })
+            .filter((rule): rule is CommandRuleConfig => Boolean(rule));
+    } catch {
+        return [];
+    }
+}
+
+function evaluateCommandRule(rule: CommandRuleConfig, context: {
+    roleIds: Set<string>;
+    bindingLevel: number;
+    channelId?: string | null;
+    parentChannelId?: string | null;
+}) {
+    const checks: boolean[] = [];
+
+    if (rule.roleIds.length > 0) {
+        const hasMatchingRole = rule.roleIds.some((roleId) => context.roleIds.has(roleId));
+        checks.push(rule.roleMode === 'WHITELIST' ? hasMatchingRole : !hasMatchingRole);
+    }
+
+    if (rule.channelIds.length > 0) {
+        const activeChannelIds = new Set<string>();
+        if (context.channelId) activeChannelIds.add(context.channelId);
+        if (context.parentChannelId) activeChannelIds.add(context.parentChannelId);
+
+        const hasMatchingChannel = rule.channelIds.some((channelId) => activeChannelIds.has(channelId));
+        checks.push(rule.channelMode === 'WHITELIST' ? hasMatchingChannel : !hasMatchingChannel);
+    }
+
+    if (rule.requiredAccessLevel !== null) {
+        checks.push(context.bindingLevel >= rule.requiredAccessLevel);
+    }
+
+    if (!checks.length) {
+        return null;
+    }
+
+    return checks.every(Boolean);
+}
+
 export function isMissingModerationTableError(error: unknown) {
     const err = error as { code?: string; message?: string };
     if (err?.code === 'P2021') return true;
@@ -694,15 +816,21 @@ export async function ensureModeratorAccess(guildId: string, member: GuildMember
     accessGroup?: string;
     accessKey?: string;
     requiredAccessLevel?: number;
+    channelId?: string | null;
+    parentChannelId?: string | null;
 }) {
     if (member.permissions.has(PermissionFlagsBits.Administrator) || member.permissions.has(PermissionFlagsBits.ManageGuild) || member.guild.ownerId === member.id) {
         return true;
     }
 
-    const [botSettings, bindings, grants] = await Promise.all([
+    const [botSettings, moderationConfig, bindings, grants] = await Promise.all([
         prisma.botSettings.findUnique({
             where: { guildId },
             select: { adminRoles: true },
+        }),
+        prisma.moderationConfig.findUnique({
+            where: { guildId },
+            select: { commandRules: true },
         }),
         prisma.moderationRoleBinding.findMany({
             where: { guildId, enabled: true },
@@ -729,11 +857,52 @@ export async function ensureModeratorAccess(guildId: string, member: GuildMember
         .reduce((max, binding) => Math.max(max, binding.accessLevel), 0);
 
     const matchingGrants = grants.filter((grant) => roleIds.has(grant.roleId));
-    if (matchingGrants.some((grant) => grant.effect === 'DENY')) {
+    const groupGrants = matchingGrants.filter((grant) => grant.scopeType === 'GROUP');
+    const commandGrants = matchingGrants.filter((grant) => grant.scopeType === 'COMMAND');
+    const savedCommandRule = options.accessKey
+        ? parseCommandRules(moderationConfig?.commandRules).find((rule) => rule.commandKey === options.accessKey)
+        : null;
+    const defaultCommandRule = options.accessKey ? getDefaultCommandRule(options.accessKey) : null;
+    const commandRule = savedCommandRule
+        ? {
+            ...(defaultCommandRule ?? savedCommandRule),
+            ...savedCommandRule,
+            requiredAccessLevel: savedCommandRule.requiredAccessLevel ?? defaultCommandRule?.requiredAccessLevel ?? null,
+        }
+        : defaultCommandRule;
+
+    if (savedCommandRule && !savedCommandRule.enabled) {
         return false;
     }
 
-    if (matchingGrants.some((grant) => grant.effect === 'ALLOW')) {
+    const commandRuleDecision = commandRule
+        ? evaluateCommandRule(commandRule, {
+            roleIds,
+            bindingLevel,
+            channelId: options.channelId,
+            parentChannelId: options.parentChannelId,
+        })
+        : null;
+
+    if (commandRuleDecision === false) {
+        return false;
+    }
+
+    if (
+        groupGrants.some((grant) => grant.effect === 'DENY') ||
+        commandGrants.some((grant) => grant.effect === 'DENY')
+    ) {
+        return false;
+    }
+
+    if (commandRuleDecision === true) {
+        return true;
+    }
+
+    if (
+        groupGrants.some((grant) => grant.effect === 'ALLOW') ||
+        commandGrants.some((grant) => grant.effect === 'ALLOW')
+    ) {
         return true;
     }
 
