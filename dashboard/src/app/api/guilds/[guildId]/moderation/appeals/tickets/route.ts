@@ -19,12 +19,20 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         }
 
         const status = request.nextUrl.searchParams.get('status');
+        const moderationActorUserId = request.nextUrl.searchParams.get('moderationActorUserId');
         const limit = Math.min(Math.max(Number(request.nextUrl.searchParams.get('limit') ?? 25) || 25, 1), 100);
 
         const tickets = await prisma.appealTicket.findMany({
             where: {
                 guildId,
                 ...(status ? { status } : {}),
+                ...(moderationActorUserId
+                    ? {
+                        moderationCase: {
+                            actorUserId: moderationActorUserId,
+                        },
+                    }
+                    : {}),
             },
             orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
             take: limit,
@@ -36,6 +44,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
                         actionType: true,
                         status: true,
                         targetUserId: true,
+                        actorUserId: true,
                     },
                 },
             },

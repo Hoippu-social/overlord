@@ -16,6 +16,9 @@ export default {
 
             if (entry && entry.targetId === ban.user.id) {
                 if (Date.now() - entry.createdTimestamp < 5000) {
+                    if (entry.executorId === ban.client.user?.id) {
+                        return;
+                    }
                     actorId = entry.executorId;
                 }
             }

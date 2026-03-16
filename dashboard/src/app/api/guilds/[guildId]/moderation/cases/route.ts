@@ -3,6 +3,25 @@ import { prisma } from '@/lib/prisma';
 import { getAuthToken } from '@/lib/auth';
 import { canAccessGuild } from '@/lib/discordAccess';
 
+const DASHBOARD_API_PORT = Number.parseInt(process.env.DASHBOARD_API_PORT || '3002', 10);
+const DASHBOARD_API_KEY = process.env.DASHBOARD_API_KEY || '';
+
+type EnrichedUser = {
+    id: string;
+    name: string;
+    username: string;
+    tag: string;
+    avatar: string | null;
+    globalName?: string | null;
+};
+
+type CaseResolution = {
+    type: string | null;
+    actorUserId: string | null;
+    reason: string | null;
+    resolvedAt: string | null;
+};
+
 const parseMetadata = (value: string | null) => {
     if (!value) {
         return null;
@@ -15,6 +34,56 @@ const parseMetadata = (value: string | null) => {
         return null;
     }
 };
+
+const parseResolution = (metadata: Record<string, unknown> | null): CaseResolution | null => {
+    if (!metadata) {
+        return null;
+    }
+
+    const resolution = metadata.resolution;
+    if (!resolution || typeof resolution !== 'object' || Array.isArray(resolution)) {
+        return null;
+    }
+
+    const parsed = resolution as Record<string, unknown>;
+    return {
+        type: typeof parsed.type === 'string' ? parsed.type : null,
+        actorUserId: typeof parsed.actorUserId === 'string' ? parsed.actorUserId : null,
+        reason: typeof parsed.reason === 'string' ? parsed.reason : null,
+        resolvedAt: typeof parsed.resolvedAt === 'string' ? parsed.resolvedAt : null,
+    };
+};
+
+async function fetchEnrichedUsers(guildId: string, userIds: string[]) {
+    if (!userIds.length) {
+        return new Map<string, EnrichedUser>();
+    }
+
+    try {
+        const response = await fetch(`http://127.0.0.1:${DASHBOARD_API_PORT}/api/enrich`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                ...(DASHBOARD_API_KEY ? { 'x-dashboard-key': DASHBOARD_API_KEY } : {}),
+            },
+            body: JSON.stringify({ guildId, userIds, channelIds: [] }),
+            cache: 'no-store',
+        });
+
+        if (!response.ok) {
+            return new Map<string, EnrichedUser>();
+        }
+
+        const data = await response.json();
+        const users = data?.users && typeof data.users === 'object' ? data.users : {};
+
+        return new Map<string, EnrichedUser>(
+            Object.entries(users).filter((entry): entry is [string, EnrichedUser] => Boolean(entry[0]) && Boolean(entry[1])),
+        );
+    } catch {
+        return new Map<string, EnrichedUser>();
+    }
+}
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ guildId: string }> }) {
     try {
@@ -71,8 +140,17 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
                 },
             },
         });
-        const relatedIds = Array.from(new Set(cases.map((row) => row.relatedCaseId).filter((value): value is number => typeof value === 'number')));
-        const caseIds = cases.map((row) => row.id);
+        const normalizedCases = cases.map((row) => {
+            const metadata = parseMetadata(row.metadata);
+            return {
+                row,
+                metadata,
+                resolution: parseResolution(metadata),
+            };
+        });
+
+        const relatedIds = Array.from(new Set(normalizedCases.map(({ row }) => row.relatedCaseId).filter((value): value is number => typeof value === 'number')));
+        const caseIds = normalizedCases.map(({ row }) => row.id);
         const relatedCases = relatedIds.length
             ? await prisma.moderationCase.findMany({
                 where: {
@@ -114,23 +192,48 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
             linkedChildMap.set(row.relatedCaseId, existing);
         }
 
+        const userIds = Array.from(new Set([
+            ...normalizedCases.map(({ row }) => row.targetUserId),
+            ...normalizedCases.map(({ row }) => row.actorUserId).filter((value): value is string => Boolean(value)),
+            ...normalizedCases.map(({ resolution }) => resolution?.actorUserId).filter((value): value is string => Boolean(value)),
+            ...normalizedCases.flatMap(({ row }) => row.notes.map((note) => note.actorUserId)).filter(Boolean),
+            ...linkedChildCases.map((row) => row.targetUserId),
+            ...linkedChildCases.map((row) => row.actorUserId).filter((value): value is string => Boolean(value)),
+        ]));
+        const enrichedUsers = await fetchEnrichedUsers(guildId, userIds);
+
         const summary = {
-            total: cases.length,
-            active: cases.filter((row) => row.status === 'ACTIVE').length,
-            warnings: cases.filter((row) => row.actionType === 'WARN' && row.status === 'ACTIVE').length,
-            timed: cases.filter((row) => row.expiresAt !== null && row.status === 'ACTIVE').length,
+            total: normalizedCases.length,
+            active: normalizedCases.filter(({ row }) => row.status === 'ACTIVE').length,
+            warnings: normalizedCases.filter(({ row }) => row.actionType === 'WARN' && row.status === 'ACTIVE').length,
+            timed: normalizedCases.filter(({ row }) => row.expiresAt !== null && row.status === 'ACTIVE').length,
         };
 
         return NextResponse.json({
             summary,
-            cases: cases.map((row) => ({
+            cases: normalizedCases.map(({ row, metadata, resolution }) => ({
                 ...row,
-                metadata: parseMetadata(row.metadata),
+                actorProfile: row.actorUserId ? enrichedUsers.get(row.actorUserId) ?? null : null,
+                targetProfile: enrichedUsers.get(row.targetUserId) ?? null,
+                metadata,
+                resolutionType: resolution?.type ?? null,
+                resolvedByUserId: resolution?.actorUserId ?? null,
+                resolvedByProfile: resolution?.actorUserId ? enrichedUsers.get(resolution.actorUserId) ?? null : null,
+                resolvedAt: resolution?.resolvedAt ?? null,
+                resolutionReason: resolution?.reason ?? null,
                 relatedCase:
                     row.relatedCaseId && relatedCaseMap.has(row.relatedCaseId)
                         ? relatedCaseMap.get(row.relatedCaseId)
                         : null,
-                linkedCases: linkedChildMap.get(row.id) ?? [],
+                linkedCases: (linkedChildMap.get(row.id) ?? []).map((linkedCase) => ({
+                    ...linkedCase,
+                    actorProfile: linkedCase.actorUserId ? enrichedUsers.get(linkedCase.actorUserId) ?? null : null,
+                    targetProfile: enrichedUsers.get(linkedCase.targetUserId) ?? null,
+                })),
+                notes: row.notes.map((note) => ({
+                    ...note,
+                    actorProfile: enrichedUsers.get(note.actorUserId) ?? null,
+                })),
             })),
         });
     } catch (error) {

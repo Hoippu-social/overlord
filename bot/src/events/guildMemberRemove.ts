@@ -27,18 +27,20 @@ export default {
 
             if (entry && entry.targetId === member.id) {
                 if (Date.now() - entry.createdTimestamp < 5000) {
-                    await logAuditEvent(member.client, {
-                        guildId,
-                        tag: 'moderation',
-                        actorId: entry.executorId,
-                        targetId: member.id,
-                        payload: {
-                            event: 'member_kick',
-                            userId: member.id,
-                            reason: entry.reason ?? null,
-                        },
-                        severity: 'WARN',
-                    });
+                    if (entry.executorId !== member.client.user?.id) {
+                        await logAuditEvent(member.client, {
+                            guildId,
+                            tag: 'moderation',
+                            actorId: entry.executorId,
+                            targetId: member.id,
+                            payload: {
+                                event: 'member_kick',
+                                userId: member.id,
+                                reason: entry.reason ?? null,
+                            },
+                            severity: 'WARN',
+                        });
+                    }
                 }
             }
         } catch (error) {

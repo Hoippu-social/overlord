@@ -2,14 +2,27 @@ import { Client, Guild, GuildTextBasedChannel, MessageCreateOptions } from 'disc
 import { logAuditEvent } from '../utils/auditLog';
 import { prisma } from '../utils/database';
 import {
-    clearWarningCase,
-    createModerationCase,
     ensureModerationConfig,
     getCaseByNumber,
     isMissingModerationTableError,
+    resolveModerationCase,
 } from './ModerationService';
 
 type AppealDecision = 'IN_REVIEW' | 'ACCEPTED' | 'REJECTED' | 'PARDONED';
+
+function getReversalAuditEvent(actionType: string) {
+    switch (actionType) {
+        case 'TIMEOUT':
+            return 'untimeout';
+        case 'MUTE':
+            return 'unmute';
+        case 'BAN':
+        case 'TEMPBAN':
+            return 'unban';
+        default:
+            return 'unwarn';
+    }
+}
 
 function formatReviewerLabel(value: string) {
     return /^\d{16,20}$/.test(value) ? `<@${value}>` : value;
@@ -103,37 +116,33 @@ async function reverseCase(guild: Guild, moderationCase: Awaited<ReturnType<type
     if (!moderationCase) {
         throw new Error('Moderation case not found.');
     }
+    if (moderationCase.status !== 'ACTIVE') {
+        throw new Error(`Case #${moderationCase.caseNumber} is already ${moderationCase.status.toLowerCase()}.`);
+    }
 
     const reason = note ?? `${source === 'pardon' ? 'Pardon' : 'Appeal accepted'} for case #${moderationCase.caseNumber}`;
 
     switch (moderationCase.actionType) {
         case 'WARN': {
-            const reversal = await clearWarningCase(guild.id, reviewerId, moderationCase.caseNumber, reason);
-            await prisma.moderationCase.update({
-                where: { id: moderationCase.id },
-                data: { status: 'REVERTED' },
+            return resolveModerationCase({
+                moderationCase,
+                nextStatus: 'CLEARED',
+                resolutionType: source,
+                actorUserId: reviewerId,
+                reason,
             });
-            return reversal;
         }
         case 'TIMEOUT': {
             const member = await guild.members.fetch(moderationCase.targetUserId).catch(() => null);
             if (!member) throw new Error('Target member is no longer in the server.');
             await member.timeout(null, reason);
-            const reversal = await createModerationCase({
-                guildId: guild.id,
-                actionType: 'UNTIMEOUT',
-                source,
+            return resolveModerationCase({
+                moderationCase,
+                nextStatus: 'CLEARED',
+                resolutionType: source,
                 actorUserId: reviewerId,
-                targetUserId: moderationCase.targetUserId,
                 reason,
-                relatedCaseId: moderationCase.id,
-                status: 'CLEARED',
             });
-            await prisma.moderationCase.update({
-                where: { id: moderationCase.id },
-                data: { status: 'REVERTED' },
-            });
-            return reversal;
         }
         case 'MUTE': {
             const member = await guild.members.fetch(moderationCase.targetUserId).catch(() => null);
@@ -143,40 +152,24 @@ async function reverseCase(guild: Guild, moderationCase: Awaited<ReturnType<type
             const muteRole = guild.roles.cache.get(config.config.muteRoleId);
             if (!muteRole) throw new Error('Configured mute role does not exist.');
             await member.roles.remove(muteRole, reason);
-            const reversal = await createModerationCase({
-                guildId: guild.id,
-                actionType: 'UNMUTE',
-                source,
+            return resolveModerationCase({
+                moderationCase,
+                nextStatus: 'CLEARED',
+                resolutionType: source,
                 actorUserId: reviewerId,
-                targetUserId: moderationCase.targetUserId,
                 reason,
-                relatedCaseId: moderationCase.id,
-                status: 'CLEARED',
             });
-            await prisma.moderationCase.update({
-                where: { id: moderationCase.id },
-                data: { status: 'REVERTED' },
-            });
-            return reversal;
         }
         case 'BAN':
         case 'TEMPBAN': {
             await guild.bans.remove(moderationCase.targetUserId, reason);
-            const reversal = await createModerationCase({
-                guildId: guild.id,
-                actionType: 'UNBAN',
-                source,
+            return resolveModerationCase({
+                moderationCase,
+                nextStatus: 'CLEARED',
+                resolutionType: source,
                 actorUserId: reviewerId,
-                targetUserId: moderationCase.targetUserId,
                 reason,
-                relatedCaseId: moderationCase.id,
-                status: 'CLEARED',
             });
-            await prisma.moderationCase.update({
-                where: { id: moderationCase.id },
-                data: { status: 'REVERTED' },
-            });
-            return reversal;
         }
         default:
             throw new Error(`Case action ${moderationCase.actionType} is not reversible through appeals yet.`);
@@ -235,7 +228,7 @@ export async function reviewAppealTicket(options: {
             `User: <@${updated.userId}>`,
             `Reviewer: ${formatReviewerLabel(options.reviewerId)}`,
             options.note ? `Note: ${options.note}` : null,
-            reversalCaseNumber ? `Reversal case: #${reversalCaseNumber}` : null,
+            reversalCaseNumber ? `Resolved case: #${reversalCaseNumber}` : null,
         ].filter(Boolean).join('\n'),
     });
 
@@ -254,6 +247,21 @@ export async function reviewAppealTicket(options: {
         },
         severity: options.decision === 'REJECTED' ? 'INFO' : 'WARN',
     });
+
+    if (reversalCaseNumber) {
+        await logAuditEvent(options.client, {
+            guildId: options.guild.id,
+            tag: 'moderation',
+            actorId: options.reviewerId,
+            targetId: updated.userId,
+            payload: {
+                event: getReversalAuditEvent(updated.moderationCase.actionType),
+                caseNumber: updated.caseNumber,
+                reason: options.note ?? `${updated.appealType === 'PARDON' ? 'Pardon approved' : 'Appeal accepted'} for case #${updated.caseNumber}`,
+            },
+            severity: 'INFO',
+        });
+    }
 
     return updated;
 }

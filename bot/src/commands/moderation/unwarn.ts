@@ -37,14 +37,13 @@ const command: Command = {
             payload: {
                 event: 'unwarn',
                 caseNumber: cleared.caseNumber,
-                relatedCaseId: cleared.relatedCaseId,
                 reason: cleared.reason,
             },
             severity: 'INFO',
         });
 
         await interaction.reply({
-            content: `Warning #${warnId} cleared. New case #${cleared.caseNumber}.`,
+            content: `Warning #${cleared.caseNumber} cleared.`,
             ephemeral: true,
         });
     },

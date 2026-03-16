@@ -56,6 +56,7 @@ export default {
         if (oldTimeout !== newTimeout) {
             let actorId = null;
             let reason = null;
+            let skipModerationLog = false;
 
             try {
                 const auditLogs = await newMember.guild.fetchAuditLogs({
@@ -68,6 +69,9 @@ export default {
                     if (Date.now() - entry.createdTimestamp < 5000) {
                         const hasCommChange = entry.changes.some(c => c.key === 'communication_disabled_until');
                         if (hasCommChange) {
+                            if (entry.executorId === newMember.client.user?.id) {
+                                skipModerationLog = true;
+                            }
                             actorId = entry.executorId;
                             reason = entry.reason;
                         }
@@ -77,7 +81,7 @@ export default {
                 // Ignore missing permissions
             }
 
-            if (!oldTimeout && newTimeout) {
+            if (!skipModerationLog && !oldTimeout && newTimeout) {
                 await logAuditEvent(newMember.client, {
                     guildId: newMember.guild.id,
                     tag: 'moderation',
@@ -91,7 +95,7 @@ export default {
                     },
                     severity: 'WARN',
                 });
-            } else if (oldTimeout && !newTimeout) {
+            } else if (!skipModerationLog && oldTimeout && !newTimeout) {
                 await logAuditEvent(newMember.client, {
                     guildId: newMember.guild.id,
                     tag: 'moderation',
