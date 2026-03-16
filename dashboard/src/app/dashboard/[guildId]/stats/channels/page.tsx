@@ -8,15 +8,17 @@ import {
 } from "@nextui-org/react";
 import {
     MagnifyingGlass, Hash, SpeakerHigh, MessengerLogo, Users,
-    CalendarCheck, Clock, ChartBar, ArrowRight, MicrophoneStage
+    CalendarCheck, Clock, ChartBar, ArrowRight, MicrophoneStage, ArrowsClockwise
 } from "@phosphor-icons/react";
-import { useGuildLocale } from "@/lib/i18n";
+
+import { useGuildLocale, useGuildTimezone } from "@/lib/i18n";
 import { usePersistentPeriod } from "@/hooks/usePersistentPeriod";
-import { formatYAxis } from "@/lib/utils";
+import { formatDateInTimezone, formatLocaleNumber, formatYAxis } from "@/lib/utils";
 import { StatsCard } from "@/components/stats/StatsCard";
 import { ChartContainer } from "@/components/stats/ChartContainer";
+import { ChartTooltip } from "@/components/stats/ChartTooltip";
 import {
-    BarChart, Bar, AreaChart, Area, XAxis, YAxis, CartesianGrid,
+    BarChart, Bar, XAxis, YAxis, CartesianGrid,
     Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend
 } from 'recharts';
 
@@ -55,7 +57,12 @@ const strings = {
         noData: 'No data for this channel',
         selectChannel: 'Select a channel to see detailed statistics',
         msgs: 'msgs',
-
+        noDataShort: 'No Data',
+        other: 'Other',
+        ago: 'ago',
+        minutesAgo: 'min ago',
+        hoursAgo: 'h ago',
+        daysAgo: 'd ago',
     },
     ru: {
         title: 'О канале',
@@ -91,7 +98,12 @@ const strings = {
         noData: 'Нет данных по этому каналу',
         selectChannel: 'Выберите канал для просмотра подробной статистики',
         msgs: 'сообщ.',
-
+        noDataShort: 'Нет данных',
+        other: 'Прочие',
+        ago: 'назад',
+        minutesAgo: 'мин назад',
+        hoursAgo: 'ч назад',
+        daysAgo: 'д назад',
     },
 } as const;
 
@@ -112,6 +124,7 @@ interface ChannelItem {
 export default function ChannelDrilldownPage() {
     const { guildId } = useParams<{ guildId: string }>();
     const { locale } = useGuildLocale(guildId);
+    const guildTimezone = useGuildTimezone(guildId);
     const text = strings[locale];
 
     const [search, setSearch] = useState('');
@@ -122,6 +135,16 @@ export default function ChannelDrilldownPage() {
     const [selectedChannelName, setSelectedChannelName] = useState('');
     const [activeTab, setActiveTab] = useState('overview');
     const [period, setPeriod] = usePersistentPeriod('7d');
+    const [refreshKey, setRefreshKey] = useState(0);
+    const [syncing, setSyncing] = useState(false);
+
+    const handleSync = async () => {
+        setSyncing(true);
+        setChannelsFetched(false);
+        setAllChannels([]);
+        setTimeout(() => setSyncing(false), 800);
+        setRefreshKey(k => k + 1);
+    };
     const [drilldownData, setDrilldownData] = useState<any>(null);
     const [loadingDrilldown, setLoadingDrilldown] = useState(false);
     const [pieTopN, setPieTopN] = useState(10);
@@ -193,68 +216,37 @@ export default function ChannelDrilldownPage() {
     }, []);
 
     const formatDate = (dateStr: string) => {
-        const d = new Date(dateStr);
-        if (isNaN(d.getTime())) return dateStr;
-        const dd = d.getDate().toString().padStart(2, '0');
-        const mm = (d.getMonth() + 1).toString().padStart(2, '0');
-        const yyyy = d.getFullYear();
-        return `${dd}.${mm}.${yyyy}`;
+        return formatDateInTimezone(dateStr, guildTimezone, locale);
     };
 
     const formatDuration = (seconds: number) => {
         const h = Math.floor(seconds / 3600);
         const m = Math.floor((seconds % 3600) / 60);
-        if (h > 0) return `${h}${text.hours} ${m}${text.minutes}`;
-        return `${m} ${text.minutes}`;
+        if (h > 0) return `${h} ${text.hours} ${m} ${text.minutes}`;
+        return `${m} ${text.minutes}`;
     };
 
     const timeAgo = (dateStr: string) => {
         const diff = Date.now() - new Date(dateStr).getTime();
         const mins = Math.floor(diff / 60000);
-        if (mins < 60) return `${mins} min ago`;
+        if (mins < 60) return `${mins} ${text.minutesAgo}`;
         const hrs = Math.floor(mins / 60);
-        if (hrs < 24) return `${hrs}h ago`;
+        if (hrs < 24) return `${hrs} ${text.hoursAgo}`;
         const days = Math.floor(hrs / 24);
-        return `${days}d ago`;
+        return `${days} ${text.daysAgo}`;
     };
 
     // --- RENDER ---
     return (
         <div className="p-6 space-y-6 min-h-screen">
             {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-500/20 to-teal-500/20 border border-cyan-500/10 flex items-center justify-center backdrop-blur-sm shadow-xl flex-shrink-0">
-                        <Hash size={32} weight="fill" className="text-cyan-500 drop-shadow-lg" />
-                    </div>
-                    <div>
-                        <h1 className="text-3xl font-black text-white tracking-tight">{text.title}</h1>
-                        <p className="text-default-400 font-medium">{text.subtitle}</p>
-                    </div>
+            <div className="flex items-center gap-4 mb-2">
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-500/20 to-teal-500/20 border border-cyan-500/10 flex items-center justify-center backdrop-blur-sm shadow-xl flex-shrink-0">
+                    <Hash size={32} weight="fill" className="text-cyan-500 drop-shadow-lg" />
                 </div>
-
-                <div className="flex items-center gap-3 bg-[#18181b]/40 p-1.5 rounded-2xl border border-white/5 backdrop-blur-md w-full md:w-auto">
-                    <Select
-                        labelPlacement="outside"
-                        selectedKeys={[period]}
-                        onChange={(e) => setPeriod(e.target.value)}
-                        className="flex-1 md:w-40"
-                        classNames={{
-                            trigger: "bg-transparent shadow-none hover:bg-white/5 border-0 min-h-10 h-10 justify-between",
-                            value: "text-small font-medium group-data-[has-value=true]:text-white",
-                            popoverContent: "bg-[#18181b] border border-white/10 dark"
-                        }}
-                        startContent={<CalendarCheck className="text-default-400" size={16} />}
-                        disallowEmptySelection
-                    >
-                        <SelectItem key="24h">{text.day1}</SelectItem>
-                        <SelectItem key="3d">{text.day3}</SelectItem>
-                        <SelectItem key="7d">{text.day7}</SelectItem>
-                        <SelectItem key="14d">{text.day14}</SelectItem>
-                        <SelectItem key="30d">{text.day30}</SelectItem>
-                        <SelectItem key="90d">{text.day90}</SelectItem>
-                        <SelectItem key="365d">{text.day365}</SelectItem>
-                    </Select>
+                <div>
+                    <h1 className="text-3xl font-black text-white tracking-tight">{text.title}</h1>
+                    <p className="text-default-400 font-medium">{text.subtitle}</p>
                 </div>
             </div>
 
@@ -311,7 +303,7 @@ export default function ChannelDrilldownPage() {
                                         {ch.messages > 0 && (
                                             <div className="flex items-center gap-1 text-default-400">
                                                 <MessengerLogo size={14} weight="fill" className="text-violet-400" />
-                                                <span className="text-xs font-semibold text-white">{ch.messages.toLocaleString()}</span>
+                                                <span className="text-xs font-semibold text-white">{formatLocaleNumber(ch.messages, locale)}</span>
                                             </div>
                                         )}
                                         {ch.voiceSeconds > 0 && (
@@ -398,14 +390,14 @@ export default function ChannelDrilldownPage() {
                             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                                 <StatsCard
                                     title={text.totalMessages}
-                                    value={drilldownData?.overview?.totalMessages?.toLocaleString() ?? '—'}
+                                    value={drilldownData?.overview?.totalMessages != null ? formatLocaleNumber(drilldownData.overview.totalMessages, locale) : '—'}
                                     description={`${text.avgPerDay}: ${drilldownData?.overview?.avgMessagesPerDay ?? 0}`}
                                     icon={<MessengerLogo size={24} weight="fill" />}
                                     loading={loadingDrilldown}
                                 />
                                 <StatsCard
                                     title={text.uniqueMembers}
-                                    value={drilldownData?.overview?.uniqueMessageMembers?.toLocaleString() ?? '—'}
+                                    value={drilldownData?.overview?.uniqueMessageMembers != null ? formatLocaleNumber(drilldownData.overview.uniqueMessageMembers, locale) : '—'}
                                     icon={<Users size={24} weight="fill" />}
                                     loading={loadingDrilldown}
                                 />
@@ -419,7 +411,7 @@ export default function ChannelDrilldownPage() {
                                 <StatsCard
                                     title={text.uniqueMembers}
                                     subValue="(voice)"
-                                    value={drilldownData?.overview?.uniqueVoiceMembers?.toLocaleString() ?? '—'}
+                                    value={drilldownData?.overview?.uniqueVoiceMembers != null ? formatLocaleNumber(drilldownData.overview.uniqueVoiceMembers, locale) : '—'}
                                     icon={<MicrophoneStage size={24} weight="fill" />}
                                     loading={loadingDrilldown}
                                 />
@@ -433,18 +425,18 @@ export default function ChannelDrilldownPage() {
                                         <p className="text-xs text-default-400 font-semibold uppercase tracking-wider mb-3">{text.topMember} (msgs)</p>
                                         {loadingDrilldown ? <Skeleton className="h-8 w-full rounded-lg" /> : (
                                             drilldownData?.overview?.topMessageMember ? (
-                                                <div className="flex items-center gap-3">
+                                                <a href={`/dashboard/${guildId}/stats/users?userId=${drilldownData.overview.topMessageMember.userId || drilldownData.overview.topMessageMember.id}`} className="flex items-center gap-3 hover:bg-white/5 p-1 rounded-lg transition-colors group">
                                                     <Avatar
                                                         src={drilldownData.overview.topMessageMember.avatar}
                                                         name={drilldownData.overview.topMessageMember.name}
                                                         size="sm"
-                                                        className="flex-shrink-0"
+                                                        className="flex-shrink-0 group-hover:ring-2 group-hover:ring-primary transition-all"
                                                     />
                                                     <div className="min-w-0">
-                                                        <p className="text-white font-bold truncate">{drilldownData.overview.topMessageMember.name}</p>
-                                                        <p className="text-xs text-default-400">{drilldownData.overview.topMessageMember.value.toLocaleString()} {text.msgs}</p>
+                                                        <p className="text-white font-bold truncate group-hover:text-primary transition-colors">{drilldownData.overview.topMessageMember.name}</p>
+                                                        <p className="text-xs text-default-400">{formatLocaleNumber(drilldownData.overview.topMessageMember.value, locale)} {text.msgs}</p>
                                                     </div>
-                                                </div>
+                                                </a>
                                             ) : <p className="text-default-500 text-sm">—</p>
                                         )}
                                     </CardBody>
@@ -456,18 +448,18 @@ export default function ChannelDrilldownPage() {
                                         <p className="text-xs text-default-400 font-semibold uppercase tracking-wider mb-3">{text.topMember} (voice)</p>
                                         {loadingDrilldown ? <Skeleton className="h-8 w-full rounded-lg" /> : (
                                             drilldownData?.overview?.topVoiceMember ? (
-                                                <div className="flex items-center gap-3">
+                                                <a href={`/dashboard/${guildId}/stats/users?userId=${drilldownData.overview.topVoiceMember.userId || drilldownData.overview.topVoiceMember.id}`} className="flex items-center gap-3 hover:bg-white/5 p-1 rounded-lg transition-colors group">
                                                     <Avatar
                                                         src={drilldownData.overview.topVoiceMember.avatar}
                                                         name={drilldownData.overview.topVoiceMember.name}
                                                         size="sm"
-                                                        className="flex-shrink-0"
+                                                        className="flex-shrink-0 group-hover:ring-2 group-hover:ring-primary transition-all"
                                                     />
                                                     <div className="min-w-0">
-                                                        <p className="text-white font-bold truncate">{drilldownData.overview.topVoiceMember.name}</p>
+                                                        <p className="text-white font-bold truncate group-hover:text-primary transition-colors">{drilldownData.overview.topVoiceMember.name}</p>
                                                         <p className="text-xs text-default-400">{formatDuration(drilldownData.overview.topVoiceMember.value)}</p>
                                                     </div>
-                                                </div>
+                                                </a>
                                             ) : <p className="text-default-500 text-sm">—</p>
                                         )}
                                     </CardBody>
@@ -522,15 +514,10 @@ export default function ChannelDrilldownPage() {
                                         <XAxis dataKey="date" stroke="#52525b" fontSize={11} tickLine={false} axisLine={false} dy={10} />
                                         <YAxis stroke="#52525b" fontSize={12} tickLine={false} axisLine={false} dx={-10} width={50} tickFormatter={(v) => formatYAxis(v, locale as 'ru' | 'en')} />
                                         <RechartsTooltip
-                                            contentStyle={{
-                                                backgroundColor: 'rgba(24, 24, 27, 0.95)',
-                                                backdropFilter: 'blur(8px)',
-                                                border: '1px solid rgba(255, 255, 255, 0.1)',
-                                                borderRadius: '12px',
-                                            }}
-                                            itemStyle={{ color: '#fff' }}
+                                            cursor={{ fill: 'rgba(255,255,255,0.05)' }}
+                                            content={<ChartTooltip locale={locale} colorOverrides={{ messages: '#06b6d4' }} />}
                                         />
-                                        <Bar dataKey="messages" fill="url(#barGradient)" radius={[4, 4, 0, 0]} />
+                                        <Bar dataKey="messages" fill="url(#barGradient)" radius={[12, 12, 0, 0]} />
                                     </BarChart>
                                 </ResponsiveContainer>
                             </ChartContainer>
@@ -548,6 +535,10 @@ export default function ChannelDrilldownPage() {
                                 percentLabel={text.percentage}
                                 pieTopN={pieTopN}
                                 setPieTopN={setPieTopN}
+                                guildId={guildId}
+                                otherLabel={text.other}
+                                noDataLabel={text.noDataShort}
+                                locale={locale}
                             />
                         </div>
                     )}
@@ -568,20 +559,22 @@ export default function ChannelDrilldownPage() {
                                         <XAxis dataKey="date" stroke="#52525b" fontSize={11} tickLine={false} axisLine={false} dy={10} />
                                         <YAxis
                                             stroke="#52525b" fontSize={12} tickLine={false} axisLine={false} dx={-10} width={50}
-                                            tickFormatter={(v) => `${formatYAxis(v, locale as 'ru' | 'en')}m`}
+                                            tickFormatter={(v) => `${formatYAxis(v, locale as 'ru' | 'en')}\u00A0${text.minutes}`}
                                         />
                                         <RechartsTooltip
-                                            contentStyle={{
-                                                backgroundColor: 'rgba(24, 24, 27, 0.95)',
-                                                backdropFilter: 'blur(8px)',
-                                                border: '1px solid rgba(255, 255, 255, 0.1)',
-                                                borderRadius: '12px',
-                                            }}
-                                            itemStyle={{ color: '#fff' }}
                                             cursor={{ fill: 'rgba(255,255,255,0.05)' }}
-                                            formatter={(val: number) => [`${val} min`, 'Voice']}
+                                            content={(props: any) => (
+                                                <ChartTooltip
+                                                    {...props}
+                                                    locale={locale}
+                                                    colorOverrides={{ voiceMinutes: '#f97316' }}
+                                                    formatters={{
+                                                        voiceMinutes: (v) => formatDuration(v as number)
+                                                    }}
+                                                />
+                                            )}
                                         />
-                                        <Bar dataKey="voiceMinutes" fill="url(#channelVoiceBarGradient)" radius={[4, 4, 0, 0]} />
+                                        <Bar dataKey="voiceMinutes" fill="url(#channelVoiceBarGradient)" radius={[12, 12, 0, 0]} />
                                     </BarChart>
                                 </ResponsiveContainer>
                             </ChartContainer>
@@ -600,6 +593,10 @@ export default function ChannelDrilldownPage() {
                                 pieTopN={pieTopN}
                                 setPieTopN={setPieTopN}
                                 formatValue={(v: number) => formatDuration(v)}
+                                guildId={guildId}
+                                otherLabel={text.other}
+                                noDataLabel={text.noDataShort}
+                                locale={locale}
                             />
                         </div>
                     )}
@@ -636,11 +633,16 @@ interface MemberBreakdownProps {
     pieTopN: number;
     setPieTopN: (n: number) => void;
     formatValue?: (v: number) => string;
+    guildId: string;
+    otherLabel: string;
+    noDataLabel: string;
+    locale: 'ru' | 'en';
 }
 
 function MemberBreakdownSection({
     members, totalValue, valueKey, valueLabel, loading, title,
-    nameLabel, countLabel, percentLabel, pieTopN, setPieTopN, formatValue
+    nameLabel, countLabel, percentLabel, pieTopN, setPieTopN, formatValue, guildId,
+    otherLabel, noDataLabel, locale
 }: MemberBreakdownProps) {
     const pieData = useMemo(() => {
         const top = members.slice(0, pieTopN);
@@ -650,7 +652,7 @@ function MemberBreakdownSection({
             value: m[valueKey] || 0
         }));
         if (otherValue > 0) {
-            result.push({ name: 'Other', value: otherValue });
+            result.push({ name: otherLabel, value: otherValue });
         }
         return result;
     }, [members, pieTopN, valueKey]);
@@ -676,25 +678,29 @@ function MemberBreakdownSection({
                     <div className="h-[350px] overflow-y-auto pr-2 custom-scrollbar space-y-3">
                         {members.length === 0 ? (
                             <div className="flex h-full items-center justify-center text-default-500">
-                                No Data
+                                {noDataLabel}
                             </div>
                         ) : (
                             members.slice(0, 15).map((m: any, i: number) => (
-                                <div key={m.userId || i} className="flex items-center justify-between p-2 md:p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors">
+                                <a
+                                    key={m.userId || i}
+                                    href={`/dashboard/${guildId}/stats/users?userId=${m.userId}`}
+                                    className="flex items-center justify-between p-2 md:p-3 rounded-xl bg-white/5 hover:bg-white/10 hover:border-white/10 border border-transparent transition-all group cursor-pointer"
+                                >
                                     <div className="flex items-center gap-2 md:gap-3 overflow-hidden flex-1 min-w-0">
-                                        <div className="flex-shrink-0 w-6 md:w-8 text-center text-default-400 font-medium text-sm">#{m.rank || i + 1}</div>
+                                        <div className="flex-shrink-0 w-6 md:w-8 text-center text-default-400 font-medium text-sm group-hover:text-primary">#{m.rank || i + 1}</div>
                                         <Avatar
                                             src={m.avatar}
                                             name={m.name}
                                             size="sm"
-                                            className="flex-shrink-0 w-8 h-8 text-tiny"
+                                            className="flex-shrink-0 w-8 h-8 text-tiny group-hover:ring-2 group-hover:ring-primary transition-all"
                                         />
-                                        <span className="font-medium truncate text-sm md:text-base flex-1 min-w-0 block text-white">{m.name}</span>
+                                        <span className="font-medium truncate text-sm md:text-base flex-1 min-w-0 block text-white group-hover:text-primary transition-colors">{m.name}</span>
                                     </div>
                                     <div className="font-bold font-mono text-primary text-sm md:text-base whitespace-nowrap ml-2 md:ml-4 text-right">
-                                        {formatValue ? formatValue(m[valueKey]) : m[valueKey]?.toLocaleString()}
+                                        {formatValue ? formatValue(m[valueKey]) : formatLocaleNumber(m[valueKey] || 0, locale)}
                                     </div>
-                                </div>
+                                </a>
                             ))
                         )}
                     </div>
@@ -711,7 +717,7 @@ function MemberBreakdownSection({
                                         onPress={() => setPieTopN(n)}
                                         className={pieTopN === n ? '' : 'bg-transparent hover:bg-white/5'}
                                     >
-                                        Top {n}
+                                        {locale === 'ru' ? 'Топ' : 'Top'} {n}
                                     </Button>
                                 ))}
                             </ButtonGroup>
@@ -736,14 +742,12 @@ function MemberBreakdownSection({
                                         ))}
                                     </Pie>
                                     <RechartsTooltip
-                                        contentStyle={{
-                                            backgroundColor: 'rgba(24, 24, 27, 0.95)',
-                                            backdropFilter: 'blur(8px)',
-                                            border: '1px solid rgba(255, 255, 255, 0.1)',
-                                            borderRadius: '12px',
-                                        }}
-                                        itemStyle={{ color: '#fff' }}
-                                        formatter={(val: number) => [formatValue ? formatValue(val) : val.toLocaleString(), '']}
+                                        content={(props: any) => (
+                                            <ChartTooltip
+                                                {...props}
+                                                locale={locale}
+                                            />
+                                        )}
                                     />
                                 </PieChart>
                             </ResponsiveContainer>

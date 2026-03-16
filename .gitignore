@@ -18,6 +18,7 @@ lavalink.session
 # Database
 *.db
 *.db-journal
+.postgres/
 
 # Backups
 backups/

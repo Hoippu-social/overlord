@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Card, CardBody, Button, Switch, Slider, Select, SelectItem, Input, Chip, SelectedItems, ButtonGroup, Checkbox, Divider } from "@nextui-org/react";
-import { MusicNote, SpeakerHigh, Clock, Users, List, Prohibit, CheckCircle, FloppyDisk, ArrowClockwise } from "@phosphor-icons/react";
+import { use } from 'react';
+import { Switch, Slider, Select, SelectItem, SelectedItems } from "@nextui-org/react";
+import { MusicNote, SpeakerHigh, Clock, Users, ArrowClockwise, FadersHorizontal, Waveform, PlayCircle, PauseCircle, SkipForward, SkipBack, Repeat, Shuffle } from "@phosphor-icons/react";
 import { useGuildLocale } from "@/lib/i18n";
 
 interface Role {
@@ -22,96 +23,76 @@ interface Channel {
 
 const strings = {
     en: {
-        pageTitle: 'Music Settings',
-        pageSubtitle: 'Configure playback behavior and permissions',
-        djTitle: 'DJ Roles',
-        djDesc: 'Users with these roles can control the music player without voting',
-        djSelectLabel: 'Select DJ Roles',
-        djSelectPlaceholder: 'Choose roles',
+        pageTitle: 'Now Playing',
+        pageSubtitle: 'Music Configuration & Controls',
+        djTitle: 'DJ Access',
+        djDesc: 'Roles allowed to control music without voting',
+        djSelectPlaceholder: 'Search roles...',
         channelsTitle: 'Voice Channels',
-        channelsNone: 'Function disabled (no channels selected)',
-        channelsWhitelist: 'Only allow bot in selected channels',
-        channelsBlacklist: 'Block bot from selected channels',
+        channelsNone: 'Any voice channel',
+        channelsWhitelist: 'Allowed Channels',
+        channelsBlacklist: 'Blocked Channels',
         whitelist: 'Whitelist',
         blacklist: 'Blacklist',
-        channelsSelectLabel: 'Select Channels',
-        channelsSelectPlaceholder: 'Choose voice channels',
+        channelsSelectPlaceholder: 'Search voice channels...',
         volumeTitle: 'Default Volume',
-        volumeDesc: 'Set the initial volume for the bot when joining',
-        maxDurationTitle: 'Max Track Duration',
-        maxDurationDesc: 'Limit the length of songs that can be queued',
-        maxDurationLabel: 'Max Duration',
-        maxDurationPlaceholder: '30',
-        maxDurationUnit: 'min',
-        saveChanges: 'Save Changes',
+        maxDurationTitle: 'Track Length Limit',
+        maxDurationDesc: 'Maximum track duration allowed to be queued',
+        maxDurationUnits: 'MIN',
+        saveChanges: 'Save Configuration',
         saving: 'Saving...',
-        resetDefaults: 'Reset Defaults',
+        resetDefaults: 'Reset',
+        currentlyPlaying: 'Not Playing',
+        artist: 'Queue Empty',
     },
     ru: {
-        pageTitle: 'Настройки музыки',
-        pageSubtitle: 'Настройте поведение плеера и права доступа',
-        djTitle: 'DJ роли',
-        djDesc: 'Пользователи с этими ролями управляют музыкой без голосования',
-        djSelectLabel: 'Выберите DJ роли',
-        djSelectPlaceholder: 'Выберите роли',
+        pageTitle: 'Сейчас играет',
+        pageSubtitle: 'Настройки музыки и управление',
+        djTitle: 'DJ Доступ',
+        djDesc: 'Роли, которые могут управлять музыкой без голосования',
+        djSelectPlaceholder: 'Поиск ролей...',
         channelsTitle: 'Голосовые каналы',
-        channelsNone: 'Ограничения отключены (каналы не выбраны)',
-        channelsWhitelist: 'Разрешить бота только в выбранных каналах',
-        channelsBlacklist: 'Запретить бота в выбранных каналах',
-        whitelist: 'Белый список',
-        blacklist: 'Чёрный список',
-        channelsSelectLabel: 'Выберите каналы',
-        channelsSelectPlaceholder: 'Выберите голосовые каналы',
-        volumeTitle: 'Громкость по умолчанию',
-        volumeDesc: 'Начальная громкость при подключении',
-        maxDurationTitle: 'Максимальная длительность',
-        maxDurationDesc: 'Ограничьте длительность треков в очереди',
-        maxDurationLabel: 'Макс. длительность',
-        maxDurationPlaceholder: '30',
-        maxDurationUnit: 'мин',
-        saveChanges: 'Сохранить изменения',
+        channelsNone: 'Любой канал',
+        channelsWhitelist: 'Разрешенные каналы',
+        channelsBlacklist: 'Заблокированные каналы',
+        whitelist: 'Разрешить',
+        blacklist: 'Запретить',
+        channelsSelectPlaceholder: 'Поиск голосовых каналов...',
+        volumeTitle: 'Начальная громкость',
+        maxDurationTitle: 'Лимит длительности',
+        maxDurationDesc: 'Максимальная длина трека',
+        maxDurationUnits: 'МИН',
+        saveChanges: 'Сохранить',
         saving: 'Сохранение...',
-        resetDefaults: 'Сбросить по умолчанию',
+        resetDefaults: 'Сброс',
+        currentlyPlaying: 'Ничего не играет',
+        artist: 'Очередь пуста',
     },
 } as const;
 
-// Helper to convert hex to rgba
-const hexToRgba = (hex: string, alpha: number) => {
-    if (!hex || hex === '#000000') return `rgba(63, 63, 70, ${alpha})`; // Default zinc-700
-    const cleanHex = hex.startsWith('#') ? hex.slice(1) : hex;
-    if (cleanHex.length !== 6) return `rgba(63, 63, 70, ${alpha})`;
-
-    const r = parseInt(cleanHex.substr(0, 2), 16);
-    const g = parseInt(cleanHex.substr(2, 2), 16);
-    const b = parseInt(cleanHex.substr(4, 2), 16);
-
-    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-};
-
-
-
 export default function MusicSettingsPage({ params }: { params: Promise<{ guildId: string }> }) {
-    const { guildId } = React.use(params);
+    const { guildId } = use(params);
     const { locale } = useGuildLocale(guildId);
     const text = strings[locale] || strings.en;
+
     const [roles, setRoles] = useState<Role[]>([]);
     const [channels, setChannels] = useState<Channel[]>([]);
 
-    // Settings State
     const [djRoles, setDjRoles] = useState<Set<string>>(new Set([]));
     const [defaultVolume, setDefaultVolume] = useState<number>(50);
     const [maxDurationEnabled, setMaxDurationEnabled] = useState<boolean>(false);
     const [maxDuration, setMaxDuration] = useState<number>(30);
 
-    // Channel Mode State
     const [channelMode, setChannelMode] = useState<'whitelist' | 'blacklist'>('blacklist');
     const [selectedChannels, setSelectedChannels] = useState<Set<string>>(new Set([]));
 
-    // UI State
     const [isSaving, setIsSaving] = useState(false);
     const [initialLoaded, setInitialLoaded] = useState(false);
 
-    // Store initial values for comparison
+    // Dummy player state
+    const [isPlaying, setIsPlaying] = useState(false);
+    const [progress, setProgress] = useState(0);
+
     const initialValues = useRef({
         djRoles: new Set<string>(),
         channelMode: 'blacklist' as 'whitelist' | 'blacklist',
@@ -122,33 +103,21 @@ export default function MusicSettingsPage({ params }: { params: Promise<{ guildI
     });
 
     useEffect(() => {
-        // Load Roles
-        fetch(`/api/guilds/${guildId}/roles`)
-            .then(res => res.json())
-            .then(data => {
-                if (Array.isArray(data)) setRoles(data);
-            })
-            .catch(err => console.error('Failed to load roles:', err));
+        fetch(`/api/guilds/${guildId}/roles`).then(res => res.json()).then(data => {
+            if (Array.isArray(data)) setRoles(data);
+        }).catch(() => { });
 
-        // Load Channels
-        fetch(`/api/guilds/${guildId}/channels`)
-            .then(res => res.json())
-            .then(data => {
-                if (Array.isArray(data)) setChannels(data);
-            })
-            .catch(err => console.error('Failed to load channels:', err));
+        fetch(`/api/guilds/${guildId}/channels`).then(res => res.json()).then(data => {
+            if (Array.isArray(data)) setChannels(data);
+        }).catch(() => { });
 
         const loadConfig = async () => {
             try {
                 const res = await fetch(`/api/guilds/${guildId}/music`);
-                if (!res.ok) {
-                    const text = await res.text().catch(() => '');
-                    throw new Error(text || `Music API returned ${res.status}`);
-                }
+                if (!res.ok) return;
                 const data = await res.json();
                 if (data.config) {
                     const config = data.config;
-
                     const loadedChannelMode = config.channelMode || 'blacklist';
                     const loadedChannels = config.allowedChannels ? JSON.parse(config.allowedChannels) : [];
                     const loadedRoles = config.djRoles ? JSON.parse(config.djRoles) : [];
@@ -159,7 +128,6 @@ export default function MusicSettingsPage({ params }: { params: Promise<{ guildI
                     setDjRoles(new Set(loadedRoles));
                     setDefaultVolume(loadedVolume);
 
-                    // Store initial values
                     initialValues.current = {
                         djRoles: new Set(loadedRoles),
                         channelMode: loadedChannelMode,
@@ -169,8 +137,6 @@ export default function MusicSettingsPage({ params }: { params: Promise<{ guildI
                         maxDuration: 30,
                     };
                 }
-            } catch (err) {
-                console.error('Failed to load music config:', err);
             } finally {
                 setInitialLoaded(true);
             }
@@ -179,16 +145,13 @@ export default function MusicSettingsPage({ params }: { params: Promise<{ guildI
         loadConfig();
     }, [guildId]);
 
-    // Calculate if current state differs from initial values
     const isDirty = useMemo(() => {
         if (!initialLoaded) return false;
-
         const setsEqual = (a: Set<string>, b: Set<string>) => {
             if (a.size !== b.size) return false;
             for (const item of a) if (!b.has(item)) return false;
             return true;
         };
-
         return (
             !setsEqual(djRoles, initialValues.current.djRoles) ||
             channelMode !== initialValues.current.channelMode ||
@@ -199,7 +162,6 @@ export default function MusicSettingsPage({ params }: { params: Promise<{ guildI
         );
     }, [initialLoaded, djRoles, channelMode, selectedChannels, defaultVolume, maxDuration, maxDurationEnabled]);
 
-    // Save handler
     const handleSave = async () => {
         setIsSaving(true);
         try {
@@ -215,7 +177,6 @@ export default function MusicSettingsPage({ params }: { params: Promise<{ guildI
                 }),
             });
             if (response.ok) {
-                // Update initial values after successful save
                 initialValues.current = {
                     djRoles: new Set(djRoles),
                     channelMode,
@@ -224,17 +185,12 @@ export default function MusicSettingsPage({ params }: { params: Promise<{ guildI
                     maxDurationEnabled,
                     maxDuration,
                 };
-            } else {
-                console.error('Failed to save config');
             }
-        } catch (error) {
-            console.error('Error saving config:', error);
         } finally {
             setIsSaving(false);
         }
     };
 
-    // Reset handler
     const handleReset = () => {
         setDjRoles(new Set([]));
         setChannelMode('blacklist');
@@ -245,298 +201,214 @@ export default function MusicSettingsPage({ params }: { params: Promise<{ guildI
     };
 
     return (
-        <>
-            <div className="space-y-8 pb-10 animate-fade-in relative min-h-screen">
-                <div className="flex items-center gap-4 mb-4">
-                    <div className="w-16 h-16 rounded-[24px] bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 flex items-center justify-center text-white shadow-xl border border-white/5">
-                        <MusicNote size={32} weight="fill" className="text-violet-400" />
-                    </div>
-                    <div>
-                        <h1 className="text-4xl font-extrabold tracking-tight bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent">
-                            {text.pageTitle}
-                        </h1>
-                        <p className="text-default-500 text-lg">{text.pageSubtitle}</p>
-                    </div>
+        <div className="space-y-8 pb-32 animate-fade-in max-w-[1000px] w-full mx-auto">
+            {/* Player Interface Component */}
+            <div className="w-full bg-[var(--surface-card)] border border-[var(--border-subtle)] rounded-[32px] overflow-hidden shadow-2xl shadow-black/50 p-8 flex flex-col md:flex-row gap-8 items-center bg-gradient-to-br from-[#111111] to-[#0a0a0a]">
+
+                {/* Album Cover Area */}
+                <div className="w-48 h-48 md:w-64 md:h-64 rounded-2xl bg-[var(--surface-hover)] border border-[var(--border-subtle)] flex items-center justify-center shadow-lg shrink-0 relative overflow-hidden group">
+                    <div className="absolute inset-0 bg-gradient-to-tr from-[#8f5eff]/20 to-transparent mix-blend-overlay"></div>
+                    <MusicNote size={64} weight="duotone" className="text-[var(--text-muted)] group-hover:scale-110 transition-transform duration-500" />
+                    {!isPlaying && <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"><PlayCircle size={48} weight="fill" className="text-white drop-shadow-md" /></div>}
                 </div>
 
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
+                {/* Track Info & Controls */}
+                <div className="flex-1 w-full space-y-6 flex flex-col justify-center">
+                    <div className="text-center md:text-left">
+                        <h2 className="text-3xl font-bold text-[var(--text-primary)] mb-1 tracking-tight">{text.currentlyPlaying}</h2>
+                        <p className="text-lg text-[var(--color-primary-2)] font-medium">{text.artist}</p>
+                    </div>
 
-                    {/* Top Row: Left - DJ Roles */}
-                    <Card className="bg-[#181A20] border border-white/5 shadow-xl rounded-[32px] overflow-visible group hover:border-white/10 transition-colors h-full">
-                        <CardBody className="p-8">
-                            <div className="flex items-center gap-4 mb-8">
-                                <div className="w-14 h-14 rounded-2xl bg-fuchsia-500/10 flex items-center justify-center text-fuchsia-500 shadow-inner-lg group-hover:scale-110 transition-transform duration-500">
-                                    <Users size={28} weight="fill" />
-                                </div>
-                                <div>
-                                    <h3 className="text-xl font-bold text-white mb-1">{text.djTitle}</h3>
-                                    <p className="text-default-500 text-sm">{text.djDesc}</p>
-                                </div>
-                            </div>
+                    {/* Progress Bar */}
+                    <div className="space-y-2">
+                        <Slider
+                            aria-label="Track Progress"
+                            size="sm"
+                            step={1}
+                            maxValue={100}
+                            minValue={0}
+                            value={progress}
+                            onChange={(val) => setProgress(val as number)}
+                            classNames={{
+                                track: "h-1.5 bg-[var(--surface-hover)]",
+                                filler: "bg-[var(--color-primary-2)]",
+                                thumb: "w-4 h-4 bg-white hidden group-hover:block"
+                            }}
+                            className="group"
+                        />
+                        <div className="flex justify-between text-xs text-[var(--text-muted)] font-mono tabular-nums">
+                            <span>0:00</span>
+                            <span>-:--</span>
+                        </div>
+                    </div>
 
-                            <Select
-                                id="dj-roles-select"
-                                items={roles}
-                                aria-label={text.djSelectLabel}
-                                variant="faded"
-                                isMultiline={true}
-                                selectionMode="multiple"
-                                placeholder={text.djSelectPlaceholder}
-                                selectedKeys={djRoles}
-                                onSelectionChange={(keys) => setDjRoles(keys as Set<string>)}
-                                classNames={{
-                                    trigger: "bg-[#0A0B0E] border border-white/5 min-h-[100px] rounded-2xl data-[hover=true]:bg-[#0A0B0E] data-[hover=true]:border-white/10 transition-all p-4 items-start",
-                                    value: "text-lg font-medium",
-                                    popoverContent: "bg-[#181A20] border border-white/10 rounded-2xl shadow-2xl",
-                                    listbox: "bg-transparent p-2 gap-1",
-                                    innerWrapper: "pt-1"
-                                }}
-                                listboxProps={{
-                                    itemClasses: { base: "py-2 px-2 min-h-[48px] rounded-xl data-[hover=true]:bg-white/5 text-default-500 data-[selected=true]:bg-white/10" },
-                                }}
-                                renderValue={(items: SelectedItems<Role>) => {
-                                    return (
-                                        <div className="flex flex-wrap gap-2 w-full">
-                                            {items.map((item) => {
-                                                const roleColor = item.data?.color && item.data.color !== '#000000' ? item.data.color : '#3f3f46';
-                                                return (
-                                                    <Chip
-                                                        key={item.key}
-                                                        variant="flat"
-                                                        style={{ backgroundColor: hexToRgba(roleColor, 0.2), color: roleColor }}
-                                                        className="border border-white/5 h-8"
-                                                    >
-                                                        <div className="flex items-center gap-1.5 font-bold">
-                                                            {item.data?.icon && <span>{item.data.icon}</span>}
-                                                            <span>{item.data?.name}</span>
-                                                        </div>
-                                                    </Chip>
-                                                );
-                                            })}
-                                        </div>
-                                    );
-                                }}
-                            >
-                                {(role) => {
-                                    const hasColor = role.color && role.color !== '#000000';
-                                    const textBorderColor = hasColor ? role.color : '#a1a1aa';
-                                    const bgColor = hasColor ? role.color : '#52525b';
-                                    const isSelected = djRoles.has(role.id);
-
-                                    return (
-                                        <SelectItem key={role.id} textValue={role.name}>
-                                            <div className="flex items-center gap-3 w-full">
-                                                <Checkbox isSelected={isSelected} color="secondary" disableAnimation classNames={{ wrapper: "before:border-white/30" }} />
-                                                <div
-                                                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg border bg-gradient-to-r from-white/5 to-transparent flex-1"
-                                                    style={{ borderColor: hexToRgba(bgColor, 0.3) }}
-                                                >
-                                                    {role.icon && <span className="text-lg">{role.icon}</span>}
-                                                    <span className="text-base font-bold" style={{ color: textBorderColor }}>{role.name}</span>
-                                                </div>
-                                            </div>
-                                        </SelectItem>
-                                    );
-                                }}
-                            </Select>
-                        </CardBody>
-                    </Card>
-
-                    {/* Top Row: Right - Playback Settings (Merged) */}
-                    <Card className="bg-[#181A20] border border-white/5 shadow-xl rounded-[32px] overflow-visible group hover:border-white/10 transition-colors h-full">
-                        <CardBody className="p-8 space-y-8">
-                            {/* Volume Section */}
-                            <div className="space-y-6">
-                                <div className="flex items-center gap-4">
-                                    <div className="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-500 shadow-inner-lg group-hover:scale-110 transition-transform duration-500">
-                                        <SpeakerHigh size={24} weight="fill" />
-                                    </div>
-                                    <div className="flex-1">
-                                        <h3 className="text-lg font-bold text-white mb-0.5">{text.volumeTitle}</h3>
-                                        <p className="text-default-500 text-xs">{text.volumeDesc}</p>
-                                    </div>
-                                    <span className="text-3xl font-black text-white tabular-nums">{defaultVolume}<span className="text-xl text-default-500 ml-1">%</span></span>
-                                </div>
-
-                                <Slider
-                                    aria-label="Default Volume"
-                                    size="md"
-                                    step={1}
-                                    maxValue={100}
-                                    minValue={0}
-                                    value={defaultVolume}
-                                    onChange={(value) => setDefaultVolume(value as number)}
-                                    color="success"
-                                    showSteps={false}
-                                    className="w-full"
-                                    classNames={{
-                                        track: "h-2 bg-white/5 border border-white/5",
-                                        filler: "bg-gradient-to-r from-emerald-500 to-teal-400",
-                                        thumb: "w-6 h-6 bg-white border-2 border-emerald-500 shadow-xl after:bg-emerald-500 after:w-1.5 after:h-1.5"
-                                    }}
-                                />
-                            </div>
-
-                            <Divider className="bg-white/5" />
-
-                            {/* Max Duration Section */}
-                            <div className="space-y-6">
-                                <div className="flex items-center gap-4">
-                                    <div className="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-500 shadow-inner-lg group-hover:scale-110 transition-transform duration-500">
-                                        <Clock size={24} weight="fill" />
-                                    </div>
-                                    <div className="flex-1">
-                                        <h3 className="text-lg font-bold text-white mb-0.5">{text.maxDurationTitle}</h3>
-                                        <p className="text-default-500 text-xs">{text.maxDurationDesc}</p>
-                                    </div>
-                                    <Switch
-                                        isSelected={maxDurationEnabled}
-                                        onValueChange={setMaxDurationEnabled}
-                                        color="warning"
-                                        size="sm"
-                                        classNames={{ wrapper: "group-data-[selected=true]:bg-amber-500" }}
-                                    />
-                                </div>
-
-                                <div className={`transition-all duration-300 ease-in-out overflow-hidden ${maxDurationEnabled ? 'max-h-[100px] opacity-100' : 'max-h-0 opacity-0 pointer-events-none'}`}>
-                                    <Input
-                                        type="number"
-                                        placeholder={text.maxDurationPlaceholder}
-                                        value={maxDuration.toString()}
-                                        onValueChange={(value) => setMaxDuration(parseInt(value) || 0)}
-                                        startContent={
-                                            <div className="pointer-events-none flex items-center">
-                                                <span className="text-default-400 text-xs font-bold uppercase mr-2">{text.maxDurationLabel}</span>
-                                            </div>
-                                        }
-                                        endContent={
-                                            <div className="pointer-events-none flex items-center">
-                                                <span className="text-default-400 text-xs font-mono">{text.maxDurationUnit}</span>
-                                            </div>
-                                        }
-                                        classNames={{
-                                            inputWrapper: "bg-[#0A0B0E] border border-white/5 h-12 rounded-xl data-[hover=true]:bg-[#0A0B0E] data-[hover=true]:border-white/10 transition-all",
-                                            input: "text-base font-bold text-right",
-                                        }}
-                                    />
-                                </div>
-                            </div>
-                        </CardBody>
-                    </Card>
-
-                    {/* Bottom Row: Full Width - Voice Channels */}
-                    <Card className="bg-[#181A20] border border-white/5 shadow-xl rounded-[32px] overflow-visible group hover:border-white/10 transition-colors xl:col-span-2">
-                        <CardBody className="p-8">
-                            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-6 mb-8">
-                                <div className="flex items-center gap-4">
-                                    <div className="w-14 h-14 rounded-2xl bg-rose-500/10 flex items-center justify-center text-rose-500 shadow-inner-lg group-hover:scale-110 transition-transform duration-500">
-                                        {channelMode === 'whitelist' ? <CheckCircle size={28} weight="fill" /> : <Prohibit size={28} weight="fill" />}
-                                    </div>
-                                    <div>
-                                        <h3 className="text-xl font-bold text-white mb-1">{text.channelsTitle}</h3>
-                                        <p className="text-default-500 text-sm">
-                                            {selectedChannels.size === 0
-                                                ? text.channelsNone
-                                                : channelMode === 'whitelist'
-                                                    ? text.channelsWhitelist
-                                                    : text.channelsBlacklist}
-                                        </p>
-                                    </div>
-                                </div>
-
-                                <div className="flex bg-[#0A0B0E] p-1.5 rounded-2xl border border-white/5 self-start">
-                                    <Button
-                                        size="sm"
-                                        className={`rounded-xl font-bold transition-all px-6 ${channelMode === 'whitelist' ? 'bg-emerald-500/20 text-emerald-400 shadow-lg' : 'bg-transparent text-default-500'}`}
-                                        onPress={() => setChannelMode('whitelist')}
-                                    >
-                                        {text.whitelist}
-                                    </Button>
-                                    <Button
-                                        size="sm"
-                                        className={`rounded-xl font-bold transition-all px-6 ${channelMode === 'blacklist' ? 'bg-rose-500/20 text-rose-400 shadow-lg' : 'bg-transparent text-default-500'}`}
-                                        onPress={() => setChannelMode('blacklist')}
-                                    >
-                                        {text.blacklist}
-                                    </Button>
-                                </div>
-                            </div>
-
-                            <Select
-                                id="channel-select"
-                                items={channels}
-                                aria-label={text.channelsSelectLabel}
-                                variant="faded"
-                                isMultiline={true}
-                                selectionMode="multiple"
-                                placeholder={text.channelsSelectPlaceholder}
-                                selectedKeys={selectedChannels}
-                                onSelectionChange={(keys) => setSelectedChannels(keys as Set<string>)}
-                                classNames={{
-                                    trigger: "bg-[#0A0B0E] border border-white/5 min-h-[120px] rounded-2xl data-[hover=true]:bg-[#0A0B0E] data-[hover=true]:border-white/10 transition-all p-4 items-start",
-                                    value: "text-lg font-medium",
-                                    popoverContent: "bg-[#181A20] border border-white/10 rounded-2xl shadow-2xl",
-                                    listbox: "bg-transparent p-2 gap-1",
-                                    innerWrapper: "pt-1"
-                                }}
-                                listboxProps={{
-                                    itemClasses: { base: "py-2 px-2 min-h-[48px] rounded-xl data-[hover=true]:bg-white/5 text-default-500 data-[selected=true]:bg-white/10" },
-                                }}
-                                renderValue={(items) => (
-                                    <div className="flex flex-wrap gap-2">
-                                        {items.map((item) => (
-                                            <Chip key={item.key} variant="flat" className="bg-white/5 text-default-200 border border-white/5 h-8 pl-1">
-                                                <div className="flex items-center gap-1 font-bold">
-                                                    <SpeakerHigh size={14} className="text-default-400" />
-                                                    <span>{item.textValue}</span>
-                                                </div>
-                                            </Chip>
-                                        ))}
-                                    </div>
-                                )}
-                            >
-                                {(channel) => (
-                                    <SelectItem key={channel.id} textValue={channel.name}>
-                                        <div className="flex items-center gap-3">
-                                            <SpeakerHigh size={20} className="text-default-400" />
-                                            <span className="text-base font-bold text-white">{channel.name}</span>
-                                        </div>
-                                    </SelectItem>
-                                )}
-                            </Select>
-                        </CardBody>
-                    </Card>
+                    {/* Playback Controls */}
+                    <div className="flex items-center justify-center md:justify-start gap-6">
+                        <button className="text-[var(--text-muted)] hover:text-white transition-colors"><Shuffle size={20} weight="bold" /></button>
+                        <button className="text-[var(--text-primary)] hover:text-[var(--color-primary-2)] transition-colors"><SkipBack size={32} weight="fill" /></button>
+                        <button onClick={() => setIsPlaying(!isPlaying)} className="w-16 h-16 bg-[var(--color-primary-2)] hover:bg-[#a67cff] rounded-full flex items-center justify-center text-white shadow-[0_0_30px_rgba(143,94,255,0.3)] transition-all hover:scale-105 active:scale-95">
+                            {isPlaying ? <PauseCircle size={36} weight="fill" /> : <PlayCircle size={36} weight="fill" />}
+                        </button>
+                        <button className="text-[var(--text-primary)] hover:text-[var(--color-primary-2)] transition-colors"><SkipForward size={32} weight="fill" /></button>
+                        <button className="text-[var(--text-muted)] hover:text-white transition-colors"><Repeat size={20} weight="bold" /></button>
+                    </div>
                 </div>
-
-                {/* Added spacer for floating bar */}
-                <div className="h-24"></div>
             </div>
 
-            {/* Floating Action Bar - Fixed to viewport bottom */}
-            <div className={`fixed bottom-6 left-0 right-0 z-50 flex justify-center px-4 transition-all duration-300 transform ${isDirty ? 'translate-y-0 opacity-100' : 'translate-y-20 opacity-0 pointer-events-none'}`}>
-                <div className="bg-[#181A20]/80 backdrop-blur-xl border border-white/10 shadow-2xl rounded-[24px] p-2 flex gap-3 w-full max-w-2xl transform transition-all duration-300 hover:scale-[1.01] hover:bg-[#181A20]/90">
-                    <Button
-                        color="primary"
-                        size="lg"
-                        className="flex-1 h-14 rounded-2xl font-bold text-lg shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all duration-300"
-                        onPress={handleSave}
-                        isLoading={isSaving}
-                        startContent={!isSaving && <CheckCircle size={24} weight="fill" />}
+            {/* Settings Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                {/* Volume & Configuration */}
+                <div className="bg-[var(--surface-card)] border border-[var(--border-subtle)] rounded-[24px] p-6 space-y-8">
+                    <div className="flex items-center gap-3 border-b border-[var(--border-divider)] pb-4">
+                        <FadersHorizontal size={24} className="text-[var(--color-primary-2)]" weight="duotone" />
+                        <h3 className="font-bold text-lg text-[var(--text-primary)]">{text.volumeTitle} & Config</h3>
+                    </div>
+
+                    <div>
+                        <div className="flex items-center justify-between mb-4">
+                            <span className="text-sm font-bold text-[var(--text-secondary)]">{text.volumeTitle}</span>
+                            <span className="text-xl font-akony text-[var(--text-primary)]">{defaultVolume}%</span>
+                        </div>
+                        <Slider
+                            aria-label="Default Volume"
+                            size="md"
+                            step={1}
+                            maxValue={100}
+                            minValue={0}
+                            value={defaultVolume}
+                            onChange={(value) => setDefaultVolume(value as number)}
+                            classNames={{
+                                track: "h-2 bg-[var(--surface-hover)] border border-[var(--border-subtle)]",
+                                filler: "bg-[var(--color-primary-2)]",
+                                thumb: "w-6 h-6 bg-[var(--surface-card)] border-[4px] border-[var(--color-primary-2)]"
+                            }}
+                        />
+                    </div>
+
+                    <div>
+                        <div className="flex items-center justify-between mb-2">
+                            <div>
+                                <h4 className="font-bold text-sm text-[var(--text-primary)]">{text.maxDurationTitle}</h4>
+                                <p className="text-xs text-[var(--text-muted)]">{text.maxDurationDesc}</p>
+                            </div>
+                            <Switch checked={maxDurationEnabled} onChange={(e) => setMaxDurationEnabled(e.target.checked)} color="secondary" />
+                        </div>
+                        {maxDurationEnabled && (
+                            <div className="mt-4 flex items-center bg-[var(--surface-hover)] rounded-xl border border-[var(--border-divider)] px-4 py-2">
+                                <input
+                                    type="number"
+                                    value={maxDuration}
+                                    onChange={(e) => setMaxDuration(parseInt(e.target.value) || 0)}
+                                    className="bg-transparent text-2xl font-bold text-white w-full outline-none"
+                                />
+                                <span className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">{text.maxDurationUnits}</span>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* Permissions & Channels */}
+                <div className="bg-[var(--surface-card)] border border-[var(--border-subtle)] rounded-[24px] p-6 space-y-8 flex flex-col h-full">
+                    <div className="flex items-center gap-3 border-b border-[var(--border-divider)] pb-4">
+                        <Users size={24} className="text-[var(--color-primary-1)]" weight="duotone" />
+                        <h3 className="font-bold text-lg text-[var(--text-primary)]">Access & Roles</h3>
+                    </div>
+
+                    <div className="space-y-3">
+                        <h4 className="font-bold text-sm text-[var(--text-primary)]">{text.djTitle}</h4>
+                        <Select
+                            items={roles}
+                            aria-label={text.djTitle}
+                            variant="bordered"
+                            isMultiline={true}
+                            selectionMode="multiple"
+                            placeholder={text.djSelectPlaceholder}
+                            selectedKeys={djRoles}
+                            onSelectionChange={(keys) => setDjRoles(keys as Set<string>)}
+                            classNames={{
+                                trigger: "bg-[var(--surface-hover)] border border-[var(--border-divider)] rounded-xl hover:bg-[#1a1a1a] min-h-12",
+                                value: "text-sm",
+                                popoverContent: "bg-[var(--surface-card)] border border-[var(--border-subtle)]",
+                            }}
+                        >
+                            {(role) => (
+                                <SelectItem key={role.id} textValue={role.name}>
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: role.color && role.color !== '#000000' ? role.color : '#ffffff' }}></div>
+                                        <span className="text-sm">{role.name}</span>
+                                    </div>
+                                </SelectItem>
+                            )}
+                        </Select>
+                    </div>
+
+                    <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                            <h4 className="font-bold text-sm text-[var(--text-primary)]">{text.channelsTitle}</h4>
+                            <div className="flex gap-1 bg-[var(--surface-hover)] rounded-lg p-1 border border-[var(--border-divider)]">
+                                <button
+                                    className={`px-3 py-1 text-xs rounded-md font-bold transition-colors ${channelMode === 'whitelist' ? 'bg-[var(--surface-card)] text-[var(--color-primary-1)] shadow-sm' : 'text-[var(--text-muted)]'}`}
+                                    onClick={() => setChannelMode('whitelist')}
+                                >
+                                    {text.whitelist}
+                                </button>
+                                <button
+                                    className={`px-3 py-1 text-xs rounded-md font-bold transition-colors ${channelMode === 'blacklist' ? 'bg-[var(--surface-card)] text-[var(--color-destructive)] shadow-sm' : 'text-[var(--text-muted)]'}`}
+                                    onClick={() => setChannelMode('blacklist')}
+                                >
+                                    {text.blacklist}
+                                </button>
+                            </div>
+                        </div>
+                        <Select
+                            items={channels}
+                            aria-label={text.channelsTitle}
+                            variant="bordered"
+                            isMultiline={true}
+                            selectionMode="multiple"
+                            placeholder={text.channelsSelectPlaceholder}
+                            selectedKeys={selectedChannels}
+                            onSelectionChange={(keys) => setSelectedChannels(keys as Set<string>)}
+                            classNames={{
+                                trigger: "bg-[var(--surface-hover)] border border-[var(--border-divider)] rounded-xl hover:bg-[#1a1a1a] min-h-12",
+                                value: "text-sm",
+                                popoverContent: "bg-[var(--surface-card)] border border-[var(--border-subtle)]",
+                            }}
+                        >
+                            {(channel) => (
+                                <SelectItem key={channel.id} textValue={channel.name}>
+                                    <div className="flex items-center gap-2">
+                                        <SpeakerHigh size={16} className="text-[var(--text-muted)]" />
+                                        <span className="text-sm">{channel.name}</span>
+                                    </div>
+                                </SelectItem>
+                            )}
+                        </Select>
+                    </div>
+                </div>
+
+            </div>
+
+            {/* Floating Action Bar */}
+            <div className={`fixed bottom-8 left-1/2 -translate-x-1/2 z-50 flex justify-center px-4 w-full max-w-lg transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${isDirty ? 'translate-y-0 opacity-100 scale-100' : 'translate-y-24 opacity-0 scale-95 pointer-events-none'}`}>
+                <div className="bg-[var(--surface-card)]/90 backdrop-blur-2xl border border-[var(--border-subtle)] shadow-2xl rounded-full p-2 flex gap-2 w-full">
+                    <button
+                        className="flex-1 h-12 rounded-full font-bold text-sm bg-[var(--color-primary-1)] text-black hover:bg-[#86f27d] transition-colors flex items-center justify-center gap-2"
+                        onClick={handleSave}
+                        disabled={isSaving}
                     >
                         {isSaving ? text.saving : text.saveChanges}
-                    </Button>
-                    <Button
-                        variant="bordered"
-                        size="lg"
-                        className="h-14 w-14 min-w-14 rounded-2xl border-white/10 text-default-500 hover:text-white hover:bg-white/5 hover:border-white/20"
-                        onPress={handleReset}
-                        isIconOnly
-                        aria-label={text.resetDefaults}
+                    </button>
+                    <button
+                        className="h-12 w-12 min-w-12 rounded-full bg-[var(--surface-hover)] hover:bg-[var(--border-divider)] text-[var(--text-secondary)] hover:text-white transition-colors flex items-center justify-center"
+                        onClick={handleReset}
+                        title={text.resetDefaults}
                     >
-                        <ArrowClockwise size={24} weight="bold" />
-                    </Button>
+                        <ArrowClockwise size={20} weight="bold" />
+                    </button>
                 </div>
             </div>
-        </>
+        </div>
     );
 }

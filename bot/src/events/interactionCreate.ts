@@ -1,10 +1,61 @@
-import { Events, Interaction, GuildMember, EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
-import { useMainPlayer, useQueue, QueryType } from 'discord-player';
+import { Events, GuildMember, Interaction } from 'discord.js';
 import logger from '../utils/logger';
+import {
+    buildGuildHelpView,
+    buildHelpModuleEmbed,
+    buildHelpOverviewEmbed,
+    buildHelpSelectRow,
+    HELP_MENU_CUSTOM_ID,
+    getHelpCommandNames,
+    getHelpModules,
+} from '../utils/helpMenu';
+import { getInteractionLocale, t } from '../utils/i18n';
 
 export default {
     name: Events.InteractionCreate,
     async execute(interaction: Interaction) {
+        if (interaction.isAutocomplete()) {
+            if (interaction.commandName !== 'help') return;
+
+            const locale = await getInteractionLocale(interaction);
+            const focused = interaction.options.getFocused().trim().toLowerCase();
+            const { commands } = await import('../handlers/commandHandler');
+
+            const member = interaction.guildId && interaction.guild
+                ? (
+                    interaction.member instanceof GuildMember
+                        ? interaction.member
+                        : await interaction.guild.members.fetch(interaction.user.id).catch(() => null)
+                )
+                : null;
+            if (interaction.guildId && interaction.guild && !member) {
+                await interaction.respond([]);
+                return;
+            }
+            const parentChannelId = interaction.channel && 'parentId' in interaction.channel ? interaction.channel.parentId : null;
+            const commandNames = interaction.guildId && interaction.guild && member
+                ? (await buildGuildHelpView(locale, commands, member, {
+                    channelId: interaction.channelId,
+                    parentChannelId,
+                })).commandNames
+                : getHelpCommandNames(getHelpModules(locale, commands));
+
+            const matches = commandNames
+                .filter((commandName) => commandName.includes(focused))
+                .slice(0, 25)
+                .map((commandName) => ({
+                    name: `/${commandName}`,
+                    value: commandName,
+                }));
+
+            try {
+                await interaction.respond(matches);
+            } catch (error) {
+                logger.error('Error responding to help autocomplete:', error);
+            }
+            return;
+        }
+
         // ----- Slash command handling -----
         if (interaction.isChatInputCommand()) {
             const { commands } = await import('../handlers/commandHandler');
@@ -91,172 +142,68 @@ export default {
             return;
         }
 
-        // ----- Search Menu Handling -----
-        if (interaction.isStringSelectMenu()) {
-            const player = useMainPlayer();
-            if (!player) return;
+        if (interaction.isStringSelectMenu() && interaction.customId.startsWith(`${HELP_MENU_CUSTOM_ID}:`)) {
+            const locale = await getInteractionLocale(interaction);
+            const [, ownerId] = interaction.customId.split(':');
 
-            if (interaction.customId === 'platform_select') {
-                await interaction.deferUpdate();
+            if (interaction.user.id !== ownerId) {
+                await interaction.reply({
+                    content: t(locale, 'general.notForYou'),
+                    ephemeral: true,
+                });
+                return;
+            }
 
-                // Extract query from message content: "Found X tracks for "**query**""
-                const content = interaction.message.content;
-                const match = content.match(/\*\*(.*?)\*\*/);
-                if (!match) {
-                    await interaction.followUp({ content: 'Could not retrieve query from message.', ephemeral: true });
-                    return;
-                }
-                const query = match[1];
-                const searchEngine = interaction.values[0];
+            const { commands } = await import('../handlers/commandHandler');
+            const member = interaction.guildId && interaction.guild
+                ? (
+                    interaction.member instanceof GuildMember
+                        ? interaction.member
+                        : await interaction.guild.members.fetch(interaction.user.id).catch(() => null)
+                )
+                : null;
+            if (interaction.guildId && interaction.guild && !member) {
+                await interaction.reply({
+                    content: t(locale, 'general.error'),
+                    ephemeral: true,
+                });
+                return;
+            }
+            const parentChannelId = interaction.channel && 'parentId' in interaction.channel ? interaction.channel.parentId : null;
+            const modules = interaction.guildId && interaction.guild && member
+                ? (await buildGuildHelpView(locale, commands, member, {
+                    channelId: interaction.channelId,
+                    parentChannelId,
+                })).modules
+                : getHelpModules(locale, commands);
+            const moduleId = interaction.values[0] ?? 'all';
+            const activeModuleId = moduleId !== 'all' && !modules.some((module) => module.id === moduleId)
+                ? 'all'
+                : moduleId;
+            const embed = activeModuleId === 'all'
+                ? buildHelpOverviewEmbed(locale, modules)
+                : buildHelpModuleEmbed(activeModuleId, locale, modules);
 
-                try {
-                    const searchResult = await player.search(query, {
-                        requestedBy: interaction.user,
-                        searchEngine: searchEngine as any
-                    });
+            try {
+                await interaction.update({
+                    embeds: [embed],
+                    components: [buildHelpSelectRow(ownerId, locale, modules, activeModuleId)],
+                });
+            } catch (error) {
+                logger.error('Error updating help menu:', error);
+                const replyOpts = {
+                    content: t(locale, 'general.error'),
+                    ephemeral: true,
+                };
 
-                    if (!searchResult || searchResult.tracks.length === 0) {
-                        await interaction.followUp({ content: `No results found on ${searchEngine}`, ephemeral: true });
-                        return;
-                    }
-                } catch (error) {
-                    logger.error('[Search] Error:', error);
-                    await interaction.followUp({ content: 'Error searching.', ephemeral: true });
-                }
-            } else if (interaction.customId === 'track_select') {
-                const url = interaction.values[0];
-                const member = interaction.member as GuildMember;
-
-                logger.info(`[Track Select] User ${interaction.user.tag} selected: ${url}`);
-
-                if (!member.voice.channel) {
-                    await interaction.reply({ content: 'You need to be in a Voice Channel!', ephemeral: true });
-                    return;
-                }
-
-                logger.info(`[Track Select] Voice channel: ${member.voice.channel.name}`);
-                await interaction.deferUpdate(); // Acknowledge
-
-                try {
-                    logger.info(`[Track Select] Calling player.play() with url: ${url}`);
-
-                    const playResult = await player.play(member.voice.channel, url, {
-                        requestedBy: interaction.user,
-                        nodeOptions: {
-                            metadata: interaction,
-                            leaveOnEmpty: true,
-                            leaveOnEmptyCooldown: 300000,
-                            leaveOnEnd: false,
-                            leaveOnStop: false,
-                        }
-                    });
-
-                    logger.info(`[Track Select] player.play() returned:`, {
-                        track: playResult.track?.title,
-                        trackUrl: playResult.track?.url,
-                        searchResult: !!playResult.searchResult,
-                        queueId: playResult.queue?.id
-                    });
-
-                    // Success - delete the search menu or replace with success message
-                    await interaction.editReply({ content: `**${playResult.track.title}** added to queue!`, components: [] });
-
-                    logger.info(`[Track Select] Updated interaction reply successfully`);
-                } catch (error) {
-                    logger.error('[Track Select] Play Error:', error);
-                    await interaction.followUp({ content: `Failed to play: ${error}`, ephemeral: true });
+                if (interaction.replied || interaction.deferred) {
+                    await interaction.followUp(replyOpts).catch(() => null);
+                } else {
+                    await interaction.reply(replyOpts).catch(() => null);
                 }
             }
-        }
-
-        if (interaction.isButton() && interaction.customId === 'cancel_search') {
-            await interaction.message.delete();
             return;
         }
 
-        // ----- Button interaction handling for music player -----
-        if (!interaction.isButton()) return;
-
-        const validIds = ['previous', 'pause', 'skip', 'stop', 'loop_track', 'loop_queue', 'shuffle', 'vol_down', 'vol_up', 'queue'];
-        if (!validIds.includes(interaction.customId)) return;
-
-        // Ensure we have a player instance
-        const player = useMainPlayer();
-        if (!player) {
-            logger.error('[Button] No player instance found.');
-            return interaction.reply({ content: 'Player is not ready.', ephemeral: true });
-        }
-
-        // Retrieve the queue for this guild
-        const guildId = interaction.guildId;
-        if (!guildId) {
-            logger.error('[Button] Interaction missing guildId.');
-            return interaction.reply({ content: 'Unable to identify server.', ephemeral: true });
-        }
-        let queue = useQueue(guildId);
-        if (!queue && player.nodes) {
-            // Fallback: directly access player nodes if useQueue fails
-            queue = player.nodes.get(guildId) ?? null;
-        }
-        logger.debug(`[Button] GuildId: ${guildId}, Queue exists: ${!!queue}`);
-        if (!queue) {
-            return interaction.reply({ content: 'No music queue found for this server!', ephemeral: true });
-        }
-
-        // Verify the user is in the same voice channel as the bot
-        const member = interaction.member as GuildMember;
-        if (member.voice.channelId !== interaction.guild?.members.me?.voice.channelId) {
-            return interaction.reply({ content: 'You need to be in the same voice channel as the bot!', ephemeral: true });
-        }
-
-        // Defer the button update to avoid "this interaction failed" messages
-        await interaction.deferUpdate();
-
-        // Execute the appropriate action
-        switch (interaction.customId) {
-            case 'previous':
-                if (queue.history.previousTrack) await queue.history.back();
-                break;
-            case 'pause':
-                queue.node.setPaused(!queue.node.isPaused());
-                break;
-            case 'skip':
-                queue.node.skip();
-                break;
-            case 'stop':
-                queue.delete();
-                break;
-            case 'loop_track':
-                // Toggle between TRACK (1) and OFF (0)
-                queue.setRepeatMode(queue.repeatMode === 1 ? 0 : 1);
-                break;
-            case 'loop_queue':
-                // Toggle between QUEUE (2) and OFF (0)
-                queue.setRepeatMode(queue.repeatMode === 2 ? 0 : 2);
-                break;
-            case 'shuffle':
-                queue.tracks.shuffle();
-                break;
-            case 'vol_down':
-                queue.node.setVolume(Math.max(10, queue.node.volume - 10));
-                break;
-            case 'vol_up':
-                queue.node.setVolume(Math.min(150, queue.node.volume + 10));
-                break;
-            case 'queue':
-                const embed = new EmbedBuilder()
-                    .setTitle('Current Queue')
-                    .setColor('#2f3136');
-                if (queue.tracks?.data?.length === 0) {
-                    embed.setDescription('Queue is empty');
-                } else {
-                    const description = queue.tracks.data
-                        .map((t: any, i: number) => `${i + 1}. ${t.title}`)
-                        .join('\n');
-                    embed.setDescription(description);
-                }
-                await interaction.followUp({ embeds: [embed], ephemeral: true });
-                break;
-        }
     },
 };

@@ -39,7 +39,7 @@ const strings = {
         totalPlaytime: 'Total Playtime',
         topGame: 'Top Game',
         hours: 'h',
-        minutes: 'm',
+        minutes: 'min',
     },
     ru: {
         title: 'Активности',
@@ -76,7 +76,8 @@ export default function ActivitiesPage() {
     const formatSeconds = (seconds: number) => {
         const h = Math.floor(seconds / 3600);
         const m = Math.floor((seconds % 3600) / 60);
-        return `${h}${text.hours} ${m}${text.minutes}`;
+        if (h > 0) return `${h}\u00A0${text.hours} ${m}\u00A0${text.minutes}`;
+        return `${m}\u00A0${text.minutes}`;
     };
 
     const handleSync = async () => {
@@ -112,50 +113,13 @@ export default function ActivitiesPage() {
     return (
         <div className="p-6 space-y-6 min-h-screen">
             {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-500/20 to-blue-500/20 border border-cyan-500/10 flex items-center justify-center backdrop-blur-sm shadow-xl flex-shrink-0">
-                        <GameController size={32} weight="fill" className="text-cyan-500 drop-shadow-lg" />
-                    </div>
-                    <div>
-                        <h1 className="text-3xl font-black text-white tracking-tight">{text.title}</h1>
-                        <p className="text-default-400 font-medium">{text.subtitle}</p>
-                    </div>
+            <div className="flex items-center gap-4 mb-2">
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-500/20 to-blue-500/20 border border-cyan-500/10 flex items-center justify-center backdrop-blur-sm shadow-xl flex-shrink-0">
+                    <GameController size={32} weight="fill" className="text-cyan-500 drop-shadow-lg" />
                 </div>
-
-                <div className="flex items-center gap-3 bg-[#18181b]/40 p-1.5 rounded-2xl border border-white/5 backdrop-blur-md w-full md:w-auto">
-                    <Button
-                        isIconOnly
-                        variant="flat"
-                        color="primary"
-                        isLoading={syncing}
-                        onPress={handleSync}
-                        className="bg-primary/10 text-primary w-10 h-10 flex-shrink-0"
-                    >
-                        {!syncing && <ArrowsClockwise size={20} weight="bold" />}
-                    </Button>
-                    <div className="h-6 w-px bg-white/10 mx-1" />
-                    <Select
-                        labelPlacement="outside"
-                        selectedKeys={[period]}
-                        onChange={(e) => setPeriod(e.target.value)}
-                        className="flex-1 md:w-40"
-                        classNames={{
-                            trigger: "bg-transparent shadow-none hover:bg-white/5 border-0 min-h-10 h-10 justify-between",
-                            value: "text-small font-medium group-data-[has-value=true]:text-white",
-                            popoverContent: "bg-[#18181b] border border-white/10 dark"
-                        }}
-                        startContent={<CalendarCheck className="text-default-400" size={16} />}
-                        disallowEmptySelection
-                    >
-                        <SelectItem key="24h">{text.day1}</SelectItem>
-                        <SelectItem key="3d">{text.day3}</SelectItem>
-                        <SelectItem key="7d">{text.day7}</SelectItem>
-                        <SelectItem key="14d">{text.day14}</SelectItem>
-                        <SelectItem key="30d">{text.day30}</SelectItem>
-                        <SelectItem key="90d">{text.month3}</SelectItem>
-                        <SelectItem key="365d">{text.year1}</SelectItem>
-                    </Select>
+                <div>
+                    <h1 className="text-3xl font-black text-white tracking-tight">{text.title}</h1>
+                    <p className="text-default-400 font-medium">{text.subtitle}</p>
                 </div>
             </div>
 
@@ -163,7 +127,7 @@ export default function ActivitiesPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <StatsCard
                     title={text.totalPlaytime}
-                    value={`${totalHours}${text.hours}`}
+                    value={`${totalHours}\u00A0${text.hours}`}
                     icon={<Clock size={24} weight="fill" />}
                     loading={loading}
                     className="border-cyan-500/20"
@@ -205,7 +169,7 @@ export default function ActivitiesPage() {
                                                             {activity.name}
                                                         </div>
                                                         <div className="text-xs text-default-400 font-mono">
-                                                            {hours}{text.hours} {mins}{text.minutes}
+                                                            {hours}\u00A0{text.hours} {mins}\u00A0{text.minutes}
                                                         </div>
                                                     </div>
                                                 </div>
@@ -248,6 +212,7 @@ export default function ActivitiesPage() {
                                 type="pie"
                                 valueFormatter={formatSeconds}
                                 totalValue={totalSeconds}
+                                locale={locale}
                                 icon={<Clock size={20} />}
                                 hideLegend
                                 hideHeader

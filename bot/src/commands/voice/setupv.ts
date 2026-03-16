@@ -6,7 +6,9 @@ import {
     ButtonBuilder,
     ButtonStyle,
     EmbedBuilder,
+    GuildMember,
 } from 'discord.js';
+import { hasGuildPermissionAccess } from '../../services/ModerationService';
 import { prisma } from '../../utils/database';
 import { getGuildLocale, t } from '../../utils/i18n';
 import logger from '../../utils/logger';
@@ -55,6 +57,8 @@ const command: Command = {
                 .setMinValue(0)
                 .setMaxValue(99)
         ) as any,
+    accessGroup: 'voice',
+    accessKey: 'setupv',
     async execute(interaction) {
         const locale = await getGuildLocale(interaction.guildId);
 
@@ -63,7 +67,16 @@ const command: Command = {
             return;
         }
 
-        if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageChannels)) {
+        const member = interaction.member instanceof GuildMember
+            ? interaction.member
+            : await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
+
+        if (!member) {
+            await interaction.reply({ content: 'Unable to resolve your guild member state.', ephemeral: true });
+            return;
+        }
+
+        if (!hasGuildPermissionAccess(member, PermissionFlagsBits.ManageChannels)) {
             await interaction.reply({ content: t(locale, 'setupv.notManager'), ephemeral: true });
             return;
         }

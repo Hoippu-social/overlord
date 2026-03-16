@@ -37,11 +37,6 @@ export const useGuildLocale = (guildId?: string) => {
         return () => window.removeEventListener(LOCALE_EVENT, handleLocaleChange);
     }, []);
 
-    useEffect(() => {
-        // Keep hook reactive to guild changes but do not override dashboard locale automatically.
-        setLocaleState(getStoredLocale());
-    }, [guildId]);
-
     const setLocale = (next: LocaleCode) => {
         const normalized = normalizeLocale(next);
         setStoredLocale(normalized);
@@ -49,4 +44,22 @@ export const useGuildLocale = (guildId?: string) => {
     };
 
     return { locale, setLocale };
+};
+
+export const useGuildTimezone = (guildId?: string) => {
+    const [timezone, setTimezone] = useState<string>('Europe/Moscow');
+
+    useEffect(() => {
+        if (!guildId) return;
+        fetch(`/api/guilds/${guildId}/bot-settings`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.config && data.config.timezone) {
+                    setTimezone(data.config.timezone);
+                }
+            })
+            .catch(() => { });
+    }, [guildId]);
+
+    return timezone;
 };

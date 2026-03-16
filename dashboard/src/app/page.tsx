@@ -101,15 +101,18 @@ export default function Home() {
     <div className="bg-[#1e1e1e] text-[#e8e8e8] selection:bg-[#8f5eff]/30 overflow-x-hidden">
 
       {/* ══════════════ NAV ══════════════ */}
-      <nav className="fixed top-0 w-full z-50 mix-blend-difference">
-        <div className="max-w-[1400px] mx-auto px-8 h-20 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <img src="/logos/logo-white.svg" alt="" className="w-8 h-8 object-contain" />
+      <nav className="fixed top-6 w-full z-50 pointer-events-none">
+        <div className="max-w-[1400px] mx-auto px-8 flex items-center justify-between pointer-events-none">
+          {/* Logo Block */}
+          <div className="flex items-center gap-3 bg-[#141414]/90 backdrop-blur-md border border-white/10 px-5 py-3 rounded-2xl pointer-events-auto shadow-lg">
+            <img src="/logos/logo-color.svg" alt="" className="w-8 h-8 object-contain" />
             <span className="font-akony text-[20px] tracking-[.15em] text-white leading-none mt-1">
               OVERLORD
             </span>
           </div>
-          <div className="flex items-center gap-4 text-white">
+
+          {/* Actions Block */}
+          <div className="flex items-center gap-4 text-white bg-[#141414]/90 backdrop-blur-md border border-white/10 px-5 py-3 rounded-2xl pointer-events-auto shadow-lg">
             <button
               onClick={() => setLang(lang === "en" ? "ru" : "en")}
               className="w-8 h-8 rounded-full flex items-center justify-center border border-white/50 hover:border-white transition-colors"

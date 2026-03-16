@@ -43,7 +43,11 @@ export function SyncProgressBar({ guildId, onSyncComplete }: SyncProgressBarProp
         }
 
         try {
-            const response = await fetch(`/api/guilds/${guildId}/stats/sync/status`);
+            // Prevent Next.js from caching GET requests containing the sync status
+            const response = await fetch(`/api/guilds/${guildId}/stats/sync/status?t=${Date.now()}`, {
+                cache: 'no-store',
+                headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+            });
             const data: SyncStatus = await response.json();
 
             setStatus(data);
@@ -59,11 +63,11 @@ export function SyncProgressBar({ guildId, onSyncComplete }: SyncProgressBarProp
                 wasRunningRef.current = false;
                 if (data.progress === 100 && onSyncComplete) onSyncComplete();
 
-                // Auto-hide after 3 seconds
+                // Auto-hide after 1 second
                 if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
                 hideTimeoutRef.current = setTimeout(() => {
                     setVisible(false);
-                }, 3000);
+                }, 1000);
             }
         } catch (error) {
             console.error('[SyncProgress] Failed to fetch status:', error);
@@ -76,7 +80,11 @@ export function SyncProgressBar({ guildId, onSyncComplete }: SyncProgressBarProp
         // Auto-sync logic
         const checkAndSync = async () => {
             try {
-                const statusRes = await fetch(`/api/guilds/${guildId}/stats/sync/status`);
+                // Also prevent caching on the initial check
+                const statusRes = await fetch(`/api/guilds/${guildId}/stats/sync/status?t=${Date.now()}`, {
+                    cache: 'no-store',
+                    headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+                });
                 const status = await statusRes.json();
 
                 if (status.isRunning) return;

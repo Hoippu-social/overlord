@@ -3,12 +3,12 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Card, CardBody, CardFooter, Image, Button, Spinner, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem } from "@nextui-org/react";
+import { Image, Button, Spinner } from "@nextui-org/react";
 import { motion } from "framer-motion";
-import { SignOut, Moon, Sun, List, CaretRight } from "@phosphor-icons/react";
-import { useTheme } from "next-themes";
+import { SignOut, CaretRight, RocketLaunch } from "@phosphor-icons/react";
 import { signOut } from 'next-auth/react';
 import { getStoredLocale } from '@/lib/i18n';
+import { FastAverageColor } from 'fast-average-color';
 
 interface Guild {
     id: string;
@@ -21,8 +21,6 @@ const strings = {
         loadingServers: 'Loading servers...',
         title: 'Select a Server',
         subtitle: 'Choose a server to manage',
-        themeLight: 'Light Mode',
-        themeDark: 'Dark Mode',
         logout: 'Logout',
         manageSettings: 'Manage settings',
         unknownServer: 'Unknown Server',
@@ -32,8 +30,6 @@ const strings = {
         loadingServers: 'Загрузка серверов...',
         title: 'Выберите сервер',
         subtitle: 'Выберите сервер для управления',
-        themeLight: 'Светлая тема',
-        themeDark: 'Тёмная тема',
         logout: 'Выйти',
         manageSettings: 'Управление',
         unknownServer: 'Неизвестный сервер',
@@ -41,11 +37,93 @@ const strings = {
     },
 } as const;
 
+function ServerCard({ guild, index, text }: { guild: Guild, index: number, text: any }) {
+    const [color, setColor] = useState<string | null>(null);
+
+    useEffect(() => {
+        let mounted = true;
+        if (guild.icon) {
+            const fac = new FastAverageColor();
+            const imgUrl = `https://cdn.discordapp.com/icons/${guild.id}/${guild.icon}.png`;
+            fac.getColorAsync(imgUrl, { crossOrigin: 'anonymous' })
+                .then(color => {
+                    if (mounted) setColor(color.hex);
+                })
+                .catch(e => {
+                    console.error('Error getting color:', e);
+                });
+        }
+        return () => { mounted = false; };
+    }, [guild.id, guild.icon]);
+
+    const dominantColor = color || '#75F16A';
+    const shadowColor = color ? `${color}40` : 'rgba(117,241,106,0.1)';
+
+    return (
+        <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: index * 0.1 }}
+            whileHover={{ y: -5 }}
+            whileTap={{ scale: 0.98 }}
+        >
+            <Link href={`/dashboard/${guild.id}`}>
+                <div
+                    className="group relative w-full h-[220px] bg-[#111111] border border-white/[0.06] hover:border-[color:var(--dominant-color)] rounded-[24px] overflow-hidden transition-all duration-500 hover:shadow-[0_0_30px_var(--shadow-color)] flex flex-col items-center justify-center p-6"
+                    style={{
+                        '--dominant-color': dominantColor,
+                        '--shadow-color': shadowColor,
+                    } as React.CSSProperties}
+                >
+                    <div
+                        className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
+                        style={{
+                            background: `linear-gradient(to bottom right, ${dominantColor}15, transparent)`
+                        }}
+                    />
+
+                    <div className="relative mb-5">
+                        {guild.icon ? (
+                            <Image
+                                src={`https://cdn.discordapp.com/icons/${guild.id}/${guild.icon}.png`}
+                                alt={guild.name || text.unknownServer}
+                                className="w-[84px] h-[84px] rounded-[22px] object-cover shadow-2xl border border-white/10 group-hover:scale-110 transition-transform duration-500"
+                                fallbackSrc="https://via.placeholder.com/150"
+                                crossOrigin="anonymous"
+                            />
+                        ) : (
+                            <div className="w-[84px] h-[84px] rounded-[22px] bg-white/[0.04] border border-white/10 flex items-center justify-center text-4xl font-akony text-white/50 shadow-2xl group-hover:scale-110 transition-transform duration-500">
+                                {guild.name?.charAt(0) || '?'}
+                            </div>
+                        )}
+                    </div>
+
+                    <h2
+                        className="text-lg font-bold text-[#e5e5e5] truncate max-w-full text-center px-4 transition-colors duration-300 group-hover:text-[color:var(--dominant-color)]"
+                    >
+                        {guild.name || text.unknownServer}
+                    </h2>
+                    <p className="text-white/40 text-sm mt-1">{text.manageSettings}</p>
+
+                    <div
+                        className="absolute bottom-6 right-6 w-8 h-8 rounded-full bg-white/[0.04] flex items-center justify-center text-white/50 opacity-0 transform translate-x-4 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300 group-hover:text-[color:var(--dominant-color)] overflow-hidden"
+                    >
+                        <div
+                            className="absolute inset-0 opacity-0 group-hover:opacity-20 transition-opacity duration-300"
+                            style={{ backgroundColor: dominantColor }}
+                        />
+                        <CaretRight size={16} weight="bold" className="relative z-10" />
+                    </div>
+                </div>
+            </Link>
+        </motion.div>
+    );
+}
+
 export default function Dashboard() {
     const [guilds, setGuilds] = useState<Guild[]>([]);
     const [loading, setLoading] = useState(true);
     const [mounted, setMounted] = useState(false);
-    const { theme, setTheme } = useTheme();
     const router = useRouter();
     const [locale] = useState(getStoredLocale());
     const text = strings[locale];
@@ -74,54 +152,39 @@ export default function Dashboard() {
         await signOut({ callbackUrl: '/login' });
     };
 
-    const toggleTheme = () => {
-        setTheme(theme === 'light' ? 'dark' : 'light');
-    };
-
     if (loading || !mounted) {
         return (
-            <div className="flex justify-center items-center h-screen bg-background">
-                <Spinner size="lg" color="primary" label={text.loadingServers} />
+            <div className="flex justify-center items-center h-screen bg-[#1a1a1a]">
+                <Spinner size="lg" color="success" label={text.loadingServers} classNames={{ label: "text-[#75F16A]" }} />
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen bg-background text-foreground p-8">
+        <div className="min-h-screen bg-[#1a1a1a] text-[#e5e5e5] p-8 pb-32">
             <div className="max-w-7xl mx-auto">
-                <div className="flex justify-between items-center mb-12">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-16 mt-8">
                     <div>
-                        <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-                            {text.title}
-                        </h1>
-                        <p className="text-default-500 mt-2">{text.subtitle}</p>
+                        <div className="flex items-center gap-4 mb-4">
+                            <div className="w-12 h-12 rounded-[18px] bg-[#75F16A]/10 flex items-center justify-center text-[#75F16A] shadow-lg border border-[#75F16A]/20">
+                                <RocketLaunch size={24} weight="fill" />
+                            </div>
+                            <h1 className="text-4xl font-akony bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent transform translate-y-1">
+                                {text.title}
+                            </h1>
+                        </div>
+                        <p className="text-white/40 text-lg">{text.subtitle}</p>
                     </div>
 
-                    <Dropdown>
-                        <DropdownTrigger>
-                            <Button isIconOnly variant="light" aria-label="Menu">
-                                <List size={24} />
-                            </Button>
-                        </DropdownTrigger>
-                        <DropdownMenu aria-label="Dashboard Actions">
-                            <DropdownItem
-                                key="theme"
-                                startContent={theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
-                                onPress={toggleTheme}
-                            >
-                                {theme === 'dark' ? text.themeLight : text.themeDark}
-                            </DropdownItem>
-                            <DropdownItem
-                                key="logout"
-                                className="text-danger"
-                                color="danger"
-                                startContent={<SignOut size={20} />}
-                                onPress={handleLogout}
-                            >
-                                {text.logout}
-                            </DropdownItem>
-                        </DropdownMenu>
-                    </Dropdown>
+                    <Button
+                        variant="flat"
+                        color="danger"
+                        startContent={<SignOut size={20} weight="bold" />}
+                        onPress={handleLogout}
+                        className="bg-danger/10 text-danger hover:bg-danger/20 font-bold px-6 h-12 rounded-xl"
+                    >
+                        {text.logout}
+                    </Button>
                 </div>
 
                 <motion.div
@@ -131,46 +194,11 @@ export default function Dashboard() {
                     transition={{ duration: 0.5 }}
                 >
                     {guilds.map((guild, index) => (
-                        <motion.div
-                            key={guild.id}
-                            initial={{ opacity: 0, scale: 0.9 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            transition={{ delay: index * 0.1 }}
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
-                        >
-                            <Link href={`/dashboard/${guild.id}`}>
-                                <Card className="w-full h-[220px] bg-surface border border-divider hover:border-primary/50 transition-colors">
-                                    <CardBody className="flex items-center justify-center p-6 overflow-hidden">
-                                        {guild.icon ? (
-                                            <Image
-                                                src={`https://cdn.discordapp.com/icons/${guild.id}/${guild.icon}.png`}
-                                                alt={guild.name || text.unknownServer}
-                                                className="w-24 h-24 rounded-full object-cover shadow-lg"
-                                                fallbackSrc="https://via.placeholder.com/150"
-                                            />
-                                        ) : (
-                                            <div className="w-24 h-24 rounded-full bg-default-100 flex items-center justify-center text-3xl font-bold text-default-500 shadow-lg">
-                                                {guild.name?.charAt(0) || '?'}
-                                            </div>
-                                        )}
-                                    </CardBody>
-                                    <CardFooter className="flex justify-between items-center px-6 pb-6 pt-0">
-                                        <div className="flex flex-col">
-                                            <h2 className="text-xl font-bold truncate max-w-[200px]">{guild.name || text.unknownServer}</h2>
-                                            <p className="text-default-500 text-sm">{text.manageSettings}</p>
-                                        </div>
-                                        <Button isIconOnly variant="light" color="primary" radius="full">
-                                            <CaretRight size={20} weight="bold" />
-                                        </Button>
-                                    </CardFooter>
-                                </Card>
-                            </Link>
-                        </motion.div>
+                        <ServerCard key={guild.id} guild={guild} index={index} text={text} />
                     ))}
 
                     {guilds.length === 0 && (
-                        <div className="col-span-full text-center text-default-500 text-xl mt-10 p-8 border border-dashed border-divider rounded-2xl">
+                        <div className="col-span-full text-center text-white/40 text-lg mt-12 p-12 border border-dashed border-white/10 rounded-3xl bg-[#111111]">
                             {text.noServers}
                         </div>
                     )}

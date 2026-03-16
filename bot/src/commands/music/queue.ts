@@ -11,6 +11,8 @@ const command: Command = {
                 .setMinValue(1)
                 .setRequired(false)
         ) as any,
+    accessGroup: 'music',
+    accessKey: 'queue',
     execute: async (interaction) => {
         const player = interaction.client.lavalink.getPlayer(interaction.guildId!);
 

@@ -1,5 +1,6 @@
 import { ActivityType, Events, Presence } from 'discord.js';
 import { StatsService } from '../services/StatsService';
+import { syncGuildRealtimeCounts } from '../utils/guildSync';
 
 /**
  * Track user activities (games, apps) for statistics.
@@ -22,6 +23,8 @@ export default {
 
         const guildId = newPresence.guild.id;
         const userId = newPresence.userId;
+
+        await syncGuildRealtimeCounts(newPresence.guild);
 
         // Get relevant activities (Playing and Listening only)
         const oldActivities = getTrackableActivities(oldPresence);

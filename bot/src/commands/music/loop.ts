@@ -15,6 +15,8 @@ const command: Command = {
                     { name: '🔁 Повтор очереди', value: 'queue' }
                 )
         ) as any,
+    accessGroup: 'music',
+    accessKey: 'loop',
     execute: async (interaction) => {
         const member = interaction.member as GuildMember;
         const voiceChannel = member.voice.channel;

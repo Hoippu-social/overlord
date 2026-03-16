@@ -6,6 +6,8 @@ const command: Command = {
     data: new SlashCommandBuilder()
         .setName('ping')
         .setDescription('Replies with Pong!'),
+    accessGroup: 'general',
+    accessKey: 'ping',
     execute: async (interaction) => {
         const locale = await getInteractionLocale(interaction);
         await interaction.reply(t(locale, 'general.ping'));

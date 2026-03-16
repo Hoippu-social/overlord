@@ -1,35 +1,360 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma, statsPrisma } from '@/lib/prisma';
+import type { Prisma } from '@prisma/client';
 import { updateSyncStatus } from './status/route';
+import { toZonedTime, fromZonedTime } from 'date-fns-tz';
+import { requireGuildStatsAccess } from '@/lib/statsAccess';
+import { getVoiceSessionBucketDate, getVoiceSessionDurationSeconds } from '@/lib/stats';
+import { withStatsTelemetry } from '@/lib/statsTelemetry';
+
+const isMissingTableError = (error: unknown) => {
+    const err = error as { code?: string; message?: string };
+    if (err?.code === 'P2021') return true;
+    const message = err?.message || '';
+    return message.includes('no such table') || message.includes('does not exist');
+};
+
+async function setAggregationState(
+    guildId: string,
+    data: {
+        timezone: string;
+        rebuildRequired?: boolean;
+        jobStatus: string;
+        lastSuccessfulRebuildAt?: Date;
+        lastReadModelSyncAt?: Date;
+        lastSourceEventAt?: Date;
+    }
+) {
+    try {
+        await statsPrisma.statsAggregationState.upsert({
+            where: { guildId },
+            update: data,
+            create: {
+                guildId,
+                schemaVersion: 1,
+                ...data,
+            },
+        });
+    } catch (error) {
+        if (!isMissingTableError(error)) {
+            throw error;
+        }
+    }
+}
+
+async function aggregateMemberEvents(
+    guildId: string,
+    since: Date,
+    getHourlyEntry: (date: Date) => { joined: number; left: number },
+    getDailyEntry: (date: Date) => { joined: number; left: number }
+) {
+    try {
+        let cursor: number | undefined;
+        let fetched = 0;
+
+        while (true) {
+            const chunk = await statsPrisma.statMemberEvent.findMany({
+                where: {
+                    guildId,
+                    createdAt: { gte: since },
+                },
+                select: {
+                    id: true,
+                    eventType: true,
+                    createdAt: true,
+                },
+                take: 50_000,
+                skip: cursor ? 1 : 0,
+                cursor: cursor ? { id: cursor } : undefined,
+                orderBy: { id: 'asc' },
+            });
+
+            if (chunk.length === 0) break;
+            fetched += chunk.length;
+
+            for (const event of chunk) {
+                if (event.eventType === 'JOIN') {
+                    getHourlyEntry(event.createdAt).joined++;
+                    getDailyEntry(event.createdAt).joined++;
+                } else if (event.eventType === 'LEAVE') {
+                    getHourlyEntry(event.createdAt).left++;
+                    getDailyEntry(event.createdAt).left++;
+                }
+            }
+
+            cursor = chunk[chunk.length - 1].id;
+        }
+
+        return { source: 'StatMemberEvent', fetched };
+    } catch (error) {
+        if (!isMissingTableError(error)) {
+            throw error;
+        }
+
+        let cursor: number | undefined;
+        let fetched = 0;
+
+        while (true) {
+            const chunk: any[] = await statsPrisma.auditLogEvent.findMany({
+                where: {
+                    guildId,
+                    tag: 'invites',
+                    createdAt: { gte: since }
+                },
+                take: 50000,
+                skip: cursor ? 1 : 0,
+                cursor: cursor ? { id: cursor } : undefined,
+                orderBy: { id: 'asc' }
+            });
+            if (chunk.length === 0) break;
+            fetched += chunk.length;
+
+            for (const event of chunk) {
+                if (!event.payload) continue;
+                let payload: { event?: string } = {};
+                try { payload = JSON.parse(event.payload) as { event?: string }; } catch { continue; }
+
+                if (payload.event === 'invite_join') {
+                    getHourlyEntry(event.createdAt).joined++;
+                    getDailyEntry(event.createdAt).joined++;
+                }
+                if (payload.event === 'invite_leave') {
+                    getHourlyEntry(event.createdAt).left++;
+                    getDailyEntry(event.createdAt).left++;
+                }
+            }
+
+            cursor = chunk[chunk.length - 1].id;
+        }
+
+        return { source: 'AuditLogEvent(invites)', fetched };
+    }
+}
+
+type DailyReadModelEntry = {
+    messages: number;
+    voiceSeconds: number;
+    interactions: number;
+};
+
+function getOrCreateDailyEntry<T extends DailyReadModelEntry>(
+    map: Map<string, T>,
+    key: string,
+    factory: () => T
+) {
+    if (!map.has(key)) {
+        map.set(key, factory());
+    }
+    return map.get(key)!;
+}
+
+async function executeOpsInChunks(
+    ops: Prisma.PrismaPromise<unknown>[],
+    guildId: string,
+    progressStart: number,
+    progressSpan: number,
+    messagePrefix: string
+) {
+    if (ops.length === 0) return;
+
+    const chunkSize = 1000;
+    for (let i = 0; i < ops.length; i += chunkSize) {
+        await statsPrisma.$transaction(ops.slice(i, i + chunkSize));
+        const percent = progressStart + Math.floor((i / ops.length) * progressSpan);
+        updateSyncStatus(guildId, {
+            progress: percent,
+            message: `${messagePrefix} ${Math.floor(i / chunkSize) + 1}...`,
+        });
+    }
+}
+
+async function getAggregationState(guildId: string) {
+    try {
+        return await statsPrisma.statsAggregationState.findUnique({
+            where: { guildId },
+            select: {
+                rebuildRequired: true,
+                timezone: true,
+                lastReadModelSyncAt: true,
+            },
+        });
+    } catch (error) {
+        if (isMissingTableError(error)) {
+            return null;
+        }
+        throw error;
+    }
+}
+
+async function getEarliestSourceDate(guildId: string): Promise<Date | null> {
+    const candidates = await Promise.all([
+        statsPrisma.statMessage.findFirst({
+            where: { guildId },
+            orderBy: { createdAt: 'asc' },
+            select: { createdAt: true },
+        }),
+        statsPrisma.statVoiceState.findFirst({
+            where: { guildId },
+            orderBy: { joinedAt: 'asc' },
+            select: { joinedAt: true },
+        }),
+        statsPrisma.statInteraction.findFirst({
+            where: { guildId },
+            orderBy: { createdAt: 'asc' },
+            select: { createdAt: true },
+        }),
+        statsPrisma.statActivity.findFirst({
+            where: { guildId },
+            orderBy: { startTime: 'asc' },
+            select: { startTime: true },
+        }),
+        statsPrisma.statMemberCount.findFirst({
+            where: { guildId },
+            orderBy: { createdAt: 'asc' },
+            select: { createdAt: true },
+        }),
+        statsPrisma.statMemberEvent.findFirst({
+            where: { guildId },
+            orderBy: { createdAt: 'asc' },
+            select: { createdAt: true },
+        }).catch((error) => {
+            if (isMissingTableError(error)) return null;
+            throw error;
+        }),
+        statsPrisma.auditLogEvent.findFirst({
+            where: { guildId, tag: 'invites' },
+            orderBy: { createdAt: 'asc' },
+            select: { createdAt: true },
+        }),
+    ]);
+
+    const dates = candidates
+        .map((entry) => {
+            if (!entry) return null;
+            if ('joinedAt' in entry) return entry.joinedAt;
+            if ('startTime' in entry) return entry.startTime;
+            return entry.createdAt;
+        })
+        .filter((date): date is Date => date instanceof Date);
+
+    if (dates.length === 0) {
+        return null;
+    }
+
+    dates.sort((a, b) => a.getTime() - b.getTime());
+    return dates[0];
+}
+
+function getMinimumDate(values: Iterable<Date>, fallback: Date) {
+    let min = fallback;
+    for (const value of values) {
+        if (value.getTime() < min.getTime()) {
+            min = value;
+        }
+    }
+    return min;
+}
+
+async function clearExistingReadModels(
+    guildId: string,
+    options: {
+        clearAll: boolean;
+        hourlyStart: Date;
+        dailyStart: Date;
+    }
+) {
+    const { clearAll, hourlyStart, dailyStart } = options;
+
+    await statsPrisma.statHourly.deleteMany({
+        where: clearAll
+            ? { guildId }
+            : { guildId, dateHour: { gte: hourlyStart } },
+    });
+
+    await statsPrisma.statDaily.deleteMany({
+        where: clearAll
+            ? { guildId }
+            : { guildId, date: { gte: dailyStart } },
+    });
+
+    try {
+        await statsPrisma.statMemberDaily.deleteMany({
+            where: clearAll
+                ? { guildId }
+                : { guildId, date: { gte: dailyStart } },
+        });
+        await statsPrisma.statChannelDaily.deleteMany({
+            where: clearAll
+                ? { guildId }
+                : { guildId, date: { gte: dailyStart } },
+        });
+    } catch (error) {
+        if (!isMissingTableError(error)) {
+            throw error;
+        }
+    }
+}
 
 export async function POST(
     request: NextRequest,
     { params }: { params: Promise<{ guildId: string }> }
 ) {
     const { guildId } = await params;
+    return withStatsTelemetry({ guildId, endpoint: 'sync', method: 'POST' }, async () => {
+        const access = await requireGuildStatsAccess(request, guildId);
+        if (!access.ok) {
+            return access.response;
+        }
 
-    // Parse request body for custom period
-    let customDays: number | null = null;
-    try {
-        const body = await request.json();
-        customDays = body.days || null;
-    } catch {
-        // No body or invalid JSON, use default
-    }
+        let customDays: number | null = null;
+        try {
+            const body = await request.json();
+            customDays = body.days || null;
+        } catch {
+            // No body or invalid JSON, use default
+        }
 
-    // Determine sync window
-    const SYNC_DAYS = customDays || 90; // Default 3 months
-    const since = new Date();
-    since.setDate(since.getDate() - SYNC_DAYS);
-    since.setHours(0, 0, 0, 0);
+        const DEFAULT_SYNC_DAYS = 90;
+        const defaultSince = new Date();
+        defaultSince.setDate(defaultSince.getDate() - (customDays || DEFAULT_SYNC_DAYS));
+        defaultSince.setHours(0, 0, 0, 0);
 
-    // Date for 30d Top calc
-    const since30d = new Date();
-    since30d.setDate(since30d.getDate() - 30);
-    since30d.setHours(0, 0, 0, 0);
+        const since30d = new Date();
+        since30d.setDate(since30d.getDate() - 30);
+        since30d.setHours(0, 0, 0, 0);
+        let aggregationTimezone = 'UTC';
 
-    try {
-        console.log(`[StatsSync] Starting comprehensive sync for guild ${guildId} for ${SYNC_DAYS} days since ${since.toISOString()}`);
+        try {
+        const existingState = await getAggregationState(guildId);
+
+        // Fetch guild timezone settings
+        const botSettings = await prisma.botSettings.findUnique({
+            where: { guildId },
+            select: { timezone: true }
+        });
+        const tz = botSettings?.timezone || 'UTC';
+        aggregationTimezone = tz;
+
+        let since = new Date(defaultSince);
+        let isFullRebuild = false;
+
+        if (existingState?.rebuildRequired && !customDays) {
+            const earliestSourceDate = await getEarliestSourceDate(guildId);
+            if (earliestSourceDate) {
+                since = new Date(earliestSourceDate);
+                isFullRebuild = true;
+            }
+        }
+
+        await setAggregationState(guildId, {
+            timezone: tz,
+            rebuildRequired: false,
+            jobStatus: 'RUNNING',
+        });
+
+        console.log(
+            `[StatsSync] Starting comprehensive sync for guild ${guildId} since ${since.toISOString()} in timezone ${tz} (fullRebuild=${isFullRebuild})`
+        );
 
         // Initialize progress
         updateSyncStatus(guildId, {
@@ -39,147 +364,241 @@ export async function POST(
             startedAt: new Date()
         });
 
-        // --- 1. Aggregating Messages (from TWO databases) ---
-        updateSyncStatus(guildId, { progress: 10, message: 'Fetching messages from both databases...' });
-
-        // Fetch from stats.db (long term)
-        const statsMessages = await statsPrisma.statMessage.findMany({
-            where: { guildId, createdAt: { gte: since } }
+        updateSyncStatus(guildId, {
+            progress: 20,
+            message: isFullRebuild ? 'Processing full rebuild from source...' : 'Processing total messages...',
         });
-
-        // Fetch from development.db (recent)
-        const devMessages = await prisma.statMessage.findMany({
-            where: { guildId, createdAt: { gte: since } }
-        });
-
-        // Combine and deduplicate (just in case they overlap)
-        const msgMap = new Map();
-        for (const m of statsMessages) msgMap.set(m.id, m);
-        for (const m of devMessages) msgMap.set(m.id, m);
-        const rawMessages = Array.from(msgMap.values());
-
-        console.log(`[StatsSync] Combined ${rawMessages.length} messages (${statsMessages.length} stats, ${devMessages.length} dev)`);
-
-        updateSyncStatus(guildId, { progress: 20, message: `Processing ${rawMessages.length} total messages...` });
 
         // Group by Hour (for StatHourly) and Day (for StatDaily)
         const hourlyStats = new Map<string, { messages: number, voice: number, joined: number, left: number }>();
         const dailyStats = new Map<string, { messages: number, voice: number, joined: number, left: number }>();
+        const memberDailyStats = new Map<string, DailyReadModelEntry & { userId: string; date: Date }>();
+        const channelDailyStats = new Map<string, DailyReadModelEntry & { channelId: string; date: Date }>();
+
+        const tzDayCache = new Map<number, Date>();
+        const tzHourCache = new Map<number, Date>();
+
+        const getTruncatedUTC = (date: Date, truncateTo: 'hour' | 'day'): Date => {
+            const utcHour = Math.floor(date.getTime() / 3600000);
+
+            if (truncateTo === 'day' && tzDayCache.has(utcHour)) return tzDayCache.get(utcHour)!;
+            if (truncateTo === 'hour' && tzHourCache.has(utcHour)) return tzHourCache.get(utcHour)!;
+
+            const zoned = toZonedTime(date, tz);
+            const y = zoned.getUTCFullYear();
+            const m = String(zoned.getUTCMonth() + 1).padStart(2, '0');
+            const d = String(zoned.getUTCDate()).padStart(2, '0');
+            const h = truncateTo === 'hour' ? String(zoned.getUTCHours()).padStart(2, '0') : '00';
+            
+            const localTruncatedStr = `${y}-${m}-${d}T${h}:00:00`;
+            const result = fromZonedTime(localTruncatedStr, tz);
+
+            if (truncateTo === 'day') tzDayCache.set(utcHour, result);
+            if (truncateTo === 'hour') tzHourCache.set(utcHour, result);
+            return result;
+        };
 
         const getHourlyEntry = (date: Date) => {
-            const d = new Date(date);
-            d.setMinutes(0, 0, 0);
-            const key = d.toISOString();
+            const truncated = getTruncatedUTC(date, 'hour');
+            const key = truncated.toISOString();
             if (!hourlyStats.has(key)) hourlyStats.set(key, { messages: 0, voice: 0, joined: 0, left: 0 });
             return hourlyStats.get(key)!;
         };
 
         const getDailyEntry = (date: Date) => {
-            const d = new Date(date);
-            d.setHours(0, 0, 0, 0);
-            const key = d.toISOString();
+            const truncated = getTruncatedUTC(date, 'day');
+            const key = truncated.toISOString();
             if (!dailyStats.has(key)) dailyStats.set(key, { messages: 0, voice: 0, joined: 0, left: 0 });
             return dailyStats.get(key)!;
         };
 
-        // Process Messages
-        for (const msg of rawMessages) {
-            const h = getHourlyEntry(msg.createdAt);
-            h.messages++;
-            const d = getDailyEntry(msg.createdAt);
-            d.messages++;
+        const getMemberDailyEntry = (userId: string, date: Date) => {
+            const truncated = getTruncatedUTC(date, 'day');
+            const key = `${userId}:${truncated.toISOString()}`;
+            return getOrCreateDailyEntry(memberDailyStats, key, () => ({
+                userId,
+                date: truncated,
+                messages: 0,
+                voiceSeconds: 0,
+                interactions: 0,
+            }));
+        };
+
+        const getChannelDailyEntry = (channelId: string, date: Date) => {
+            const truncated = getTruncatedUTC(date, 'day');
+            const key = `${channelId}:${truncated.toISOString()}`;
+            return getOrCreateDailyEntry(channelDailyStats, key, () => ({
+                channelId,
+                date: truncated,
+                messages: 0,
+                voiceSeconds: 0,
+                interactions: 0,
+            }));
+        };
+
+        // Maps for Tops (calculated directly in chunk loops to avoid memory overhead)
+        const topMsgChannelMap = new Map<string, number>();
+        const topMsgMemberMap = new Map<string, number>();
+        const topVoiceChannelMap = new Map<string, number>();
+        const topVoiceMemberMap = new Map<string, number>();
+
+        console.time('[StatsSync] Process Messages Loop');
+        let msgCursor: number | undefined = undefined;
+        let fetchedMsgs = 0;
+        
+        while (true) {
+            const chunk: any[] = await statsPrisma.statMessage.findMany({
+                where: { guildId, createdAt: { gte: since } },
+                take: 50000,
+                skip: msgCursor ? 1 : 0,
+                cursor: msgCursor ? { id: msgCursor } : undefined,
+                orderBy: { id: 'asc' }
+            });
+            if (chunk.length === 0) break;
+            fetchedMsgs += chunk.length;
+
+            for (const msg of chunk) {
+                const h = getHourlyEntry(msg.createdAt);
+                h.messages++;
+                const d = getDailyEntry(msg.createdAt);
+                d.messages++;
+                getMemberDailyEntry(msg.authorId, msg.createdAt).messages++;
+                getChannelDailyEntry(msg.channelId, msg.createdAt).messages++;
+
+                // Inline Top Calculation
+                if (msg.createdAt >= since30d) {
+                    topMsgChannelMap.set(msg.channelId, (topMsgChannelMap.get(msg.channelId) || 0) + 1);
+                    topMsgMemberMap.set(msg.authorId, (topMsgMemberMap.get(msg.authorId) || 0) + 1);
+                }
+            }
+            msgCursor = chunk[chunk.length - 1].id;
         }
+        console.timeEnd('[StatsSync] Process Messages Loop');
+        console.log(`[StatsSync] Fetched and processed ${fetchedMsgs} messages from stats.db`);
 
-        // --- 2. Aggregating Voice (from TWO databases) ---
-        updateSyncStatus(guildId, { progress: 30, message: 'Fetching voice data from both databases...' });
+        // --- 2. Aggregating Voice ---
+        updateSyncStatus(guildId, { progress: 30, message: 'Fetching voice data...' });
 
-        const statsVoice = await statsPrisma.statVoiceState.findMany({
-            where: {
-                guildId,
-                OR: [
-                    { leftAt: { gte: since } },
-                    { leftAt: null, joinedAt: { gte: since } }
-                ]
+        console.time('[StatsSync] Process Voice Loop');
+        let voiceCursor: number | undefined = undefined;
+        let fetchedVoice = 0;
+
+        while (true) {
+            const chunk: any[] = await statsPrisma.statVoiceState.findMany({
+                where: {
+                    guildId,
+                    OR: [
+                        { leftAt: { gte: since } },
+                        { leftAt: null, joinedAt: { gte: since } }
+                    ]
+                },
+                take: 50000,
+                skip: voiceCursor ? 1 : 0,
+                cursor: voiceCursor ? { id: voiceCursor } : undefined,
+                orderBy: { id: 'asc' }
+            });
+            if (chunk.length === 0) break;
+            fetchedVoice += chunk.length;
+
+            for (const session of chunk) {
+                if (!session.joinedAt) continue;
+
+                const duration = getVoiceSessionDurationSeconds(session, new Date());
+                const endDate = getVoiceSessionBucketDate(session, new Date());
+                const h = getHourlyEntry(endDate);
+                h.voice += duration;
+                const d = getDailyEntry(endDate);
+                d.voice += duration;
+                getMemberDailyEntry(session.userId, endDate).voiceSeconds += duration;
+                getChannelDailyEntry(session.channelId, endDate).voiceSeconds += duration;
+
+                // Inline Top Calculation
+                if (endDate >= since30d) {
+                    topVoiceChannelMap.set(session.channelId, (topVoiceChannelMap.get(session.channelId) || 0) + duration);
+                    topVoiceMemberMap.set(session.userId, (topVoiceMemberMap.get(session.userId) || 0) + duration);
+                }
             }
-        });
-
-        const devVoice = await prisma.statVoiceState.findMany({
-            where: {
-                guildId,
-                OR: [
-                    { leftAt: { gte: since } },
-                    { leftAt: null, joinedAt: { gte: since } }
-                ]
-            }
-        });
-
-        // Combine and deduplicate
-        const voiceMap = new Map();
-        for (const v of statsVoice) voiceMap.set(v.id, v);
-        for (const v of devVoice) voiceMap.set(v.id, v);
-        const rawVoice = Array.from(voiceMap.values());
-
-        console.log(`[StatsSync] Combined ${rawVoice.length} voice sessions (${statsVoice.length} stats, ${devVoice.length} dev)`);
-
-        for (const session of rawVoice) {
-            if (!session.joinedAt) continue;
-
-            let duration: number;
-            if (session.duration) {
-                duration = session.duration;
-            } else if (session.leftAt) {
-                duration = Math.floor((session.leftAt.getTime() - session.joinedAt.getTime()) / 1000);
-            } else {
-                duration = Math.floor((Date.now() - session.joinedAt.getTime()) / 1000);
-            }
-            if (duration < 0) duration = 0;
-
-            const endDate = session.leftAt || new Date();
-            const h = getHourlyEntry(endDate);
-            h.voice += duration;
-            const d = getDailyEntry(endDate);
-            d.voice += duration;
+            voiceCursor = chunk[chunk.length - 1].id;
         }
+        console.timeEnd('[StatsSync] Process Voice Loop');
+        console.log(`[StatsSync] Fetched and processed ${fetchedVoice} voice sessions from stats.db`);
 
-        // --- 3. Aggregating Members (Joins/Leaves) from Audit Logs ---
+        // --- 3. Aggregating Interactions for daily read models ---
+        updateSyncStatus(guildId, { progress: 40, message: 'Fetching interactions...' });
+
+        console.time('[StatsSync] Process Interactions Loop');
+        let interactionCursor: number | undefined = undefined;
+        let fetchedInteractions = 0;
+
+        while (true) {
+            const chunk: Array<{ id: number; fromUserId: string; channelId: string; createdAt: Date }> =
+                await statsPrisma.statInteraction.findMany({
+                    where: { guildId, createdAt: { gte: since } },
+                    select: {
+                        id: true,
+                        fromUserId: true,
+                        channelId: true,
+                        createdAt: true,
+                    },
+                    take: 50_000,
+                    skip: interactionCursor ? 1 : 0,
+                    cursor: interactionCursor ? { id: interactionCursor } : undefined,
+                    orderBy: { id: 'asc' },
+                });
+
+            if (chunk.length === 0) break;
+            fetchedInteractions += chunk.length;
+
+            for (const interaction of chunk) {
+                getMemberDailyEntry(interaction.fromUserId, interaction.createdAt).interactions++;
+                getChannelDailyEntry(interaction.channelId, interaction.createdAt).interactions++;
+            }
+
+            interactionCursor = chunk[chunk.length - 1].id;
+        }
+        console.timeEnd('[StatsSync] Process Interactions Loop');
+        console.log(`[StatsSync] Fetched and processed ${fetchedInteractions} interactions from stats.db`);
+
+        // --- 4. Aggregating Members (Joins/Leaves) from Audit Logs ---
         updateSyncStatus(guildId, { progress: 45, message: 'Fetching member events...' });
 
-        const rawMemberEvents = await prisma.auditLogEvent.findMany({
-            where: {
-                guildId,
-                tag: 'invites',
-                createdAt: { gte: since }
-            }
+        console.time('[StatsSync] Process Member Events Loop');
+        const memberEvents = await aggregateMemberEvents(guildId, since, getHourlyEntry, getDailyEntry);
+        console.timeEnd('[StatsSync] Process Member Events Loop');
+        console.log(`[StatsSync] Fetched and processed ${memberEvents.fetched} member events from ${memberEvents.source}`);
+
+        const cleanupHourlyStart = getMinimumDate(
+            Array.from(hourlyStats.keys(), (key) => new Date(key)),
+            since
+        );
+        const cleanupDailyStart = getMinimumDate(
+            [
+                ...Array.from(dailyStats.keys(), (key) => new Date(key)),
+                ...Array.from(memberDailyStats.values(), (entry) => entry.date),
+                ...Array.from(channelDailyStats.values(), (entry) => entry.date),
+            ],
+            since
+        );
+
+        updateSyncStatus(guildId, {
+            progress: 55,
+            message: isFullRebuild ? 'Clearing stale aggregates for full rebuild...' : 'Clearing stale aggregates...',
         });
-        console.log(`[StatsSync] Fetched ${rawMemberEvents.length} member events`);
+        await clearExistingReadModels(guildId, {
+            clearAll: isFullRebuild,
+            hourlyStart: cleanupHourlyStart,
+            dailyStart: cleanupDailyStart,
+        });
 
-        for (const event of rawMemberEvents) {
-            if (!event.payload) continue;
-            let payload: any = {};
-            try { payload = JSON.parse(event.payload); } catch { continue; }
-
-            const eventType = payload.event;
-            const ts = event.createdAt;
-
-            if (eventType === 'invite_join' && ts >= since) {
-                getHourlyEntry(ts).joined++;
-                getDailyEntry(ts).joined++;
-            }
-            if (eventType === 'invite_leave' && ts >= since) {
-                getHourlyEntry(ts).left++;
-                getDailyEntry(ts).left++;
-            }
-        }
-
-        // --- 4. Writing Hourly/Daily to Database (AGGREGATE DATABASE) ---
+        // --- 5. Writing Hourly/Daily to Database (AGGREGATE DATABASE) ---
         updateSyncStatus(guildId, { progress: 60, message: 'Updating hourly/daily records...' });
 
-        const totalHours = hourlyStats.size;
-        let processedHours = 0;
+        const ops: Prisma.PrismaPromise<unknown>[] = [];
 
+        console.time('[StatsSync] Build Upsert Arrays');
         for (const [key, stats] of hourlyStats) {
             const dateHour = new Date(key);
-            await statsPrisma.statHourly.upsert({
+            ops.push(statsPrisma.statHourly.upsert({
                 where: { guildId_dateHour: { guildId, dateHour } },
                 update: {
                     messages: stats.messages,
@@ -194,17 +613,12 @@ export async function POST(
                     newMembers: stats.joined,
                     leftMembers: stats.left
                 }
-            });
-
-            processedHours++;
-            if (processedHours % 50 === 0) {
-                updateSyncStatus(guildId, { progress: 60 + Math.floor((processedHours / totalHours) * 10), message: `Saving hourly data...` });
-            }
+            }));
         }
 
         for (const [key, stats] of dailyStats) {
             const date = new Date(key);
-            await statsPrisma.statDaily.upsert({
+            ops.push(statsPrisma.statDaily.upsert({
                 where: { guildId_date: { guildId, date } },
                 update: {
                     messages: stats.messages,
@@ -219,35 +633,69 @@ export async function POST(
                     newMembers: stats.joined,
                     leftMembers: stats.left
                 }
-            });
+            }));
         }
+        console.timeEnd('[StatsSync] Build Upsert Arrays');
 
-        // --- 5. Calculating Tops (Last 30d) ---
-        updateSyncStatus(guildId, { progress: 80, message: 'Calculating rankings...' });
+        console.time('[StatsSync] Execute Transactions');
+        await executeOpsInChunks(ops, guildId, 60, 10, 'Saving hourly/daily chunk');
+        console.timeEnd('[StatsSync] Execute Transactions');
 
-        // We use combined raw data for tops to be accurate
-        // However, GROUP BY across two databases in Prisma is impossible.
-        // For simplicity and speed, we take the combined rawMessages array from earlier if it was within 30d
+        updateSyncStatus(guildId, { progress: 70, message: 'Updating member/channel daily records...' });
+        try {
+            const readModelOps: Prisma.PrismaPromise<unknown>[] = [];
 
-        const topMsgChannelMap = new Map<string, number>();
-        const topMsgMemberMap = new Map<string, number>();
-
-        for (const m of rawMessages) {
-            if (m.createdAt >= since30d) {
-                topMsgChannelMap.set(m.channelId, (topMsgChannelMap.get(m.channelId) || 0) + 1);
-                topMsgMemberMap.set(m.authorId, (topMsgMemberMap.get(m.authorId) || 0) + 1);
+            for (const stats of memberDailyStats.values()) {
+                readModelOps.push(statsPrisma.statMemberDaily.upsert({
+                    where: { guildId_userId_date: { guildId, userId: stats.userId, date: stats.date } },
+                    update: {
+                        messages: stats.messages,
+                        voiceSeconds: stats.voiceSeconds,
+                        interactions: stats.interactions,
+                    },
+                    create: {
+                        guildId,
+                        userId: stats.userId,
+                        date: stats.date,
+                        messages: stats.messages,
+                        voiceSeconds: stats.voiceSeconds,
+                        interactions: stats.interactions,
+                    }
+                }));
             }
+
+            for (const stats of channelDailyStats.values()) {
+                readModelOps.push(statsPrisma.statChannelDaily.upsert({
+                    where: { guildId_channelId_date: { guildId, channelId: stats.channelId, date: stats.date } },
+                    update: {
+                        messages: stats.messages,
+                        voiceSeconds: stats.voiceSeconds,
+                        interactions: stats.interactions,
+                    },
+                    create: {
+                        guildId,
+                        channelId: stats.channelId,
+                        date: stats.date,
+                        messages: stats.messages,
+                        voiceSeconds: stats.voiceSeconds,
+                        interactions: stats.interactions,
+                    }
+                }));
+            }
+
+            console.time('[StatsSync] Execute Read Model Transactions');
+            await executeOpsInChunks(readModelOps, guildId, 70, 10, 'Saving read-model chunk');
+            console.timeEnd('[StatsSync] Execute Read Model Transactions');
+        } catch (error) {
+            if (!isMissingTableError(error)) {
+                throw error;
+            }
+            console.warn('[StatsSync] Read-model tables are not available yet; skipping StatMemberDaily/StatChannelDaily sync');
         }
 
-        const topVoiceChannelMap = new Map<string, number>();
-        const topVoiceMemberMap = new Map<string, number>();
-        for (const v of rawVoice) {
-            const duration = v.duration || (v.leftAt ? Math.floor((v.leftAt.getTime() - v.joinedAt.getTime()) / 1000) : 0);
-            if (v.joinedAt >= since30d) {
-                topVoiceChannelMap.set(v.channelId, (topVoiceChannelMap.get(v.channelId) || 0) + duration);
-                topVoiceMemberMap.set(v.userId, (topVoiceMemberMap.get(v.userId) || 0) + duration);
-            }
-        }
+        // --- 6. Saving Tops (Last 30d) ---
+        updateSyncStatus(guildId, { progress: 80, message: 'Saving rankings...' });
+        console.time('[StatsSync] Calculate & Save Tops');
 
         // Clean old 30d tops
         await statsPrisma.statTopChannel.deleteMany({ where: { guildId, period: '30D' } });
@@ -278,6 +726,7 @@ export async function POST(
         }
 
         await Promise.all(topPromises);
+        console.timeEnd('[StatsSync] Calculate & Save Tops');
 
         console.log(`[StatsSync] Completed comprehensive sync for ${guildId}.`);
 
@@ -287,6 +736,16 @@ export async function POST(
             message: 'Sync completed',
             finishedAt: new Date(),
             lastSyncDate: new Date()
+        });
+
+        const completedAt = new Date();
+        await setAggregationState(guildId, {
+            timezone: tz,
+            rebuildRequired: false,
+            jobStatus: 'IDLE',
+            lastSuccessfulRebuildAt: completedAt,
+            lastReadModelSyncAt: completedAt,
+            lastSourceEventAt: completedAt,
         });
 
         return NextResponse.json({ success: true });
@@ -299,6 +758,16 @@ export async function POST(
             message: `Sync failed: ${error instanceof Error ? error.message : String(error)}`,
             finishedAt: new Date()
         });
-        return NextResponse.json({ error: 'Sync failed', details: String(error) }, { status: 500 });
-    }
+        try {
+            await setAggregationState(guildId, {
+                timezone: aggregationTimezone,
+                rebuildRequired: true,
+                jobStatus: 'FAILED',
+            });
+        } catch (stateError) {
+            console.error('[StatsSync] Failed to update aggregation state:', stateError);
+        }
+            return NextResponse.json({ error: 'Sync failed', details: String(error) }, { status: 500 });
+        }
+    });
 }

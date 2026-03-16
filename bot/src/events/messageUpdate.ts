@@ -2,7 +2,7 @@ import { Events, Message } from 'discord.js';
 import { processMessageForAiModeration } from '../services/AiModerationService';
 import { processCustomRulesForAutomod, processMessageForAutomod } from '../services/AutomodService';
 import logger from '../utils/logger';
-import { prisma } from '../utils/database';
+import { prisma, statsPrisma } from '../utils/database';
 import { logAuditEvent } from '../utils/auditLog';
 
 function serializeAttachments(message: Message) {
@@ -43,7 +43,7 @@ export default {
         const authorId = newMessage.author?.id || oldMessage.author?.id || null;
 
         try {
-            await prisma.messageEvent.create({
+            await statsPrisma.messageEvent.create({
                 data: {
                     guildId,
                     channelId: newMessage.channelId || oldMessage.channelId,

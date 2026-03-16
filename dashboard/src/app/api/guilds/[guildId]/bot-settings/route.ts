@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getAuthToken } from '@/lib/auth';
 import { canAccessGuild } from '@/lib/discordAccess';
+import { upsertTimezoneRebuildState } from '@/lib/statsControl';
 
 type BotSettingsClient = {
     findUnique: (args: { where: { guildId: string } }) => Promise<unknown>;
@@ -167,6 +168,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
                 timezone: timezone ?? 'UTC',
             }
         });
+
+        if (timezone) {
+            await upsertTimezoneRebuildState(guildId, timezone);
+        }
 
         return NextResponse.json(config);
     } catch (error) {

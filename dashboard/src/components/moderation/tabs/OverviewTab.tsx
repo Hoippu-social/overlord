@@ -1,6 +1,6 @@
 import React from 'react';
-import { ShieldCheck, WarningOctagon, Clock, UserMinus, ShieldSlash, CheckCircle } from '@phosphor-icons/react';
-import { CasesState } from '@/app/dashboard/[guildId]/moderation/types';
+import { ShieldCheck, WarningOctagon, Clock, UserMinus, ShieldSlash, CheckCircle, UserCircle } from '@phosphor-icons/react';
+import { CasesState, ModerationCase } from '@/app/dashboard/[guildId]/moderation/types';
 import { StatsCard } from '@/components/stats/StatsCard';
 import { AnimatedCard, TextField, InteractiveSelect, Badge } from '@/components/moderation/ui';
 import { formatDate } from '@/app/dashboard/[guildId]/moderation/constants';
@@ -9,34 +9,194 @@ interface OverviewTabProps {
     casesState: CasesState;
     locale: 'en' | 'ru';
     tr: (ru: string, en: string) => string;
-    caseFilter: string; setCaseFilter: (v: string) => void;
-    caseNumberFilter: string; setCaseNumberFilter: (v: string) => void;
-    caseStatusFilter: string; setCaseStatusFilter: (v: string) => void;
-    caseActionFilter: string; setCaseActionFilter: (v: string) => void;
-    selectedCaseId: number | null; setSelectedCaseId: (id: number | null) => void;
+    caseFilter: string;
+    setCaseFilter: (v: string) => void;
+    caseNumberFilter: string;
+    setCaseNumberFilter: (v: string) => void;
+    caseStatusFilter: string;
+    setCaseStatusFilter: (v: string) => void;
+    caseActionFilter: string;
+    setCaseActionFilter: (v: string) => void;
+    selectedCaseId: number | null;
+    setSelectedCaseId: (id: number | null) => void;
+}
+
+type CaseUserProfile = NonNullable<ModerationCase['targetProfile']>;
+
+function getUserPrimary(profile: CaseUserProfile | null | undefined, userId: string) {
+    return profile?.name || profile?.globalName || profile?.username || userId;
+}
+
+function getUserSecondary(profile: CaseUserProfile | null | undefined, userId: string) {
+    return profile?.tag || userId;
+}
+
+function UserIdentity({
+    profile,
+    userId,
+    accentClass = 'text-white',
+    align = 'left',
+    compact = false,
+}: {
+    profile?: CaseUserProfile | null;
+    userId: string;
+    accentClass?: string;
+    align?: 'left' | 'right';
+    compact?: boolean;
+}) {
+    const primary = getUserPrimary(profile, userId);
+    const secondary = getUserSecondary(profile, userId);
+
+    return (
+        <div className={`flex min-w-0 items-center gap-2.5 ${align === 'right' ? 'justify-end text-right' : ''}`}>
+            {profile?.avatar ? (
+                <img
+                    src={profile.avatar}
+                    alt={primary}
+                    className={`${compact ? 'h-7 w-7 rounded-md' : 'h-11 w-11 rounded-2xl'} shrink-0 border border-white/10 object-cover shadow-inner`}
+                />
+            ) : (
+                <div className={`${compact ? 'h-7 w-7 rounded-md' : 'h-11 w-11 rounded-2xl'} shrink-0 border border-white/10 bg-white/[0.04] flex items-center justify-center text-white/35 shadow-inner`}>
+                    <UserCircle size={compact ? 16 : 24} weight="fill" />
+                </div>
+            )}
+            <div className={`min-w-0 ${align === 'right' ? 'text-right' : ''}`}>
+                <div className={`${compact ? 'text-[12px]' : 'text-sm'} truncate font-bold tracking-wide ${accentClass}`}>{primary}</div>
+                {!compact ? <div className="truncate text-xs text-white/40">{secondary}</div> : null}
+            </div>
+        </div>
+    );
 }
 
 export function OverviewTab({
     casesState,
     locale,
     tr,
-    caseFilter, setCaseFilter,
-    caseNumberFilter, setCaseNumberFilter,
-    caseStatusFilter, setCaseStatusFilter,
-    caseActionFilter, setCaseActionFilter,
-    selectedCaseId, setSelectedCaseId
+    caseFilter,
+    setCaseFilter,
+    caseNumberFilter,
+    setCaseNumberFilter,
+    caseStatusFilter,
+    setCaseStatusFilter,
+    caseActionFilter,
+    setCaseActionFilter,
+    selectedCaseId,
+    setSelectedCaseId,
 }: OverviewTabProps) {
+    void locale;
 
-    const selectedCase = casesState.cases.find(c => c.id === selectedCaseId);
+    const filteredCases = React.useMemo(() => {
+        const normalizedReason = caseFilter.trim().toLocaleLowerCase();
+        const normalizedCaseNumber = caseNumberFilter.trim();
+
+        return casesState.cases.filter((entry) => {
+            if (normalizedReason) {
+                const reason = (entry.reason || '').toLocaleLowerCase();
+                if (!reason.includes(normalizedReason)) {
+                    return false;
+                }
+            }
+
+            if (normalizedCaseNumber) {
+                if (!String(entry.caseNumber).includes(normalizedCaseNumber)) {
+                    return false;
+                }
+            }
+
+            if (caseStatusFilter && entry.status !== caseStatusFilter) {
+                return false;
+            }
+
+            if (caseActionFilter && entry.actionType !== caseActionFilter) {
+                return false;
+            }
+
+            return true;
+        });
+    }, [caseActionFilter, caseFilter, caseNumberFilter, caseStatusFilter, casesState.cases]);
+
+    const selectedCase = filteredCases.find((entry) => entry.id === selectedCaseId) ?? null;
+
+    React.useEffect(() => {
+        if (selectedCaseId !== null && !filteredCases.some((entry) => entry.id === selectedCaseId)) {
+            setSelectedCaseId(filteredCases[0]?.id ?? null);
+        }
+    }, [filteredCases, selectedCaseId, setSelectedCaseId]);
 
     const activeTimed = casesState.cases.filter(
-        c => c.status === 'ACTIVE' && c.expiresAt && new Date(c.expiresAt).getTime() > Date.now()
+        (entry) => entry.status === 'ACTIVE' && entry.expiresAt && new Date(entry.expiresAt).getTime() > Date.now(),
     );
+
+    const getStatusLabel = (status: string) => {
+        switch (status) {
+            case 'ACTIVE':
+                return tr('Активен', 'Active');
+            case 'CLEARED':
+                return tr('Снят', 'Cleared');
+            case 'EXPIRED':
+                return tr('Истек', 'Expired');
+            case 'REVERTED':
+                return tr('Отменен', 'Reverted');
+            default:
+                return status;
+        }
+    };
+
+    const getActionLabel = (actionType: string) => {
+        switch (actionType) {
+            case 'WARN':
+                return tr('Варн', 'Warn');
+            case 'MUTE':
+                return tr('Мут', 'Mute');
+            case 'TIMEOUT':
+                return tr('Тайм-аут', 'Timeout');
+            case 'KICK':
+                return tr('Кик', 'Kick');
+            case 'BAN':
+                return tr('Бан', 'Ban');
+            case 'TEMPBAN':
+                return tr('Временный бан', 'Temp Ban');
+            case 'UNWARN':
+                return tr('Снятие варна', 'Unwarn');
+            case 'UNMUTE':
+                return tr('Размут', 'Unmute');
+            case 'UNTIMEOUT':
+                return tr('Снятие тайм-аута', 'Remove Timeout');
+            case 'UNBAN':
+                return tr('Разбан', 'Unban');
+            default:
+                return actionType;
+        }
+    };
+
+    const getSourceLabel = (source: string) => {
+        switch (source.toLowerCase()) {
+            case 'manual':
+                return tr('Вручную', 'Manual');
+            case 'system':
+                return tr('Система', 'System');
+            case 'automod':
+                return tr('Автомод', 'AutoMod');
+            default:
+                return source;
+        }
+    };
+
+    const getStatusVariant = (status: string) => (status === 'ACTIVE' ? 'danger' : 'default');
+
+    const getActionVariant = (actionType: string) =>
+        actionType === 'BAN' || actionType === 'TEMPBAN' || actionType === 'KICK' ? 'danger' : 'warning';
+
+    const getActionIcon = (actionType: string) => {
+        if (actionType === 'BAN' || actionType === 'TEMPBAN' || actionType === 'UNBAN') return UserMinus;
+        if (actionType === 'MUTE' || actionType === 'UNMUTE') return ShieldSlash;
+        if (actionType === 'TIMEOUT' || actionType === 'UNTIMEOUT') return Clock;
+        return WarningOctagon;
+    };
 
     return (
         <div className="space-y-8 animate-fade-in">
-            {/* Top Stat Cards Hero Section */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
                 <StatsCard
                     title={tr('Всего кейсов', 'Total Cases')}
                     value={casesState.summary.total}
@@ -53,118 +213,156 @@ export function OverviewTab({
                     title={tr('Предупреждения', 'Warnings')}
                     value={casesState.summary.warnings}
                     icon={<ShieldSlash size={24} weight="duotone" />}
-                    accentColor="#f43f5e"
+                    accentColor="#60a5fa"
                 />
                 <StatsCard
-                    title={tr('Временные мьюты/баны', 'Timed Punishments')}
+                    title={tr('Временные наказания', 'Timed Punishments')}
                     value={casesState.summary.timed}
                     icon={<Clock size={24} weight="duotone" />}
-                    accentColor="#8b5cf6"
+                    accentColor="#fcd34d"
                 />
             </div>
 
-            {/* Active Timed Punishments Feed - Horizontal Scroller */}
             {activeTimed.length > 0 && (
-                <div className="flex gap-4 overflow-x-auto pb-4 custom-scrollbar snap-x">
-                    {activeTimed.map(c => (
-                        <div key={c.id} className="snap-start min-w-[300px] shrink-0 rounded-[20px] border border-white/10 bg-white/[0.03] backdrop-blur-md p-5 flex flex-col gap-3 transition-transform hover:-translate-y-1 hover:bg-white/[0.05]">
-                            <div className="flex items-center justify-between">
-                                <Badge variant="danger">#{c.caseNumber} {c.actionType}</Badge>
-                                <span className="text-xs text-white/40 font-mono bg-black/30 px-2 py-1 rounded-md">{formatDate(c.expiresAt)}</span>
+                <div className="custom-scrollbar flex snap-x gap-4 overflow-x-auto pb-4">
+                    {activeTimed.map((entry) => (
+                        <div
+                            key={entry.id}
+                            className="snap-start flex min-w-[320px] shrink-0 flex-col gap-4 rounded-[20px] border border-white/10 bg-white/[0.03] p-5 backdrop-blur-md transition-transform hover:-translate-y-1 hover:bg-white/[0.05]"
+                        >
+                            <div className="flex items-center justify-between gap-3">
+                                <Badge variant={getActionVariant(entry.actionType)}>
+                                    #{entry.caseNumber} {getActionLabel(entry.actionType)}
+                                </Badge>
+                                <span className="rounded-md bg-black/30 px-2 py-1 font-mono text-xs text-white/40">
+                                    {formatDate(entry.expiresAt, tr('Без срока', 'No expiry'))}
+                                </span>
                             </div>
-                            <div className="text-sm text-white/90 font-bold truncate tracking-wide">Target: {c.targetUserId}</div>
-                            <div className="text-xs text-white/50 line-clamp-2 italic">&ldquo;{c.reason || 'No reason'}&rdquo;</div>
+                            <UserIdentity profile={entry.targetProfile} userId={entry.targetUserId} compact />
+                            <div className="line-clamp-2 text-xs italic text-white/55">
+                                &ldquo;{entry.reason || tr('Причина не указана', 'No reason specified')}&rdquo;
+                            </div>
                         </div>
                     ))}
                 </div>
             )}
 
-            {/* Main Dual Column Area */}
-            <div className="flex flex-col lg:flex-row gap-8 items-start">
-                
-                {/* Left Column: CASE MANAGEMENT (60%) */}
-                <div className="w-full lg:w-[60%] flex flex-col gap-6">
-                    <AnimatedCard title={tr('Лента Действий', 'Recent Actions')} subtitle={tr('Управление и фильтрация всех модерационных кейсов.', 'Manage and filter all moderation cases.')}>
-                        {/* Filters Row */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
-                            <TextField 
-                                value={caseFilter} 
-                                onChange={setCaseFilter} 
-                                placeholder={tr('Поиск по причине...', 'Search reason...')} 
+            <div className="flex flex-col items-start gap-8 lg:flex-row">
+                <div className="flex w-full flex-col gap-6 lg:w-[60%]">
+                    <AnimatedCard
+                        title={tr('Лента Действий', 'Recent Actions')}
+                        subtitle={tr('Управление и фильтрация всех модерационных кейсов.', 'Manage and filter all moderation cases.')}
+                    >
+                        <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                            <TextField
+                                value={caseFilter}
+                                onChange={setCaseFilter}
+                                placeholder={tr('Поиск по причине...', 'Search reason...')}
                             />
-                            <TextField 
-                                value={caseNumberFilter} 
-                                onChange={setCaseNumberFilter} 
-                                placeholder="Case #" 
+                            <TextField
+                                value={caseNumberFilter}
+                                onChange={setCaseNumberFilter}
+                                placeholder={tr('Кейс #', 'Case #')}
                             />
-                            <InteractiveSelect 
+                            <InteractiveSelect
                                 value={caseStatusFilter}
                                 onChange={setCaseStatusFilter}
                                 options={[
-                                    { id: 'ACTIVE', name: 'Active' },
-                                    { id: 'CLEARED', name: 'Cleared' },
-                                    { id: 'EXPIRED', name: 'Expired' }
+                                    { id: 'ACTIVE', name: tr('Активен', 'Active') },
+                                    { id: 'EXPIRED', name: tr('Истек', 'Expired') },
+                                    { id: 'CLEARED', name: tr('Снят', 'Cleared') },
                                 ]}
                                 placeholder={tr('Статус', 'Status')}
                             />
-                            <InteractiveSelect 
+                            <InteractiveSelect
                                 value={caseActionFilter}
                                 onChange={setCaseActionFilter}
                                 options={[
-                                    { id: 'WARN', name: 'Warn' },
-                                    { id: 'MUTE', name: 'Mute' },
-                                    { id: 'KICK', name: 'Kick' },
-                                    { id: 'BAN', name: 'Ban' }
+                                    { id: 'WARN', name: tr('Варн', 'Warn'), color: '#60a5fa' },
+                                    { id: 'MUTE', name: tr('Мут', 'Mute'), color: '#fcd34d' },
+                                    { id: 'TIMEOUT', name: tr('Тайм-аут', 'Timeout'), color: '#fcd34d' },
+                                    { id: 'KICK', name: tr('Кик', 'Kick'), color: '#f59e0b' },
+                                    { id: 'BAN', name: tr('Бан', 'Ban'), color: '#fb7185' },
+                                    { id: 'TEMPBAN', name: tr('Временный бан', 'Temp Ban'), color: '#fb7185' },
                                 ]}
                                 placeholder={tr('Действие', 'Action')}
                             />
                         </div>
 
-                        {/* Animated Case Timeline Feed */}
-                        <div className="flex flex-col gap-4 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
-                            {casesState.cases.length === 0 ? (
-                                <div className="py-16 flex flex-col items-center justify-center text-white/30 border border-white/5 bg-white/[0.02] rounded-3xl">
-                                    <CheckCircle size={48} weight="duotone" className="mb-4 opacity-50 text-[var(--color-primary-1)]" />
+                        <div className="custom-scrollbar flex max-h-[600px] flex-col gap-4 overflow-y-auto pr-2">
+                            {filteredCases.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center rounded-3xl border border-white/5 bg-white/[0.02] py-16 text-white/30">
+                                    <CheckCircle size={48} weight="duotone" className="mb-4 text-[var(--color-primary-1)] opacity-50" />
                                     <p className="text-lg font-semibold">{tr('Здесь чисто', 'All clear')}</p>
-                                    <p className="text-sm mt-1">{tr('Нет кейсов, соответствующих фильтрам.', 'No cases match filtering.')}</p>
+                                    <p className="mt-1 text-sm">{tr('Нет кейсов, соответствующих фильтрам.', 'No cases match filtering.')}</p>
                                 </div>
                             ) : (
-                                casesState.cases.map(c => {
-                                    const isSelected = selectedCaseId === c.id;
-                                    const ActionIcon = c.actionType === 'BAN' ? UserMinus : c.actionType === 'MUTE' ? ShieldSlash : WarningOctagon;
-                                    
+                                filteredCases.map((entry) => {
+                                    const isSelected = selectedCaseId === entry.id;
+                                    const ActionIcon = getActionIcon(entry.actionType);
+
                                     return (
                                         <button
-                                            key={c.id}
-                                            onClick={() => setSelectedCaseId(c.id)}
-                                            className={`relative flex items-start gap-4 text-left w-full p-4 rounded-2xl transition-all duration-300 group overflow-hidden ${
-                                                isSelected 
-                                                ? 'bg-gradient-to-r from-[var(--color-primary-1)]/20 to-transparent border-l-4 border-[var(--color-primary-1)]' 
-                                                : 'bg-white/[0.03] border-l-4 border-transparent hover:bg-white/[0.06]'
+                                            key={entry.id}
+                                            onClick={() => setSelectedCaseId(entry.id)}
+                                            className={`group relative flex min-h-[104px] w-full items-start gap-4 overflow-hidden rounded-2xl px-5 py-4 text-left transition-all duration-300 ${
+                                                isSelected
+                                                    ? 'border-l-4 border-[var(--color-primary-1)] bg-gradient-to-r from-[var(--color-primary-1)]/20 to-transparent'
+                                                    : 'border-l-4 border-transparent bg-white/[0.03] hover:bg-white/[0.06]'
                                             }`}
                                         >
-                                            <div className="absolute inset-0 bg-gradient-to-r from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
-                                            
-                                            <div className="mt-1 flex-shrink-0 relative z-10">
-                                                <div className={`p-2 rounded-xl bg-black/40 ${c.actionType === 'BAN' || c.actionType === 'KICK' ? 'text-rose-400' : 'text-amber-400'}`}>
+                                            <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-white/5 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
+
+                                            <div className="relative z-10 mt-1 shrink-0">
+                                                <div
+                                                    className={`rounded-xl bg-black/40 p-2 ${
+                                                        entry.actionType === 'BAN' || entry.actionType === 'TEMPBAN' || entry.actionType === 'KICK'
+                                                            ? 'text-rose-400'
+                                                            : entry.actionType === 'WARN'
+                                                                ? 'text-blue-400'
+                                                                : 'text-amber-300'
+                                                    }`}
+                                                >
                                                     <ActionIcon size={24} weight="duotone" />
                                                 </div>
                                             </div>
-                                            
-                                            <div className="flex-1 min-w-0 relative z-10">
-                                                <div className="flex items-center gap-3 mb-1">
-                                                    <span className="font-black text-lg text-white drop-shadow-md">#{c.caseNumber}</span>
-                                                    <Badge variant={c.status === 'ACTIVE' ? 'danger' : 'default'} className="scale-90 origin-left">
-                                                        {c.status}
+
+                                            <div className="relative z-10 flex-1 min-w-0 py-1">
+                                                <div className="mb-3 flex min-w-0 items-center gap-2">
+                                                    <span className="text-lg font-black text-white drop-shadow-md">#{entry.caseNumber}</span>
+                                                    <span className="text-sm text-white/25">|</span>
+                                                    <div className="min-w-0 max-w-[220px]">
+                                                        <UserIdentity profile={entry.targetProfile} userId={entry.targetUserId} compact />
+                                                    </div>
+                                                    <span className="text-sm text-white/25">|</span>
+                                                    <span
+                                                        className={`truncate text-[12px] font-bold uppercase tracking-wide ${
+                                                            entry.actionType === 'BAN' || entry.actionType === 'TEMPBAN' || entry.actionType === 'KICK'
+                                                                ? 'text-rose-400'
+                                                                : entry.actionType === 'WARN'
+                                                                    ? 'text-blue-400'
+                                                                    : 'text-amber-300'
+                                                        }`}
+                                                    >
+                                                        {getActionLabel(entry.actionType)}
+                                                    </span>
+                                                    <Badge variant={getStatusVariant(entry.status)} className="origin-left scale-90">
+                                                        {getStatusLabel(entry.status)}
                                                     </Badge>
                                                 </div>
-                                                <p className="text-sm font-semibold text-white/80 truncate">User: <span className="text-white">{c.targetUserId}</span></p>
-                                                <p className="text-xs text-white/50 line-clamp-1 mt-1 pr-4">{c.reason || 'No reason provided.'}</p>
+
+                                                <p className="line-clamp-2 pr-4 text-xs text-white/50">
+                                                    {entry.reason || tr('Причина не указана.', 'No reason provided.')}
+                                                </p>
                                             </div>
-                                            
-                                            <div className="hidden sm:flex flex-col items-end gap-2 flex-shrink-0 text-right relative z-10">
-                                                <span className="text-xs text-white/40 font-mono bg-black/40 px-2 py-1 rounded-lg border border-white/5">{formatDate(c.createdAt)}</span>
-                                                <span className="text-[10px] font-bold tracking-widest uppercase text-[var(--color-primary-1)]">{c.source}</span>
+
+                                            <div className="relative z-10 hidden shrink-0 text-right sm:flex sm:flex-col sm:items-end sm:gap-2">
+                                                <span className="rounded-lg border border-white/5 bg-black/40 px-2 py-1 font-mono text-xs text-white/40">
+                                                    {formatDate(entry.createdAt)}
+                                                </span>
+                                                <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--color-primary-1)]">
+                                                    {getSourceLabel(entry.source)}
+                                                </span>
                                             </div>
                                         </button>
                                     );
@@ -174,75 +372,122 @@ export function OverviewTab({
                     </AnimatedCard>
                 </div>
 
-                {/* Right Column: DETAIL PANEL (40%) */}
-                <div className="w-full lg:w-[40%] lg:sticky lg:top-[90px]">
-                    <AnimatedCard title={tr('Детали кейса', 'Case Details')} subtitle={tr('Подробная информация о нарушении', 'Detailed violation info')}>
+                <div className="w-full lg:sticky lg:top-[90px] lg:w-[40%]">
+                    <AnimatedCard
+                        title={tr('Детали кейса', 'Case Details')}
+                        subtitle={tr('Подробная информация о нарушении', 'Detailed violation info')}
+                    >
                         {!selectedCase ? (
-                            <div className="flex flex-col items-center justify-center p-10 text-center text-white/30 h-[400px]">
+                            <div className="flex h-[400px] flex-col items-center justify-center p-10 text-center text-white/30">
                                 <ShieldCheck size={64} weight="thin" className="mb-6 opacity-20" />
-                                <p className="text-lg font-medium">{tr('Выберите дело', 'Select a case')}</p>
-                                <p className="text-sm mt-2 max-w-[200px]">{tr('Выберите кейс из списка слева, чтобы посмотреть его историю.', 'Select a case from the timeline to view its history.')}</p>
+                                <p className="text-lg font-medium">{tr('Выберите кейс', 'Select a case')}</p>
+                                <p className="mt-2 max-w-[200px] text-sm">
+                                    {tr('Выберите кейс из списка слева, чтобы посмотреть его историю.', 'Select a case from the timeline to view its history.')}
+                                </p>
                             </div>
                         ) : (
-                            <div className="flex flex-col gap-6 animate-fade-in relative">
-                                {/* Header badge */}
-                                <div className="flex items-center justify-between pb-6 border-b border-white/10">
+                            <div className="relative flex flex-col gap-6 animate-fade-in">
+                                <div className="flex items-center justify-between border-b border-white/10 pb-6">
                                     <div className="flex items-center gap-4">
-                                        <div className="bg-black/50 border border-white/5 w-16 h-16 rounded-2xl flex items-center justify-center shadow-inner">
+                                        <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-white/5 bg-black/50 shadow-inner">
                                             <span className="text-2xl font-black text-white">#{selectedCase.caseNumber}</span>
                                         </div>
                                         <div>
-                                            <Badge variant={selectedCase.actionType === 'BAN' ? 'danger' : 'warning'} className="text-sm px-3 py-1 uppercase">{selectedCase.actionType}</Badge>
+                                            <Badge variant={getActionVariant(selectedCase.actionType)} className="px-3 py-1 text-sm uppercase">
+                                                {getActionLabel(selectedCase.actionType)}
+                                            </Badge>
                                         </div>
                                     </div>
-                                    <Badge variant={selectedCase.status === 'ACTIVE' ? 'danger' : 'default'} className="px-4 py-1.5 text-sm uppercase shadow-lg">
-                                        {selectedCase.status}
+                                    <Badge variant={getStatusVariant(selectedCase.status)} className="px-4 py-1.5 text-sm uppercase shadow-lg">
+                                        {getStatusLabel(selectedCase.status)}
                                     </Badge>
                                 </div>
 
-                                {/* Main Data Grid - Glassy Panels */}
                                 <div className="grid grid-cols-1 gap-3">
-                                    <div className="bg-black/20 rounded-2xl p-4 border border-white/5 flex flex-col sm:flex-row justify-between sm:items-center gap-2">
-                                        <span className="text-xs uppercase font-bold text-white/40 tracking-widest">Target User</span>
-                                        <span className="text-sm font-bold text-white bg-white/5 px-3 py-1.5 rounded-lg border border-white/5 break-all">{selectedCase.targetUserId}</span>
+                                    <div className="flex flex-col justify-between gap-3 rounded-2xl border border-white/5 bg-black/20 p-4 sm:flex-row sm:items-center">
+                                        <span className="text-xs font-bold uppercase tracking-widest text-white/40">
+                                            {tr('Нарушитель', 'Target User')}
+                                        </span>
+                                        <UserIdentity profile={selectedCase.targetProfile} userId={selectedCase.targetUserId} accentClass="text-white" align="right" />
                                     </div>
-                                    <div className="bg-black/20 rounded-2xl p-4 border border-white/5 flex flex-col sm:flex-row justify-between sm:items-center gap-2">
-                                        <span className="text-xs uppercase font-bold text-white/40 tracking-widest">Moderator</span>
-                                        <span className="text-sm font-bold text-[var(--color-primary-1)] bg-[var(--color-primary-1)]/10 px-3 py-1.5 rounded-lg break-all">{selectedCase.actorUserId || 'System AutoMod'}</span>
+                                    <div className="flex flex-col justify-between gap-3 rounded-2xl border border-white/5 bg-black/20 p-4 sm:flex-row sm:items-center">
+                                        <span className="text-xs font-bold uppercase tracking-widest text-white/40">
+                                            {tr('Модератор', 'Moderator')}
+                                        </span>
+                                        {selectedCase.actorUserId ? (
+                                            <UserIdentity
+                                                profile={selectedCase.actorProfile}
+                                                userId={selectedCase.actorUserId}
+                                                accentClass="text-[var(--color-primary-1)]"
+                                                align="right"
+                                            />
+                                        ) : (
+                                            <span className="rounded-lg bg-[var(--color-primary-1)]/10 px-3 py-1.5 text-sm font-bold text-[var(--color-primary-1)]">
+                                                {tr('Система', 'System')}
+                                            </span>
+                                        )}
                                     </div>
-                                    
-                                    <div className="grid grid-cols-2 gap-3 mt-2">
-                                        <div className="bg-black/20 rounded-2xl p-4 border border-white/5">
-                                            <div className="text-[10px] uppercase font-bold text-white/40 tracking-wider mb-2">Issued</div>
-                                            <div className="text-xs text-white/80 font-mono">{formatDate(selectedCase.createdAt)}</div>
+                                    {selectedCase.status === 'CLEARED' && selectedCase.resolvedByUserId ? (
+                                        <div className="flex flex-col justify-between gap-3 rounded-2xl border border-white/5 bg-black/20 p-4 sm:flex-row sm:items-center">
+                                            <span className="text-xs font-bold uppercase tracking-widest text-white/40">
+                                                {tr('Кто снял', 'Cleared By')}
+                                            </span>
+                                            <UserIdentity
+                                                profile={selectedCase.resolvedByProfile}
+                                                userId={selectedCase.resolvedByUserId}
+                                                accentClass="text-[var(--color-primary-1)]"
+                                                align="right"
+                                            />
                                         </div>
-                                        <div className="bg-black/20 rounded-2xl p-4 border border-white/5">
-                                            <div className="text-[10px] uppercase font-bold text-white/40 tracking-wider mb-2">Expires</div>
-                                            <div className="text-xs text-white/80 font-mono">{formatDate(selectedCase.expiresAt, 'Never')}</div>
+                                    ) : null}
+
+                                    <div className="mt-2 grid grid-cols-2 gap-3">
+                                        <div className="rounded-2xl border border-white/5 bg-black/20 p-4">
+                                            <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-white/40">
+                                                {tr('Выдан', 'Issued')}
+                                            </div>
+                                            <div className="font-mono text-xs text-white/80">{formatDate(selectedCase.createdAt)}</div>
+                                        </div>
+                                        <div className="rounded-2xl border border-white/5 bg-black/20 p-4">
+                                            <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-white/40">
+                                                {tr('Истекает', 'Expires')}
+                                            </div>
+                                            <div className="font-mono text-xs text-white/80">
+                                                {formatDate(selectedCase.expiresAt, tr('Без срока', 'Never'))}
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
 
-                                {/* Reason Block */}
-                                <div className="rounded-2xl bg-gradient-to-br from-white/5 to-white/0 border border-white/10 p-5 mt-2 shadow-lg relative overflow-hidden">
-                                    <div className="absolute top-0 right-0 w-32 h-32 bg-[var(--color-primary-1)]/10 blur-3xl rounded-full" />
-                                    <div className="text-xs uppercase font-bold text-white/50 tracking-widest mb-3 relative z-10">Reason for Action</div>
-                                    <p className="text-base text-white/90 leading-relaxed italic relative z-10">&ldquo;{selectedCase.reason || 'No reason specified'}&rdquo;</p>
+                                <div className="relative mt-2 overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-white/5 to-white/0 p-5 shadow-lg">
+                                    <div className="absolute right-0 top-0 h-32 w-32 rounded-full bg-[var(--color-primary-1)]/10 blur-3xl" />
+                                    <div className="relative z-10 mb-3 text-xs font-bold uppercase tracking-widest text-white/50">
+                                        {tr('Причина наказания', 'Reason for Action')}
+                                    </div>
+                                    <p className="relative z-10 text-base italic leading-relaxed text-white/90">
+                                        &ldquo;{selectedCase.reason || tr('Причина не указана', 'No reason specified')}&rdquo;
+                                    </p>
                                 </div>
 
-                                {/* Notes Block */}
                                 {selectedCase.notes && selectedCase.notes.length > 0 && (
-                                    <div className="space-y-4 mt-4">
-                                        <div className="text-xs uppercase font-bold text-white/50 tracking-widest flex items-center gap-2">
-                                            <span>Staff Notes</span>
-                                            <span className="h-px bg-white/10 flex-1" />
+                                    <div className="mt-4 space-y-4">
+                                        <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-white/50">
+                                            <span>{tr('Заметки персонала', 'Staff Notes')}</span>
+                                            <span className="h-px flex-1 bg-white/10" />
                                         </div>
                                         <div className="space-y-3">
-                                            {selectedCase.notes.map(note => (
-                                                <div key={note.id} className="relative p-4 rounded-2xl bg-black/30 border border-white/5">
-                                                    <div className="w-1.5 h-full absolute left-0 top-0 bg-blue-500/50 rounded-l-2xl" />
-                                                    <div className="text-sm text-white/90 mb-2">{note.note}</div>
-                                                    <div className="text-xs text-white/40 font-mono">By <span className="text-white/60">{note.actorUserId}</span> at {formatDate(note.createdAt)}</div>
+                                            {selectedCase.notes.map((note) => (
+                                                <div key={note.id} className="relative rounded-2xl border border-white/5 bg-black/30 p-4">
+                                                    <div className="absolute left-0 top-0 h-full w-1.5 rounded-l-2xl bg-blue-500/50" />
+                                                    <div className="mb-3 text-sm text-white/90">{note.note}</div>
+                                                    <div className="flex flex-wrap items-center gap-2 text-xs text-white/40">
+                                                        <span>{tr('Автор:', 'By')}</span>
+                                                        <span className="text-white/70">
+                                                            {getUserPrimary(note.actorProfile, note.actorUserId)}
+                                                        </span>
+                                                        <span>{tr('в', 'at')}</span>
+                                                        <span className="font-mono">{formatDate(note.createdAt)}</span>
+                                                    </div>
                                                 </div>
                                             ))}
                                         </div>
@@ -256,4 +501,3 @@ export function OverviewTab({
         </div>
     );
 }
-

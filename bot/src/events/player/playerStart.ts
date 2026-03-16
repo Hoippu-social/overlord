@@ -1,4 +1,3 @@
-import { useMainPlayer } from 'discord-player';
 import {
     EmbedBuilder,
     ActionRowBuilder,

@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
@@ -11,13 +11,14 @@ import {
     ArrowsClockwise,
     CalendarCheck,
 } from "@phosphor-icons/react";
-import { useGuildLocale } from "@/lib/i18n";
+import { useGuildLocale, useGuildTimezone } from "@/lib/i18n";
 import { useStats } from "@/hooks/useStats";
 import { usePersistentPeriod } from "@/hooks/usePersistentPeriod";
-import { formatYAxis } from "@/lib/utils";
+import { formatLocaleNumber, formatYAxis } from "@/lib/utils";
 import { StatsCard } from "@/components/stats/StatsCard";
 import { ChartContainer } from "@/components/stats/ChartContainer";
 import { StatsTopWidget } from "@/components/stats/StatsTopWidget";
+import { ChartTooltip } from "@/components/stats/ChartTooltip";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, BarChart, Bar, Cell, ReferenceLine } from 'recharts';
 
 const strings = {
@@ -47,39 +48,52 @@ const strings = {
         saturday: 'Sat',
         sunday: 'Sun',
         median: 'Median',
+        totalMessages: 'Total Messages',
+        avgDaily: 'Avg. Daily',
+        messagesUnit: 'messages',
+        other: 'Other',
+        msgs: 'msgs',
+        messagesLabel: 'Messages',
     },
     ru: {
-        title: 'Сообщения',
-        subtitle: 'Анализ активности и топ участников',
-        heatmap: 'Карта активности',
-        heatmapDesc: 'Почасовое распределение сообщений',
-        topChannels: 'Топ каналов',
-        topMembers: 'Топ участников',
-        messagesOverTime: 'Динамика сообщений',
-        uniqueUsers: 'Уник. участников',
-        uniqueChannels: 'Уник. каналов',
-        period: 'Период',
-        day1: '24 часа',
-        day3: '3 дня',
-        day7: '7 дней',
-        day14: '14 дней',
-        day30: '30 дней',
-        month3: '90 дней',
-        year1: '365 дней',
-        monday: 'Пн',
-        tuesday: 'Вт',
-        wednesday: 'Ср',
-        thursday: 'Чт',
-        friday: 'Пт',
-        saturday: 'Сб',
-        sunday: 'Вс',
-        median: 'Медиана',
+        title: '\u0421\u043e\u043e\u0431\u0449\u0435\u043d\u0438\u044f',
+        subtitle: '\u0410\u043d\u0430\u043b\u0438\u0437 \u0430\u043a\u0442\u0438\u0432\u043d\u043e\u0441\u0442\u0438 \u0438 \u0442\u043e\u043f \u0443\u0447\u0430\u0441\u0442\u043d\u0438\u043a\u043e\u0432',
+        heatmap: '\u041a\u0430\u0440\u0442\u0430 \u0430\u043a\u0442\u0438\u0432\u043d\u043e\u0441\u0442\u0438',
+        heatmapDesc: '\u041f\u043e\u0447\u0430\u0441\u043e\u0432\u043e\u0435 \u0440\u0430\u0441\u043f\u0440\u0435\u0434\u0435\u043b\u0435\u043d\u0438\u0435 \u0441\u043e\u043e\u0431\u0449\u0435\u043d\u0438\u0439',
+        topChannels: '\u0422\u043e\u043f \u043a\u0430\u043d\u0430\u043b\u043e\u0432',
+        topMembers: '\u0422\u043e\u043f \u0443\u0447\u0430\u0441\u0442\u043d\u0438\u043a\u043e\u0432',
+        messagesOverTime: '\u0414\u0438\u043d\u0430\u043c\u0438\u043a\u0430 \u0441\u043e\u043e\u0431\u0449\u0435\u043d\u0438\u0439',
+        uniqueUsers: '\u0423\u043d\u0438\u043a. \u0443\u0447\u0430\u0441\u0442\u043d\u0438\u043a\u043e\u0432',
+        uniqueChannels: '\u0423\u043d\u0438\u043a. \u043a\u0430\u043d\u0430\u043b\u043e\u0432',
+        period: '\u041f\u0435\u0440\u0438\u043e\u0434',
+        day1: '24 \u0447\u0430\u0441\u0430',
+        day3: '3 \u0434\u043d\u044f',
+        day7: '7 \u0434\u043d\u0435\u0439',
+        day14: '14 \u0434\u043d\u0435\u0439',
+        day30: '30 \u0434\u043d\u0435\u0439',
+        month3: '90 \u0434\u043d\u0435\u0439',
+        year1: '365 \u0434\u043d\u0435\u0439',
+        monday: '\u041f\u043d',
+        tuesday: '\u0412\u0442',
+        wednesday: '\u0421\u0440',
+        thursday: '\u0427\u0442',
+        friday: '\u041f\u0442',
+        saturday: '\u0421\u0431',
+        sunday: '\u0412\u0441',
+        median: '\u041c\u0435\u0434\u0438\u0430\u043d\u0430',
+        totalMessages: '\u0412\u0441\u0435\u0433\u043e \u0441\u043e\u043e\u0431\u0449\u0435\u043d\u0438\u0439',
+        avgDaily: '\u0421\u0440\u0435\u0434\u043d\u0435\u0435 / \u0414\u0435\u043d\u044c',
+        messagesUnit: '\u0441\u043e\u043e\u0431\u0449\u0435\u043d\u0438\u0439',
+        other: '\u041f\u0440\u043e\u0447\u0438\u0435',
+        msgs: '\u0441\u043e\u043e\u0431\u0449.',
+        messagesLabel: '\u0421\u043e\u043e\u0431\u0449\u0435\u043d\u0438\u044f',
     },
 } as const;
 
 export default function MessagesPage() {
     const { guildId } = useParams<{ guildId: string }>();
     const { locale } = useGuildLocale(guildId);
+    const guildTimezone = useGuildTimezone(guildId);
     const text = strings[locale];
 
     const [period, setPeriod] = usePersistentPeriod('7d');
@@ -119,16 +133,32 @@ export default function MessagesPage() {
         if (data?.heatmap) {
             data.heatmap.forEach((h: any) => {
                 const date = new Date(h.date);
-                const jsDay = date.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
-                // Convert to Monday-first: Mon=0, Tue=1, ..., Sun=6
-                const day = jsDay === 0 ? 6 : jsDay - 1;
-                const hour = date.getHours();
+                const parts = new Intl.DateTimeFormat('en-US', {
+                    timeZone: guildTimezone,
+                    weekday: 'short',
+                    hour: 'numeric',
+                    hour12: false
+                }).formatToParts(date);
+
+                let day = 0;
+                let hour = 0;
+                parts.forEach(p => {
+                    if (p.type === 'weekday') {
+                        const daysMap = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+                        const jsDay = daysMap.indexOf(p.value);
+                        day = jsDay === 0 ? 6 : jsDay - 1;
+                    }
+                    if (p.type === 'hour') {
+                        hour = parseInt(p.value, 10);
+                        if (hour === 24) hour = 0;
+                    }
+                });
                 grid[day][hour] += h.count;
             });
             max = Math.max(...grid.flat()) || 1;
         }
         return { heatmapGrid: grid, maxHeatmapValue: max };
-    }, [data]);
+    }, [data, guildTimezone]);
 
     const lineChartData = data?.lineChart || [];
     const topChannels = data?.topChannels || [];
@@ -145,76 +175,39 @@ export default function MessagesPage() {
     return (
         <div className="p-6 space-y-6 min-h-screen">
             {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 border border-violet-500/10 flex items-center justify-center backdrop-blur-sm shadow-xl flex-shrink-0">
-                        <MessengerLogo size={32} weight="fill" className="text-violet-500 drop-shadow-lg" />
-                    </div>
-                    <div>
-                        <h1 className="text-3xl font-black text-white tracking-tight">{text.title}</h1>
-                        <p className="text-default-400 font-medium">{text.subtitle}</p>
-                    </div>
+            <div className="flex items-center gap-4 mb-2">
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 border border-violet-500/10 flex items-center justify-center backdrop-blur-sm shadow-xl flex-shrink-0">
+                    <MessengerLogo size={32} weight="fill" className="text-violet-500 drop-shadow-lg" />
                 </div>
-
-                <div className="flex items-center gap-3 bg-[#18181b]/40 p-1.5 rounded-2xl border border-white/5 backdrop-blur-md w-full md:w-auto">
-                    <Button
-                        isIconOnly
-                        variant="flat"
-                        color="primary"
-                        isLoading={syncing}
-                        onPress={handleSync}
-                        className="bg-primary/10 text-primary w-10 h-10 flex-shrink-0"
-                    >
-                        {!syncing && <ArrowsClockwise size={20} weight="bold" />}
-                    </Button>
-                    <div className="h-6 w-px bg-white/10 mx-1" />
-                    <Select
-                        labelPlacement="outside"
-                        selectedKeys={[period]}
-                        onChange={(e) => setPeriod(e.target.value)}
-                        className="flex-1 md:w-40"
-                        classNames={{
-                            trigger: "bg-transparent shadow-none hover:bg-white/5 border-0 min-h-10 h-10 justify-between",
-                            value: "text-small font-medium group-data-[has-value=true]:text-white",
-                            popoverContent: "bg-[#18181b] border border-white/10 dark"
-                        }}
-                        startContent={<CalendarCheck className="text-default-400" size={16} />}
-                        disallowEmptySelection
-                    >
-                        <SelectItem key="24h">{text.day1}</SelectItem>
-                        <SelectItem key="3d">{text.day3}</SelectItem>
-                        <SelectItem key="7d">{text.day7}</SelectItem>
-                        <SelectItem key="14d">{text.day14}</SelectItem>
-                        <SelectItem key="30d">{text.day30}</SelectItem>
-                        <SelectItem key="90d">{text.month3}</SelectItem>
-                        <SelectItem key="365d">{text.year1}</SelectItem>
-                    </Select>
+                <div>
+                    <h1 className="text-3xl font-black text-white tracking-tight">{text.title}</h1>
+                    <p className="text-default-400 font-medium">{text.subtitle}</p>
                 </div>
             </div>
 
             {/* Summary Cards */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
                 <StatsCard
-                    title="Total Messages"
-                    value={totalMessages.toLocaleString()}
+                    title={text.totalMessages}
+                    value={formatLocaleNumber(totalMessages, locale)}
                     icon={<MessengerLogo size={24} weight="fill" />}
                     loading={loading}
                 />
                 <StatsCard
-                    title="Avg. Daily"
-                    value={avgMessages.toLocaleString()}
+                    title={text.avgDaily}
+                    value={formatLocaleNumber(avgMessages, locale)}
                     icon={<CalendarCheck size={24} weight="fill" />}
                     loading={loading}
                 />
                 <StatsCard
                     title={text.uniqueUsers}
-                    value={uniqueUsers.toLocaleString()}
+                    value={formatLocaleNumber(uniqueUsers, locale)}
                     icon={<Users size={24} weight="fill" />}
                     loading={loading}
                 />
                 <StatsCard
                     title={text.uniqueChannels}
-                    value={uniqueChannels.toLocaleString()}
+                    value={formatLocaleNumber(uniqueChannels, locale)}
                     icon={<Hash size={24} weight="fill" />}
                     loading={loading}
                 />
@@ -240,20 +233,22 @@ export default function MessagesPage() {
                             <XAxis dataKey="date" stroke="#52525b" fontSize={12} tickLine={false} axisLine={false} dy={10} />
                             <YAxis stroke="#52525b" fontSize={12} tickLine={false} axisLine={false} width={50} tickFormatter={(value) => formatYAxis(value, locale as 'ru' | 'en')} />
                             <RechartsTooltip
-                                contentStyle={{
-                                    backgroundColor: 'rgba(24, 24, 27, 0.9)',
-                                    backdropFilter: 'blur(8px)',
-                                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                                    borderRadius: '12px',
-                                }}
-                                itemStyle={{ color: '#fff' }}
                                 cursor={{ stroke: 'rgba(255,255,255,0.1)', strokeWidth: 2 }}
+                                content={(props) => (
+                                    <ChartTooltip
+                                        {...props}
+                                        locale={locale}
+                                        order={['messages', 'weeklyMedian']}
+                                        colorOverrides={{ messages: '#8B5CF6' }}
+                                    />
+                                )}
                             />
                             <Line
                                 type="monotone"
                                 dataKey="messages"
+                                name={text.messagesLabel}
                                 stroke="url(#lineColor)"
-                                strokeWidth={3}
+                                strokeWidth={4}
                                 dot={{ fill: '#8B5CF6', strokeWidth: 0, r: 4 }}
                                 activeDot={{ r: 6, stroke: '#fff', strokeWidth: 2 }}
                             />
@@ -305,17 +300,17 @@ export default function MessagesPage() {
                                             return (
                                                 <div
                                                     key={`${dayIndex}-${hour}`}
-                                                    className="group/cell relative h-6 flex-1 mx-[1px] min-w-[12px] rounded-sm transition-transform hover:scale-110 hover:z-20 cursor-pointer"
+                                                    className="group/cell relative h-6 flex-1 mx-[1px] min-w-[12px] rounded-full transition-transform hover:scale-110 hover:z-20 cursor-pointer"
                                                     style={{
                                                         backgroundColor: value > 0
                                                             ? `rgba(139, 92, 246, ${0.15 + intensity * 0.85})`
-                                                            : 'rgba(255, 255, 255, 0.02)',
+                                                            : 'rgba(255, 255, 255, 0.03)',
                                                     }}
                                                 >
                                                     {/* CSS-only tooltip */}
-                                                    <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 rounded-lg bg-[#18181b]/95 border border-white/10 backdrop-blur-md shadow-xl opacity-0 scale-95 group-hover/cell:opacity-100 group-hover/cell:scale-100 transition-all duration-100 whitespace-nowrap z-50">
+                                                    <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-4 py-2 rounded-2xl bg-[#111111]/95 border border-white/[0.04] backdrop-blur-xl shadow-2xl opacity-0 scale-95 group-hover/cell:opacity-100 group-hover/cell:scale-100 transition-all duration-100 whitespace-nowrap z-50">
                                                         <div className="font-bold text-white text-sm">{days[dayIndex]} {hour}:00</div>
-                                                        <div className="text-xs text-default-300">{value} messages</div>
+                                                        <div className="text-xs text-default-300">{value} {text.messagesUnit}</div>
                                                     </div>
                                                 </div>
                                             );
@@ -336,13 +331,16 @@ export default function MessagesPage() {
                         id: ch.channelId || ch.id,
                         name: ch.name || ch.channelId || ch.id,
                         value: ch.value,
-                        discordUrl: ch.discordUrl
+                        discordUrl: ch.discordUrl,
+                        drilldownUrl: ch.drilldownUrl
                     }))}
-                    valueFormatter={(v) => `${v.toLocaleString()} msgs`}
+                    valueFormatter={(v) => `${formatLocaleNumber(v, locale)} ${text.msgs}`}
                     type="list"
                     icon={<Hash size={20} />}
                     totalValue={totalChannelValue}
+                    locale={locale}
                     isChannel
+                    othersLabel={text.other}
                 />
 
                 <StatsTopWidget
@@ -351,14 +349,20 @@ export default function MessagesPage() {
                         id: m.userId || m.id,
                         name: m.name || m.userId || m.id,
                         value: m.value,
-                        avatar: m.avatar
+                        avatar: m.avatar,
+                        username: m.username,
+                        drilldownUrl: m.drilldownUrl
                     }))}
-                    valueFormatter={(v) => `${v.toLocaleString()} msgs`}
+                    valueFormatter={(v) => `${formatLocaleNumber(v, locale)} ${text.msgs}`}
                     type="list"
                     icon={<User size={20} />}
                     totalValue={totalMemberValue}
+                    locale={locale}
+                    othersLabel={text.other}
                 />
             </div>
         </div>
     );
 }
+
+

@@ -1,6 +1,6 @@
 import { Client, Guild, Invite } from 'discord.js';
 import logger from './logger';
-import { prisma } from './database';
+import { prisma, statsPrisma } from './database';
 
 const inviteCache = new Map<string, Map<string, number>>();
 
@@ -28,7 +28,7 @@ async function persistSnapshots(guildId: string, invites: Map<string, Invite>) {
         const uses = invite.uses ?? 0;
 
         try {
-            await prisma.inviteSnapshot.upsert({
+            await statsPrisma.inviteSnapshot.upsert({
                 where: { guildId_code: { guildId, code } },
                 update: {
                     inviterId,
@@ -95,7 +95,7 @@ export async function handleInviteCreate(invite: Invite) {
     setCache(guildId, cache);
 
     try {
-        await prisma.inviteSnapshot.upsert({
+        await statsPrisma.inviteSnapshot.upsert({
             where: { guildId_code: { guildId, code: invite.code } },
             update: {
                 inviterId: invite.inviter?.id ?? null,
@@ -125,7 +125,7 @@ export async function handleInviteDelete(invite: Invite) {
     cache?.delete(invite.code);
 
     try {
-        await prisma.inviteSnapshot.delete({
+        await statsPrisma.inviteSnapshot.delete({
             where: { guildId_code: { guildId, code: invite.code } },
         });
     } catch (error) {
@@ -171,7 +171,7 @@ export async function getInviteAttribution(guild: Guild) {
 export async function addVoiceDuration(guildId: string, memberId: string, durationSec: number) {
     if (!durationSec || durationSec <= 0) return;
 
-    const existing = await prisma.inviteUseEvent.findFirst({
+    const existing = await statsPrisma.inviteUseEvent.findFirst({
         where: {
             guildId,
             memberId,
@@ -184,7 +184,7 @@ export async function addVoiceDuration(guildId: string, memberId: string, durati
 
     const current = existing.voiceDurationSec ?? 0;
     try {
-        await prisma.inviteUseEvent.update({
+        await statsPrisma.inviteUseEvent.update({
             where: { id: existing.id },
             data: { voiceDurationSec: current + Math.floor(durationSec) },
         });

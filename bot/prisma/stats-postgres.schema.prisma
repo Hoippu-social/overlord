@@ -1,0 +1,440 @@
+// Dedicated stats runtime client for PostgreSQL cutover.
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/stats-pg-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("STATS_PG_DATABASE_URL")
+}
+
+model User {
+  id        String    @id
+  balance   Int       @default(0)
+  xp        Int       @default(0)
+  level     Int       @default(1)
+  lastDaily DateTime?
+  lastWork  DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  warnings  Warning[]
+}
+
+model Guild {
+  id                String              @id
+  prefix            String              @default("!")
+  name              String?
+  icon              String?
+  channels          String?
+  roles             String?
+  memberCount       Int?
+  onlineCount       Int?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  botSettings       BotSettings?
+  musicConfig       MusicConfig?
+  nowPlaying        MusicNowPlaying?
+  tempVoiceConfig   TempVoiceConfig?
+  userVoiceSettings UserVoiceSettings[]
+}
+
+model BotSettings {
+  id                      Int      @id @default(autoincrement())
+  guildId                 String   @unique
+  guild                   Guild    @relation(fields: [guildId], references: [id])
+  locale                  String   @default("ru")
+  timezone                String   @default("UTC")
+  prefixCommandsEnabled   Boolean  @default(true)
+  commandChannelMode      String   @default("BLACKLIST")
+  allowedTextChannels     String?
+  adminRoles              String?
+  restoreRolesOnRejoin    Boolean  @default(false)
+  restoreNicknameOnRejoin Boolean  @default(false)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+}
+
+model MusicConfig {
+  id              Int      @id @default(autoincrement())
+  guildId         String   @unique
+  guild           Guild    @relation(fields: [guildId], references: [id])
+  channelMode     String   @default("BLACKLIST")
+  allowedChannels String?
+  djMode          Boolean  @default(false)
+  djRoles         String?
+  defaultVolume   Int      @default(50)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Warning {
+  id          Int      @id @default(autoincrement())
+  reason      String
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  moderatorId String
+  createdAt   DateTime @default(now())
+}
+
+model TempVoiceConfig {
+  id                 Int             @id @default(autoincrement())
+  guildId            String          @unique
+  guild              Guild           @relation(fields: [guildId], references: [id])
+  hubChannelId       String
+  interfaceChannelId String?
+  categoryId         String?
+  nameTemplate       String          @default("Room {user}")
+  userLimit          Int?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  rooms              TempVoiceRoom[]
+}
+
+model TempVoiceRoom {
+  id           Int             @id @default(autoincrement())
+  channelId    String          @unique
+  ownerId      String
+  guildId      String
+  hubChannelId String
+  createdAt    DateTime        @default(now())
+  config       TempVoiceConfig @relation(fields: [guildId], references: [guildId], onDelete: Cascade)
+
+  @@index([guildId])
+}
+
+model UserVoiceSettings {
+  id             Int      @id @default(autoincrement())
+  guildId        String
+  userId         String
+  preferredName  String?
+  preferredLimit Int?
+  locked         Boolean  @default(false)
+  blockedUsers   String?
+  allowedUsers   String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  guild          Guild    @relation(fields: [guildId], references: [id])
+
+  @@unique([guildId, userId])
+}
+
+model MusicNowPlaying {
+  id         Int      @id @default(autoincrement())
+  guildId    String   @unique
+  guild      Guild    @relation(fields: [guildId], references: [id])
+  title      String
+  author     String?
+  uri        String?
+  artworkUrl String?
+  durationMs Int?
+  positionMs Int?
+  volume     Int?
+  paused     Boolean  @default(false)
+  updatedAt  DateTime @updatedAt
+  createdAt  DateTime @default(now())
+}
+
+model MessageEvent {
+  id                Int      @id @default(autoincrement())
+  guildId           String
+  channelId         String
+  messageId         String
+  authorId          String?
+  eventType         String
+  isBot             Boolean  @default(false)
+  contentBefore     String?
+  contentAfter      String?
+  attachmentsBefore String?
+  attachmentsAfter  String?
+  createdAt         DateTime @default(now())
+
+  @@index([guildId, channelId, createdAt])
+  @@index([guildId, authorId, createdAt])
+}
+
+model AuditLogEvent {
+  id        Int      @id @default(autoincrement())
+  guildId   String
+  tag       String
+  actorId   String?
+  targetId  String?
+  channelId String?
+  messageId String?
+  payload   String?
+  severity  String?
+  createdAt DateTime @default(now())
+
+  @@index([guildId, tag, createdAt])
+}
+
+model AuditTagRoute {
+  id        Int      @id @default(autoincrement())
+  guildId   String
+  tag       String
+  channelId String
+  enabled   Boolean  @default(true)
+  template  String?
+  mentions  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([guildId, tag])
+}
+
+model InviteSnapshot {
+  id        Int       @id @default(autoincrement())
+  guildId   String
+  code      String
+  inviterId String?
+  uses      Int       @default(0)
+  maxUses   Int?
+  expiresAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@unique([guildId, code])
+}
+
+model InviteUseEvent {
+  id               Int       @id @default(autoincrement())
+  guildId          String
+  memberId         String
+  inviterId        String?
+  code             String?
+  joinedAt         DateTime  @default(now())
+  leftAt           DateTime?
+  stayDurationSec  Int?
+  voiceDurationSec Int?
+  createdAt        DateTime  @default(now())
+
+  @@index([guildId, memberId])
+}
+
+model StatMessage {
+  id              Int      @id @default(autoincrement())
+  guildId         String
+  channelId       String
+  authorId        String
+  length          Int
+  sourceMessageId String?  @unique
+  createdAt       DateTime @default(now())
+
+  @@index([guildId, channelId])
+  @@index([guildId, authorId])
+  @@index([guildId, createdAt])
+}
+
+model StatVoiceState {
+  id         Int       @id @default(autoincrement())
+  guildId    String
+  channelId  String
+  userId     String
+  sessionKey String?   @unique
+  joinedAt   DateTime  @default(now())
+  leftAt     DateTime?
+  duration   Int?
+
+  @@index([guildId, channelId])
+  @@index([guildId, userId])
+  @@index([guildId, joinedAt])
+}
+
+model StatMemberCount {
+  id        Int      @id @default(autoincrement())
+  guildId   String
+  online    Int      @default(0)
+  idle      Int      @default(0)
+  dnd       Int      @default(0)
+  offline   Int      @default(0)
+  total     Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([guildId, createdAt])
+}
+
+model StatMemberEvent {
+  id        Int      @id @default(autoincrement())
+  guildId   String
+  userId    String
+  eventType String
+  eventKey  String?  @unique
+  source    String   @default("live")
+  createdAt DateTime @default(now())
+
+  @@index([guildId, createdAt])
+  @@index([guildId, userId, createdAt])
+  @@index([guildId, eventType, createdAt])
+}
+
+model StatHourly {
+  id           Int      @id @default(autoincrement())
+  guildId      String
+  dateHour     DateTime
+  messages     Int      @default(0)
+  voiceSeconds Int      @default(0)
+  newMembers   Int      @default(0)
+  leftMembers  Int      @default(0)
+
+  @@unique([guildId, dateHour])
+}
+
+model StatDaily {
+  id           Int      @id @default(autoincrement())
+  guildId      String
+  date         DateTime
+  messages     Int      @default(0)
+  voiceSeconds Int      @default(0)
+  newMembers   Int      @default(0)
+  leftMembers  Int      @default(0)
+  maxOnline    Int      @default(0)
+
+  @@unique([guildId, date])
+}
+
+model StatTopMember {
+  id        Int      @id @default(autoincrement())
+  guildId   String
+  userId    String
+  period    String
+  category  String
+  value     Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  @@unique([guildId, userId, period, category])
+  @@index([guildId, period, category, value(sort: Desc)])
+}
+
+model StatTopChannel {
+  id        Int      @id @default(autoincrement())
+  guildId   String
+  channelId String
+  period    String
+  category  String
+  value     Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  @@unique([guildId, channelId, period, category])
+  @@index([guildId, period, category, value(sort: Desc)])
+}
+
+model StatMemberDaily {
+  id           Int      @id @default(autoincrement())
+  guildId      String
+  userId       String
+  date         DateTime
+  messages     Int      @default(0)
+  voiceSeconds Int      @default(0)
+  interactions Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([guildId, userId, date])
+  @@index([guildId, date])
+  @@index([guildId, userId, date])
+}
+
+model StatChannelDaily {
+  id           Int      @id @default(autoincrement())
+  guildId      String
+  channelId    String
+  date         DateTime
+  messages     Int      @default(0)
+  voiceSeconds Int      @default(0)
+  interactions Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([guildId, channelId, date])
+  @@index([guildId, date])
+  @@index([guildId, channelId, date])
+}
+
+model StatActivity {
+  id         Int       @id @default(autoincrement())
+  guildId    String
+  userId     String
+  name       String
+  sessionKey String?   @unique
+  startTime  DateTime  @default(now())
+  endTime    DateTime?
+  duration   Int?
+
+  @@index([guildId, userId])
+  @@index([guildId, name])
+  @@index([guildId, startTime])
+}
+
+model StatInteraction {
+  id             Int      @id @default(autoincrement())
+  guildId        String
+  fromUserId     String
+  toUserId       String
+  type           String
+  channelId      String
+  interactionKey String?  @unique
+  createdAt      DateTime @default(now())
+
+  @@index([guildId, createdAt])
+  @@index([guildId, fromUserId])
+  @@index([guildId, toUserId])
+}
+
+model GuildTimezoneHistory {
+  id            Int      @id @default(autoincrement())
+  guildId       String
+  timezone      String
+  source        String   @default("manual")
+  effectiveFrom DateTime @default(now())
+  createdAt     DateTime @default(now())
+
+  @@index([guildId, effectiveFrom])
+}
+
+model StatsAggregationState {
+  guildId                 String   @id
+  timezone                String   @default("UTC")
+  schemaVersion           Int      @default(1)
+  sourceHighWatermark     String?
+  rebuildRequired         Boolean  @default(false)
+  jobStatus               String   @default("IDLE")
+  lastSuccessfulRebuildAt DateTime?
+  lastSourceEventAt       DateTime?
+  lastReadModelSyncAt     DateTime?
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+}
+
+model StatsJob {
+  id         Int      @id @default(autoincrement())
+  guildId    String
+  jobType    String
+  status     String   @default("PENDING")
+  payload    String?
+  attempts   Int      @default(0)
+  startedAt  DateTime?
+  finishedAt DateTime?
+  error      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@index([guildId, status, createdAt])
+}
+
+model StatsApiRequestMetric {
+  id         Int      @id @default(autoincrement())
+  guildId    String
+  endpoint   String
+  method     String
+  period     String?
+  statusCode Int
+  durationMs Int
+  errorCode  String?
+  createdAt  DateTime @default(now())
+
+  @@index([guildId, createdAt])
+  @@index([guildId, endpoint, createdAt])
+  @@index([createdAt])
+}

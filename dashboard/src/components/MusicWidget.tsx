@@ -403,11 +403,11 @@ export const MusicWidget = ({ className = "", nowPlaying, guildId }: { className
                     {/* Now Playing Info */}
                     <div className="flex flex-col items-center text-center space-y-4 mt-4">
                         <div className="relative w-48 h-48 rounded-2xl overflow-hidden shadow-2xl">
-                                <Image
-                                    src={artwork}
-                                    alt={text.albumArt}
-                                    classNames={{ wrapper: "w-full h-full", img: "w-full h-full object-cover" }}
-                                />
+                            <Image
+                                src={artwork}
+                                alt={text.albumArt}
+                                classNames={{ wrapper: "w-full h-full", img: "w-full h-full object-cover" }}
+                            />
                         </div>
                         <div>
                             <h3 className="text-xl font-bold text-foreground line-clamp-1">{title}</h3>

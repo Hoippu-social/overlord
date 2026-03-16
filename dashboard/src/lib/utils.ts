@@ -9,22 +9,27 @@ export function formatDate(date: string | Date): string {
     return `${day}.${month}.${year}`;
 }
 
+export function formatDateInTimezone(date: string | Date, timeZone: string, locale: 'ru' | 'en' = 'ru'): string {
+    const d = typeof date === 'string' ? new Date(date) : date;
+    if (isNaN(d.getTime())) return typeof date === 'string' ? date : '';
+
+    return new Intl.DateTimeFormat(locale === 'ru' ? 'ru-RU' : 'en-GB', {
+        timeZone,
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+    }).format(d);
+}
+
 export function formatChartDate(dateStr: string): string {
     if (!dateStr) return '';
 
-    // YYYY-MM-DD
     if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
         const [y, m, d] = dateStr.split('-');
         return `${d}.${m}.${y}`;
     }
 
-    // DD.MM HH:mm (from 7d period in API)
     if (/^\d{2}\.\d{2} \d{2}:\d{2}$/.test(dateStr)) {
-        const [dm, time] = dateStr.split(' ');
-        // We don't have year here from the string alone, but usually we want to keep HH:mm on charts
-        // The user specifically asked for dd.mm.year though.
-        // However, if we return dd.mm.year on every tick for 7d, it might be too long.
-        // Let's see.
         return dateStr;
     }
 
@@ -32,15 +37,21 @@ export function formatChartDate(dateStr: string): string {
 }
 
 export function formatYAxis(value: number, locale: 'ru' | 'en'): string {
-    if (value >= 1000000) {
-        const val = value / 1000000;
+    if (value >= 1_000_000) {
+        const val = value / 1_000_000;
         const str = Number.isInteger(val) ? val.toString() : val.toFixed(1).replace(/\.0$/, '');
-        return locale === 'ru' ? `${str} млн` : `${str} kk`;
+        return locale === 'ru' ? `${str} млн` : `${str}M`;
     }
-    if (value >= 10000) {
-        const val = value / 1000;
+
+    if (value >= 10_000) {
+        const val = value / 1_000;
         const str = Number.isInteger(val) ? val.toString() : val.toFixed(1).replace(/\.0$/, '');
         return locale === 'ru' ? `${str} тыс.` : `${str}k`;
     }
+
     return value.toString();
+}
+
+export function formatLocaleNumber(value: number, locale: 'ru' | 'en'): string {
+    return value.toLocaleString(locale === 'ru' ? 'ru-RU' : 'en-US');
 }

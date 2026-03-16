@@ -1,8 +1,10 @@
 import { Events, GuildMember } from 'discord.js';
 import logger from '../utils/logger';
-import { prisma } from '../utils/database';
+import { prisma, statsPrisma } from '../utils/database';
 import { getInviteAttribution } from '../utils/inviteTracker';
 import { logAuditEvent } from '../utils/auditLog';
+import { StatsService } from '../services/StatsService';
+import { syncGuildRealtimeCounts } from '../utils/guildSync';
 
 export default {
     name: Events.GuildMemberAdd,
@@ -11,12 +13,17 @@ export default {
         const guildId = member.guild.id;
         const joinedAt = member.joinedAt ?? new Date();
 
+        await syncGuildRealtimeCounts(member.guild);
+
+        // Track member join in stats
+        await StatsService.trackMemberJoin(guildId, member.id, joinedAt);
+
         const attribution = await getInviteAttribution(member.guild);
         const code = attribution.code;
         const inviterId = attribution.inviterId;
 
         try {
-            await prisma.inviteUseEvent.create({
+            await statsPrisma.inviteUseEvent.create({
                 data: {
                     guildId,
                     memberId: member.id,

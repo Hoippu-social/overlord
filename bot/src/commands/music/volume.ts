@@ -12,6 +12,8 @@ const command: Command = {
                 .setMaxValue(100)
                 .setRequired(false)
         ) as any,
+    accessGroup: 'music',
+    accessKey: 'volume',
     execute: async (interaction) => {
         const member = interaction.member as GuildMember;
         const voiceChannel = member.voice.channel;

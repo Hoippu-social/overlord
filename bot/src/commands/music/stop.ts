@@ -5,6 +5,8 @@ const command: Command = {
     data: new SlashCommandBuilder()
         .setName('stop')
         .setDescription('Stops the music and clears the queue'),
+    accessGroup: 'music',
+    accessKey: 'stop',
     execute: async (interaction) => {
         const player = interaction.client.lavalink.getPlayer(interaction.guildId!);
 

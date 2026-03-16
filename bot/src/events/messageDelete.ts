@@ -1,6 +1,6 @@
-import { Events, Message } from 'discord.js';
+import { Events, Message, AuditLogEvent } from 'discord.js';
 import logger from '../utils/logger';
-import { prisma } from '../utils/database';
+import { prisma, statsPrisma } from '../utils/database';
 import { logAuditEvent } from '../utils/auditLog';
 
 function serializeAttachments(message: Message) {
@@ -18,14 +18,32 @@ export default {
     name: Events.MessageDelete,
     once: false,
     async execute(message: Message) {
-        if (!message.guildId) return;
+        if (!message.guild || !message.guildId) return;
 
         const authorId = message.author?.id || null;
+        let executorId = authorId;
         const contentBefore = typeof message.content === 'string' ? message.content : null;
         const attachments = serializeAttachments(message);
 
         try {
-            await prisma.messageEvent.create({
+            const auditLogs = await message.guild.fetchAuditLogs({
+                limit: 1,
+                type: AuditLogEvent.MessageDelete,
+            });
+            const entry = auditLogs.entries.first();
+
+            if (entry && entry.targetId === authorId && entry.extra.channel.id === message.channelId) {
+                if (Date.now() - entry.createdTimestamp < 5000) {
+                    executorId = entry.executorId || authorId;
+                }
+            }
+        } catch (error) {
+            // Missing permissions or other errors
+            logger.debug(`[AuditLog] Could not fetch audit logs for messageDelete in ${message.guildId}`);
+        }
+
+        try {
+            await statsPrisma.messageEvent.create({
                 data: {
                     guildId: message.guildId,
                     channelId: message.channelId,
@@ -44,13 +62,14 @@ export default {
         await logAuditEvent(message.client, {
             guildId: message.guildId,
             tag: 'message',
-            actorId: authorId,
+            actorId: executorId,
             targetId: authorId,
             channelId: message.channelId,
             messageId: message.id,
             payload: {
                 event: 'message_delete',
                 authorId,
+                executorId,
                 contentBefore,
                 attachments,
             },

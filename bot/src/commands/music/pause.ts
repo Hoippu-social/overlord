@@ -5,6 +5,8 @@ const command: Command = {
     data: new SlashCommandBuilder()
         .setName('pause')
         .setDescription('Pauses the current track'),
+    accessGroup: 'music',
+    accessKey: 'pause',
     execute: async (interaction) => {
         const member = interaction.member as GuildMember;
         const voiceChannel = member.voice.channel;

@@ -47,6 +47,7 @@ model BotSettings {
   guildId                 String   @unique
   guild                   Guild    @relation(fields: [guildId], references: [id])
   locale                  String   @default("ru")
+  timezone                String   @default("UTC")
   prefixCommandsEnabled   Boolean  @default(true)
   commandChannelMode      String   @default("BLACKLIST") // WHITELIST or BLACKLIST
   allowedTextChannels     String? // JSON string of channel IDs
@@ -454,6 +455,7 @@ model StatMessage {
   channelId String
   authorId  String
   length    Int
+  sourceMessageId String?  @unique
   createdAt DateTime @default(now())
 
   @@index([guildId, channelId])
@@ -466,6 +468,7 @@ model StatVoiceState {
   guildId   String
   channelId String
   userId    String
+  sessionKey String?  @unique
   joinedAt  DateTime  @default(now())
   leftAt    DateTime?
   duration  Int? // Seconds
@@ -486,6 +489,20 @@ model StatMemberCount {
   createdAt DateTime @default(now())
 
   @@index([guildId, createdAt])
+}
+
+model StatMemberEvent {
+  id         Int      @id @default(autoincrement())
+  guildId    String
+  userId     String
+  eventType  String
+  eventKey   String?  @unique
+  source     String   @default("live")
+  createdAt  DateTime @default(now())
+
+  @@index([guildId, createdAt])
+  @@index([guildId, userId, createdAt])
+  @@index([guildId, eventType, createdAt])
 }
 
 model StatHourly {
@@ -539,11 +556,44 @@ model StatTopChannel {
   @@index([guildId, period, category, value(sort: Desc)])
 }
 
+model StatMemberDaily {
+  id           Int      @id @default(autoincrement())
+  guildId      String
+  userId       String
+  date         DateTime
+  messages     Int      @default(0)
+  voiceSeconds Int      @default(0)
+  interactions Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([guildId, userId, date])
+  @@index([guildId, date])
+  @@index([guildId, userId, date])
+}
+
+model StatChannelDaily {
+  id           Int      @id @default(autoincrement())
+  guildId      String
+  channelId    String
+  date         DateTime
+  messages     Int      @default(0)
+  voiceSeconds Int      @default(0)
+  interactions Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([guildId, channelId, date])
+  @@index([guildId, date])
+  @@index([guildId, channelId, date])
+}
+
 model StatActivity {
   id        Int       @id @default(autoincrement())
   guildId   String
   userId    String
   name      String // e.g. "Visual Studio Code"
+  sessionKey String?  @unique
   startTime DateTime  @default(now())
   endTime   DateTime?
   duration  Int? // Seconds
@@ -552,3 +602,62 @@ model StatActivity {
   @@index([guildId, name])
   @@index([guildId, startTime])
 }
+
+model StatInteraction {
+  id         Int      @id @default(autoincrement())
+  guildId    String
+  fromUserId String
+  toUserId   String
+  type       String   // "REPLY" | "MENTION"
+  channelId  String
+  interactionKey String? @unique
+  createdAt  DateTime @default(now())
+
+  @@index([guildId, createdAt])
+  @@index([guildId, fromUserId])
+  @@index([guildId, toUserId])
+}
+
+model GuildTimezoneHistory {
+  id           Int      @id @default(autoincrement())
+  guildId      String
+  timezone     String
+  source       String   @default("manual")
+  effectiveFrom DateTime @default(now())
+  createdAt    DateTime @default(now())
+
+  @@index([guildId, effectiveFrom])
+}
+
+model StatsAggregationState {
+  guildId                 String   @id
+  timezone                String   @default("UTC")
+  schemaVersion           Int      @default(1)
+  sourceHighWatermark     String?
+  rebuildRequired         Boolean  @default(false)
+  jobStatus               String   @default("IDLE")
+  lastSuccessfulRebuildAt DateTime?
+  lastSourceEventAt       DateTime?
+  lastReadModelSyncAt     DateTime?
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+}
+
+model StatsJob {
+  id         Int      @id @default(autoincrement())
+  guildId    String
+  jobType    String
+  status     String   @default("PENDING")
+  payload    String?
+  attempts   Int      @default(0)
+  startedAt  DateTime?
+  finishedAt DateTime?
+  error      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@index([guildId, status, createdAt])
+}
+
+

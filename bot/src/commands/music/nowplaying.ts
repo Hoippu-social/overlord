@@ -5,6 +5,8 @@ const command: Command = {
     data: new SlashCommandBuilder()
         .setName('nowplaying')
         .setDescription('Shows the currently playing track'),
+    accessGroup: 'music',
+    accessKey: 'nowplaying',
     execute: async (interaction) => {
         const player = interaction.client.lavalink.getPlayer(interaction.guildId!);
 

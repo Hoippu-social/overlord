@@ -1,4 +1,4 @@
-import { Events, GuildMember } from 'discord.js';
+import { Events, GuildMember, AuditLogEvent } from 'discord.js';
 import { logAuditEvent } from '../utils/auditLog';
 
 export default {
@@ -48,6 +48,66 @@ export default {
                 },
                 severity: 'INFO',
             });
+        }
+
+        const oldTimeout = oldMember.communicationDisabledUntil;
+        const newTimeout = newMember.communicationDisabledUntil;
+
+        if (oldTimeout !== newTimeout) {
+            let actorId = null;
+            let reason = null;
+            let skipModerationLog = false;
+
+            try {
+                const auditLogs = await newMember.guild.fetchAuditLogs({
+                    limit: 1,
+                    type: AuditLogEvent.MemberUpdate,
+                });
+                const entry = auditLogs.entries.first();
+
+                if (entry && entry.targetId === newMember.id) {
+                    if (Date.now() - entry.createdTimestamp < 5000) {
+                        const hasCommChange = entry.changes.some(c => c.key === 'communication_disabled_until');
+                        if (hasCommChange) {
+                            if (entry.executorId === newMember.client.user?.id) {
+                                skipModerationLog = true;
+                            }
+                            actorId = entry.executorId;
+                            reason = entry.reason;
+                        }
+                    }
+                }
+            } catch (error) {
+                // Ignore missing permissions
+            }
+
+            if (!skipModerationLog && !oldTimeout && newTimeout) {
+                await logAuditEvent(newMember.client, {
+                    guildId: newMember.guild.id,
+                    tag: 'moderation',
+                    actorId,
+                    targetId: newMember.id,
+                    payload: {
+                        event: 'member_timeout',
+                        userId: newMember.id,
+                        reason,
+                        until: newTimeout.toISOString(),
+                    },
+                    severity: 'WARN',
+                });
+            } else if (!skipModerationLog && oldTimeout && !newTimeout) {
+                await logAuditEvent(newMember.client, {
+                    guildId: newMember.guild.id,
+                    tag: 'moderation',
+                    actorId,
+                    targetId: newMember.id,
+                    payload: {
+                        event: 'member_timeout_remove',
+                        userId: newMember.id,
+                    },
+                    severity: 'INFO',
+                });
+            }
         }
     },
 };

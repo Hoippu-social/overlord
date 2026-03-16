@@ -10,6 +10,8 @@ const command: Command = {
                 .setDescription('Position to seek to (e.g., 1:30 or 90)')
                 .setRequired(true)
         ) as any,
+    accessGroup: 'music',
+    accessKey: 'seek',
     execute: async (interaction) => {
         const member = interaction.member as GuildMember;
         const voiceChannel = member.voice.channel;

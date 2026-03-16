@@ -1,6 +1,5 @@
 import { Client, TextChannel, ChannelType, Collection, Message } from 'discord.js';
-import { prisma, statsPrisma } from '../utils/database';
-import { RollupService } from './RollupService';
+import { statsPrisma } from '../utils/database';
 
 export interface HistoricalSyncProgress {
     phase: string;
@@ -39,7 +38,7 @@ export class HistoricalSyncService {
             const guild = client.guilds.cache.get(guildId);
             if (!guild) return { success: false, messagesCollected: 0, error: 'Сервер не найден' };
 
-            const since = new Date(); since.setDate(since.getDate() - days); since.setHours(0, 0, 0, 0);
+            const since = new Date(); since.setDate(since.getDate() - days); since.setUTCHours(0, 0, 0, 0);
 
             onProgress({ phase: 'init', current: 0, total: 100, message: 'Подготовка...', percentComplete: 0 });
 
@@ -199,10 +198,7 @@ export class HistoricalSyncService {
             createdAt: msg.createdAt
         }));
 
-        await Promise.all([
-            prisma.statMessage.createMany({ data }),
-            statsPrisma.statMessage.createMany({ data })
-        ]);
+        await statsPrisma.statMessage.createMany({ data });
 
         return newMessages.length;
     }
@@ -228,11 +224,11 @@ export class HistoricalSyncService {
         const dailyMap = new Map<string, number>();
 
         for (const msg of messages) {
-            const h = new Date(msg.createdAt); h.setMinutes(0, 0, 0);
+            const h = new Date(msg.createdAt); h.setUTCMinutes(0, 0, 0);
             const hKey = h.toISOString();
             hourlyMap.set(hKey, (hourlyMap.get(hKey) || 0) + 1);
 
-            const d = new Date(msg.createdAt); d.setHours(0, 0, 0, 0);
+            const d = new Date(msg.createdAt); d.setUTCHours(0, 0, 0, 0);
             const dKey = d.toISOString();
             dailyMap.set(dKey, (dailyMap.get(dKey) || 0) + 1);
         }
@@ -243,17 +239,10 @@ export class HistoricalSyncService {
         const hourlyOperations = [];
         for (const [dateHourStr, count] of hourlyMap) {
             const dateHour = new Date(dateHourStr);
-            const data = { guildId, dateHour, messages: count, voiceSeconds: 0, newMembers: 0, leftMembers: 0 };
-
-            hourlyOperations.push(prisma.statHourly.upsert({
-                where: { guildId_dateHour: { guildId, dateHour } },
-                update: { messages: count },
-                create: data
-            }));
             hourlyOperations.push(statsPrisma.statHourly.upsert({
                 where: { guildId_dateHour: { guildId, dateHour } },
-                update: { messages: count },
-                create: data
+                update: { messages: count }, // ONLY update messages so voice/member counts are preserved
+                create: { guildId, dateHour, messages: count, voiceSeconds: 0, newMembers: 0, leftMembers: 0 }
             }));
         }
 
@@ -261,17 +250,11 @@ export class HistoricalSyncService {
         const dailyOperations = [];
         for (const [dateStr, count] of dailyMap) {
             const date = new Date(dateStr);
-            const data = { guildId, date, messages: count, voiceSeconds: 0, newMembers: 0, leftMembers: 0 };
 
-            dailyOperations.push(prisma.statDaily.upsert({
-                where: { guildId_date: { guildId, date } },
-                update: { messages: count },
-                create: data
-            }));
             dailyOperations.push(statsPrisma.statDaily.upsert({
                 where: { guildId_date: { guildId, date } },
-                update: { messages: count },
-                create: data
+                update: { messages: count }, // ONLY update messages so voice/member counts are preserved
+                create: { guildId, date, messages: count, voiceSeconds: 0, newMembers: 0, leftMembers: 0 }
             }));
         }
 

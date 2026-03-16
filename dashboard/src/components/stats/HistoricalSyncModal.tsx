@@ -63,53 +63,55 @@ export function HistoricalSyncModal({ isOpen, onClose, guildId, selectedDays }: 
             });
 
             if (!response.ok) {
-                const data = await response.json();
+                const data = await response.json().catch(() => ({}));
                 throw new Error(data.error || 'Ошибка сервера');
             }
 
-            // Handle SSE stream
+            // Read SSE stream
             const reader = response.body?.getReader();
             const decoder = new TextDecoder();
 
-            if (!reader) {
-                throw new Error('Не удалось получить поток данных');
-            }
+            if (reader) {
+                let buffer = '';
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
 
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() || '';
 
-                const chunk = decoder.decode(value);
-                const lines = chunk.split('\n');
-
-                for (const line of lines) {
-                    if (line.startsWith('data: ')) {
-                        try {
-                            const data = JSON.parse(line.slice(6));
-
-                            if (data.type === 'progress') {
-                                setProgress({
-                                    phase: data.phase,
-                                    current: data.current,
-                                    total: data.total,
-                                    message: data.message,
-                                    percentComplete: data.percentComplete
-                                });
-                            } else if (data.type === 'complete') {
-                                if (data.success) {
-                                    setResult({ messagesCollected: data.messagesCollected });
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const event = JSON.parse(line.slice(6));
+                                if (event.type === 'progress') {
+                                    setProgress({
+                                        phase: event.phase,
+                                        current: event.current,
+                                        total: event.total,
+                                        message: event.message,
+                                        percentComplete: event.percentComplete
+                                    });
+                                } else if (event.type === 'complete') {
+                                    setResult({ messagesCollected: event.messagesCollected || 0 });
                                     setStage('complete');
-                                } else {
-                                    setResult({ messagesCollected: 0, error: data.error });
-                                    setStage('error');
+                                } else if (event.type === 'error') {
+                                    throw new Error(event.error);
                                 }
+                            } catch (e) {
+                                if (e instanceof Error && e.message !== 'Unexpected end of JSON input') throw e;
                             }
-                        } catch (e) {
-                            console.error('Failed to parse SSE data:', e);
                         }
                     }
                 }
             }
+
+            if (stage !== 'complete' && stage !== 'error') {
+                setStage('complete');
+                if (!result) setResult({ messagesCollected: 0 });
+            }
+
         } catch (err) {
             console.error('Historical sync error:', err);
             setResult({ messagesCollected: 0, error: err instanceof Error ? err.message : 'Неизвестная ошибка' });

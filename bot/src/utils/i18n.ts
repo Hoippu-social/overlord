@@ -37,6 +37,7 @@ const translations: Record<LocaleCode, Record<string, string>> = {
         'help.details.module': 'Module',
         'help.details.access': 'Access',
         'help.details.more': 'Details',
+        'help.insufficientAccess': 'Insufficient access level.',
 
         // Search
         'search.title': '🎵 Search results for: **{query}**',
@@ -116,6 +117,7 @@ const translations: Record<LocaleCode, Record<string, string>> = {
         'music.player.loop.off': 'Off',
         'music.player.loop.track': 'Track',
         'music.player.loop.queue': 'Queue',
+        'music.player.queueEnd': '⏹️ Queue finished. Disconnecting...',
 
         // Temp voice
         'tempvoice.enabled': [
@@ -255,6 +257,7 @@ const translations: Record<LocaleCode, Record<string, string>> = {
         'help.details.module': 'Модуль',
         'help.details.access': 'Доступ',
         'help.details.more': 'Подробнее',
+        'help.insufficientAccess': 'Недостаточный уровень доступа.',
 
         // Search
         'search.title': '🎵 Результаты поиска для: **{query}**',
@@ -334,6 +337,7 @@ const translations: Record<LocaleCode, Record<string, string>> = {
         'music.player.loop.off': 'Выкл',
         'music.player.loop.track': 'Трек',
         'music.player.loop.queue': 'Очередь',
+        'music.player.queueEnd': '⏹️ Очередь завершена. Отключаюсь...',
 
         // Temp voice
         'tempvoice.enabled': [

@@ -1,13 +1,13 @@
 import {
-    ConfigState,
-    CasesState,
     AiIncidentState,
-    AppealTicketState,
     AnalyticsState,
-    CustomRule,
     AppealReviewDecision,
-    CommandRule,
+    AppealTicketState,
+    CasesState,
+    ConfigState,
+    CustomRule,
 } from './types';
+import { createDefaultCommandRules } from '@/lib/commandCatalog';
 
 export const BUILTIN_RULE_LABELS: Record<string, string> = {
     flood: 'Flood',
@@ -58,150 +58,6 @@ export const CATEGORY_LABELS_RU: Record<string, string> = {
 };
 
 export const ACCESS_PRESETS = ['Helper', 'Moderator', 'Control', 'Administrator'];
-export const MODERATION_COMMANDS = [
-    {
-        key: 'appeals',
-        label: { en: 'Appeals', ru: 'Апелляции' },
-        description: { en: 'Review and resolve moderation appeals.', ru: 'Просмотр и разбор апелляций модерации.' },
-    },
-    {
-        key: 'ban',
-        label: { en: 'Ban', ru: 'Бан' },
-        description: { en: 'Ban a member from the server.', ru: 'Блокировка участника на сервере.' },
-    },
-    {
-        key: 'case',
-        label: { en: 'Case', ru: 'Кейс' },
-        description: { en: 'Inspect a specific moderation case.', ru: 'Просмотр конкретного модерационного кейса.' },
-    },
-    {
-        key: 'cases',
-        label: { en: 'Cases', ru: 'Кейсы' },
-        description: { en: 'Browse moderation case history.', ru: 'Просмотр истории модерационных кейсов.' },
-    },
-    {
-        key: 'clear',
-        label: { en: 'Clear', ru: 'Очистка' },
-        description: { en: 'Bulk delete messages in a channel.', ru: 'Массовое удаление сообщений в канале.' },
-    },
-    {
-        key: 'kick',
-        label: { en: 'Kick', ru: 'Кик' },
-        description: { en: 'Kick a member from the server.', ru: 'Исключение участника с сервера.' },
-    },
-    {
-        key: 'lock',
-        label: { en: 'Lock', ru: 'Лок' },
-        description: { en: 'Lock a channel from sending messages.', ru: 'Закрытие канала для отправки сообщений.' },
-    },
-    {
-        key: 'mute',
-        label: { en: 'Mute', ru: 'Мьют' },
-        description: { en: 'Apply the configured mute role.', ru: 'Выдача настроенной роли мута.' },
-    },
-    {
-        key: 'note',
-        label: { en: 'Notes', ru: 'Заметки' },
-        description: { en: 'Manage internal moderation notes.', ru: 'Управление внутренними заметками модерации.' },
-    },
-    {
-        key: 'slowmode',
-        label: { en: 'Slowmode', ru: 'Медленный режим' },
-        description: { en: 'Configure channel slowmode.', ru: 'Настройка медленного режима канала.' },
-    },
-    {
-        key: 'tempban',
-        label: { en: 'Tempban', ru: 'Временный бан' },
-        description: { en: 'Temporarily ban a user.', ru: 'Временная блокировка пользователя.' },
-    },
-    {
-        key: 'timeout',
-        label: { en: 'Timeout', ru: 'Таймаут' },
-        description: { en: 'Temporarily timeout a member.', ru: 'Временное ограничение участника.' },
-    },
-    {
-        key: 'unban',
-        label: { en: 'Unban', ru: 'Разбан' },
-        description: { en: 'Remove an active ban.', ru: 'Снятие активной блокировки.' },
-    },
-    {
-        key: 'unlock',
-        label: { en: 'Unlock', ru: 'Разлок' },
-        description: { en: 'Re-open a locked channel.', ru: 'Повторное открытие закрытого канала.' },
-    },
-    {
-        key: 'unmute',
-        label: { en: 'Unmute', ru: 'Размьют' },
-        description: { en: 'Remove the configured mute role.', ru: 'Снятие настроенной роли мута.' },
-    },
-    {
-        key: 'untimeout',
-        label: { en: 'Untimeout', ru: 'Снять таймаут' },
-        description: { en: 'Remove an active timeout.', ru: 'Снятие активного таймаута.' },
-    },
-    {
-        key: 'unwarn',
-        label: { en: 'Unwarn', ru: 'Снять предупреждение' },
-        description: { en: 'Clear a warning case.', ru: 'Снятие предупреждения по кейсу.' },
-    },
-    {
-        key: 'voicekick',
-        label: { en: 'Voice Kick', ru: 'Кик из голосового' },
-        description: { en: 'Disconnect a member from voice.', ru: 'Отключение участника из голосового канала.' },
-    },
-    {
-        key: 'voicemove',
-        label: { en: 'Voice Move', ru: 'Перемещение в голосовом' },
-        description: { en: 'Move a member between voice channels.', ru: 'Перемещение участника между голосовыми каналами.' },
-    },
-    {
-        key: 'warn',
-        label: { en: 'Warn', ru: 'Предупреждение' },
-        description: { en: 'Issue a warning to a member.', ru: 'Выдача предупреждения участнику.' },
-    },
-    {
-        key: 'warnings',
-        label: { en: 'Warnings', ru: 'Предупреждения' },
-        description: { en: 'List active warnings for a member.', ru: 'Просмотр активных предупреждений участника.' },
-    },
-] as const;
-
-export const MODERATION_COMMAND_DEFAULT_LEVELS: Record<string, number> = {
-    appeals: 70,
-    ban: 85,
-    case: 35,
-    cases: 35,
-    clear: 55,
-    kick: 65,
-    lock: 55,
-    mute: 55,
-    note: 30,
-    slowmode: 55,
-    tempban: 80,
-    timeout: 60,
-    unban: 80,
-    unlock: 55,
-    unmute: 55,
-    untimeout: 60,
-    unwarn: 60,
-    voicekick: 45,
-    voicemove: 45,
-    warn: 45,
-    warnings: 35,
-};
-
-export const getDefaultCommandRule = (commandKey: string): CommandRule => ({
-    commandKey,
-    enabled: true,
-    roleMode: 'WHITELIST',
-    roleIds: [],
-    channelMode: 'WHITELIST',
-    channelIds: [],
-    requiredAccessLevel: MODERATION_COMMAND_DEFAULT_LEVELS[commandKey] ?? 50,
-});
-
-export const createDefaultCommandRules = (): CommandRule[] =>
-    MODERATION_COMMANDS.map((command) => getDefaultCommandRule(command.key));
 export const SANCTION_ACTIONS = ['WARN', 'TIMEOUT', 'MUTE', 'KICK', 'BAN'];
 export const CUSTOM_RULE_TYPES = ['regex', 'keyword-list'];
 export const CUSTOM_RULE_ACTIONS = ['DELETE', 'WARN', 'TIMEOUT', 'MUTE', 'KICK'];

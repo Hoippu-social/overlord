@@ -11,6 +11,8 @@ const command: Command = {
                 .setDescription('The song to play')
                 .setRequired(true)
         ) as any,
+    accessGroup: 'music',
+    accessKey: 'play',
     execute: async (interaction) => {
         try {
             const member = interaction.member as GuildMember;

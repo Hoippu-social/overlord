@@ -1,8 +1,9 @@
 import React, { useState, useMemo } from 'react';
-import { Card, CardBody, CardHeader, Button, Avatar, Tooltip, Link } from "@nextui-org/react";
+import { Card, CardBody, CardHeader, Avatar, Tooltip, Link } from "@nextui-org/react";
 import { List, ChartPie, Eye, EyeSlash, Hash, User } from "@phosphor-icons/react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
 import { motion, AnimatePresence } from 'framer-motion';
+import { formatLocaleNumber } from "@/lib/utils";
 
 interface TopItem {
     id: string;
@@ -11,6 +12,7 @@ interface TopItem {
     avatar?: string;
     discordUrl?: string; // For channels
     color?: string;
+    username?: string;
     [key: string]: any;
 }
 
@@ -19,6 +21,7 @@ interface StatsTopWidgetProps {
     data: TopItem[];
     type: 'list' | 'pie';
     valueFormatter: (val: number) => string;
+    locale?: 'ru' | 'en';
     icon?: React.ReactNode;
     totalValue?: number; // Total for calculating "Others"
     isChannel?: boolean; // Whether this is a channel list (for styling)
@@ -28,6 +31,7 @@ interface StatsTopWidgetProps {
     pieRadius?: [number, number];
     hideControls?: boolean;
     largeText?: boolean;
+    othersLabel?: string;
 }
 
 export const COLORS = ['#06B6D4', '#3B82F6', '#8B5CF6', '#EC4899', '#F43F5E', '#F97316', '#EAB308', '#22C55E', '#14B8A6', '#6366F1'];
@@ -38,6 +42,7 @@ export const StatsTopWidget: React.FC<StatsTopWidgetProps> = ({
     data,
     type: defaultType = 'list',
     valueFormatter,
+    locale = 'en',
     icon,
     totalValue,
     isChannel = false,
@@ -46,7 +51,8 @@ export const StatsTopWidget: React.FC<StatsTopWidgetProps> = ({
     className,
     pieRadius,
     hideControls = false,
-    largeText = false
+    largeText = false,
+    othersLabel = 'Others',
 }) => {
     const [viewType, setViewType] = useState<'list' | 'pie'>(hideControls ? defaultType : defaultType);
     const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
@@ -68,7 +74,7 @@ export const StatsTopWidget: React.FC<StatsTopWidgetProps> = ({
         if (othersValue > 0) {
             items.push({
                 id: 'others',
-                name: 'Прочие',
+                name: othersLabel,
                 value: othersValue,
                 color: OTHERS_COLOR
             });
@@ -114,45 +120,51 @@ export const StatsTopWidget: React.FC<StatsTopWidgetProps> = ({
         // Default to total
         const total = activeData.reduce((acc, curr) => acc + curr.value, 0);
         return {
-            label: "Total",
+            label: locale === 'ru' ? 'Итого' : 'Total',
             value: valueFormatter(total),
             sub: null
         };
-    }, [activeIndex, activeData, valueFormatter]);
+    }, [activeIndex, activeData, locale, valueFormatter]);
 
     return (
-        <Card className={`h-full bg-[#18181b]/50 border border-white/5 shadow-sm ${className || ''}`}>
+        <Card className={`h-full bg-[#111111] border border-white/[0.04] shadow-sm shadow-black/20 rounded-[32px] overflow-hidden ${className || ''}`}>
             {!hideHeader && (
-                <CardHeader className="flex justify-between items-center px-6 py-4 border-b border-white/5">
+                <CardHeader className="flex justify-between items-center px-8 py-6 pb-2">
                     <div className="flex items-center gap-3">
-                        {icon && <div className="text-default-500 flex-shrink-0">{icon}</div>}
-                        <h3 className="text-lg font-semibold">{title}</h3>
+                        {icon && <div className="text-white/40 flex-shrink-0">{icon}</div>}
+                        <h3 className="text-sm font-semibold text-white/40 tracking-wide">{title}</h3>
                     </div>
                     {!hideControls && (
-                        <div className="flex gap-1 bg-default-100/10 p-1 rounded-lg">
-                            <Button
-                                size="sm"
-                                isIconOnly
-                                variant={viewType === 'list' ? "solid" : "light"}
-                                color={viewType === 'list' ? "primary" : "default"}
-                                onPress={() => setViewType('list')}
+                        <div className="flex gap-1 bg-white/[0.04] p-1 rounded-full border border-white/[0.04]">
+                            <button
+                                type="button"
+                                onClick={() => setViewType('list')}
+                                className={`flex items-center justify-center w-8 h-8 rounded-full transition-all ${
+                                    viewType === 'list'
+                                        ? 'bg-[#75F16A] text-[#0a0a0a] shadow-[0_0_14px_rgba(117,241,106,0.35)]'
+                                        : 'text-white/30 hover:text-white/70 hover:bg-white/[0.06]'
+                                }`}
+                                aria-label={locale === 'ru' ? 'Список' : 'List view'}
                             >
-                                <List size={18} />
-                            </Button>
-                            <Button
-                                size="sm"
-                                isIconOnly
-                                variant={viewType === 'pie' ? "solid" : "light"}
-                                color={viewType === 'pie' ? "primary" : "default"}
-                                onPress={() => setViewType('pie')}
+                                <List size={16} weight={viewType === 'list' ? 'bold' : 'regular'} />
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setViewType('pie')}
+                                className={`flex items-center justify-center w-8 h-8 rounded-full transition-all ${
+                                    viewType === 'pie'
+                                        ? 'bg-[#75F16A] text-[#0a0a0a] shadow-[0_0_14px_rgba(117,241,106,0.35)]'
+                                        : 'text-white/30 hover:text-white/70 hover:bg-white/[0.06]'
+                                }`}
+                                aria-label={locale === 'ru' ? 'Круговая диаграмма' : 'Pie view'}
                             >
-                                <ChartPie size={18} />
-                            </Button>
+                                <ChartPie size={16} weight={viewType === 'pie' ? 'bold' : 'regular'} />
+                            </button>
                         </div>
                     )}
                 </CardHeader>
             )}
-            <CardBody className="p-6 h-[400px] overflow-hidden">
+            <CardBody className="px-8 pb-8 pt-2 h-[400px] overflow-hidden">
                 <AnimatePresence mode="wait">
                     {viewType === 'list' ? (
                         <motion.div
@@ -163,14 +175,14 @@ export const StatsTopWidget: React.FC<StatsTopWidgetProps> = ({
                             className="h-full overflow-y-auto pr-2 custom-scrollbar space-y-3"
                         >
                             {data.length === 0 ? (
-                                <div className="flex h-full items-center justify-center text-default-500">
-                                    No Data
+                                <div className="flex h-full items-center justify-center text-white/30">
+                                    {locale === 'ru' ? 'Нет данных' : 'No Data'}
                                 </div>
                             ) : (
                                 data.map((item, index) => (
-                                    <div key={item.id} className="flex items-center justify-between p-2 md:p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors">
+                                    <div key={item.id} className="flex items-center justify-between p-2 md:p-3 rounded-2xl bg-white/[0.02] border border-white/[0.02] hover:bg-white/[0.04] transition-colors">
                                         <div className="flex items-center gap-2 md:gap-3 overflow-hidden flex-1 min-w-0">
-                                            <div className="flex-shrink-0 w-6 md:w-8 text-center text-default-400 font-medium text-sm">#{index + 1}</div>
+                                            <div className="flex-shrink-0 w-6 md:w-8 text-center text-white/30 font-medium text-sm">#{index + 1}</div>
                                             {isChannel ? (
                                                 <div className="w-8 h-8 rounded-full bg-default-100 flex items-center justify-center flex-shrink-0">
                                                     <Hash size={16} className="text-default-400" />
@@ -185,7 +197,19 @@ export const StatsTopWidget: React.FC<StatsTopWidgetProps> = ({
                                                     fallback={<User size={16} className="text-default-400" />}
                                                 />
                                             )}
-                                            {item.discordUrl ? (
+                                            {item.drilldownUrl ? (
+                                                <Link
+                                                    href={item.drilldownUrl}
+                                                    className="font-medium truncate text-white hover:text-primary transition-colors text-sm md:text-base flex-1 min-w-0 block"
+                                                >
+                                                    <div className="flex flex-col justify-center min-w-0">
+                                                        <span className="truncate">{item.name}</span>
+                                                        {item.username && item.username !== item.name && (
+                                                            <span className="text-[11px] text-white/30 truncate leading-none mt-0.5">@{item.username}</span>
+                                                        )}
+                                                    </div>
+                                                </Link>
+                                            ) : item.discordUrl ? (
                                                 <Link
                                                     href={item.discordUrl}
                                                     isExternal
@@ -194,7 +218,12 @@ export const StatsTopWidget: React.FC<StatsTopWidgetProps> = ({
                                                     {item.name}
                                                 </Link>
                                             ) : (
-                                                <span className="font-medium truncate text-sm md:text-base flex-1 min-w-0 block">{item.name}</span>
+                                                <div className="flex-1 min-w-0 flex flex-col justify-center">
+                                                    <span className="font-medium truncate text-sm md:text-base">{item.name}</span>
+                                                    {item.username && item.username !== item.name && (
+                                                        <span className="text-[11px] text-white/30 truncate leading-none mt-0.5">@{item.username}</span>
+                                                    )}
+                                                </div>
                                             )}
                                         </div>
                                         <div className="font-bold font-mono text-primary text-sm md:text-base whitespace-nowrap ml-2 md:ml-4 text-right">
@@ -287,7 +316,7 @@ export const StatsTopWidget: React.FC<StatsTopWidgetProps> = ({
                                                 {item.name}
                                             </span>
                                             <span className="text-[10px] text-default-500 font-mono">
-                                                {((item.value / (pieData.reduce((a, b) => a + b.value, 0) || 1)) * 100).toFixed(0)}%
+                                                {formatLocaleNumber(Number((((item.value / (pieData.reduce((a, b) => a + b.value, 0) || 1)) * 100).toFixed(0))), locale)}%
                                             </span>
                                         </div>
                                     ))}

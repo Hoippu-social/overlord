@@ -116,6 +116,14 @@ export type ConfigState = {
 export type CaseNote = {
     id: number;
     actorUserId: string;
+    actorProfile?: {
+        id: string;
+        name: string;
+        username: string;
+        tag: string;
+        avatar: string | null;
+        globalName?: string | null;
+    } | null;
     note: string;
     createdAt: string;
 };
@@ -127,7 +135,35 @@ export type ModerationCase = {
     status: string;
     source: string;
     actorUserId: string | null;
+    actorProfile?: {
+        id: string;
+        name: string;
+        username: string;
+        tag: string;
+        avatar: string | null;
+        globalName?: string | null;
+    } | null;
     targetUserId: string;
+    targetProfile?: {
+        id: string;
+        name: string;
+        username: string;
+        tag: string;
+        avatar: string | null;
+        globalName?: string | null;
+    } | null;
+    resolvedByUserId?: string | null;
+    resolvedByProfile?: {
+        id: string;
+        name: string;
+        username: string;
+        tag: string;
+        avatar: string | null;
+        globalName?: string | null;
+    } | null;
+    resolvedAt?: string | null;
+    resolutionType?: string | null;
+    resolutionReason?: string | null;
     reason: string | null;
     createdAt: string;
     expiresAt?: string | null;
@@ -213,6 +249,7 @@ export type AppealTicket = {
         actionType: string;
         status: string;
         targetUserId: string;
+        actorUserId?: string | null;
     };
 };
 
@@ -233,7 +270,18 @@ export type AppealReviewDecision = 'IN_REVIEW' | 'ACCEPTED' | 'REJECTED' | 'PARD
 
 export type ModeratorAnalyticsRow = {
     moderatorId: string;
+    moderatorProfile?: {
+        id: string;
+        name: string;
+        username: string;
+        tag: string;
+        avatar: string | null;
+        globalName?: string | null;
+        roleName?: string | null;
+        roleColor?: number | null;
+    } | null;
     totalActions: number;
+    activeCases: number;
     warns: number;
     timeouts: number;
     bans: number;
@@ -246,6 +294,8 @@ export type ModeratorAnalyticsRow = {
     appealsReviewed: number;
     acceptedAppeals: number;
     rejectedAppeals: number;
+    relatedAppealTickets: number;
+    activeRelatedAppealTickets: number;
     avgAiReviewMinutes: number | null;
     avgAppealReviewHours: number | null;
 };

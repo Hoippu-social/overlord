@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireGuildStatsAccess } from '@/lib/statsAccess';
+import { withStatsTelemetry } from '@/lib/statsTelemetry';
 
 // In-memory storage for sync status
 // In production, consider using Redis or database
@@ -15,24 +17,30 @@ export async function GET(
     request: NextRequest,
     { params }: { params: Promise<{ guildId: string }> }
 ) {
-    try {
-        const { guildId } = await params;
+    const { guildId } = await params;
+    return withStatsTelemetry({ guildId, endpoint: 'sync-status', method: 'GET' }, async () => {
+        try {
+            const access = await requireGuildStatsAccess(request, guildId);
+            if (!access.ok) {
+                return access.response;
+            }
 
-        const status = syncStatus.get(guildId) || {
-            isRunning: false,
-            progress: 0,
-            message: 'Ready',
-            lastSyncDate: null
-        };
+            const status = syncStatus.get(guildId) || {
+                isRunning: false,
+                progress: 0,
+                message: 'Ready',
+                lastSyncDate: null
+            };
 
-        return NextResponse.json(status);
-    } catch (error) {
-        console.error('[SyncStatus] Error:', error);
-        return NextResponse.json(
-            { error: 'Failed to get sync status' },
-            { status: 500 }
-        );
-    }
+            return NextResponse.json(status);
+        } catch (error) {
+            console.error('[SyncStatus] Error:', error);
+            return NextResponse.json(
+                { error: 'Failed to get sync status' },
+                { status: 500 }
+            );
+        }
+    });
 }
 
 // Helper functions to update status (used by sync route)

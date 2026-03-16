@@ -466,6 +466,12 @@ export function startDashboardApi(client: Client): http.Server {
                         if (member) {
                             const user = member.user;
                             const avatarUrl = member.displayAvatarURL({ size: 64, extension: 'webp' });
+                            const topRole = member.roles.highest.id !== member.guild.id
+                                ? member.roles.highest
+                                : member.roles.cache
+                                    .filter((role) => role.id !== member.guild.id)
+                                    .sort((left, right) => right.position - left.position)
+                                    .first() ?? null;
                             users[userId] = {
                                 id: userId,
                                 name: member.displayName,           // server nickname or username
@@ -474,6 +480,8 @@ export function startDashboardApi(client: Client): http.Server {
                                 tag: user.discriminator !== '0' ? `${user.username}#${user.discriminator}` : `@${user.username}`,
                                 avatar: avatarUrl,
                                 globalName: user.globalName || user.username,
+                                roleName: topRole?.name ?? null,
+                                roleColor: topRole?.color || null,
                             };
                         } else {
                             // Fallback: try to fetch user globally
@@ -487,13 +495,15 @@ export function startDashboardApi(client: Client): http.Server {
                                     tag: user.discriminator !== '0' ? `${user.username}#${user.discriminator}` : `@${user.username}`,
                                     avatar: user.displayAvatarURL({ size: 64, extension: 'webp' }),
                                     globalName: user.globalName || user.username,
+                                    roleName: null,
+                                    roleColor: null,
                                 };
                             } catch {
-                                users[userId] = { id: userId, name: userId, username: userId, tag: userId, avatar: null };
+                                users[userId] = { id: userId, name: userId, username: userId, tag: userId, avatar: null, roleName: null, roleColor: null };
                             }
                         }
                     } catch {
-                        users[userId] = { id: userId, name: userId, username: userId, tag: userId, avatar: null };
+                        users[userId] = { id: userId, name: userId, username: userId, tag: userId, avatar: null, roleName: null, roleColor: null };
                     }
                 }
 

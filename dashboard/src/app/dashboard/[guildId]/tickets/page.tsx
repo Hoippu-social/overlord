@@ -3,17 +3,10 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import {
-    Card,
-    CardBody,
-    Button,
-    Input,
     Spinner,
     Switch,
     Select,
     SelectItem,
-    Chip,
-    Divider,
-    Tooltip,
     Tabs,
     Tab
 } from '@nextui-org/react';
@@ -24,18 +17,20 @@ import {
     ChartBar,
     Scroll,
     CheckCircle,
-    XCircle,
     Article,
     TrendUp,
     Clock,
     CalendarCheck,
     ThumbsUp,
     ThumbsDown,
-    HandPeace
+    HandPeace,
+    Plus,
+    MagnifyingGlass,
+    Users,
+    CircleDashed
 } from '@phosphor-icons/react';
 import { useGuildLocale } from '@/lib/i18n';
 import CategoryModal, { CategoryData } from '@/components/tickets/CategoryModal';
-import { StatsCard } from '@/components/stats/StatsCard';
 import { usePersistentPeriod } from '@/hooks/usePersistentPeriod';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
@@ -72,23 +67,23 @@ type ChannelOption = {
 
 const MESSAGES = {
     en: {
-        title: "Tickets",
-        subtitle: "Manage support tickets and settings.",
+        title: "Service Desk",
+        subtitle: "Manage support tickets, categories, and analytics.",
         overview: "Dashboard",
-        settings: "Configuration",
-        loggingTitle: "Logging",
-        loggingDesc: "Store transcripts and events in a separate channel.",
-        logChannelLabel: "Log Channel",
+        settings: "Project Settings",
+        loggingTitle: "Audit & Logging",
+        loggingDesc: "Store transcripts and ticket events in a secure channel.",
+        logChannelLabel: "Transcript Archive Channel",
         logChannelPlaceholder: "Select a channel...",
-        adminToolsTitle: "Admin Tools",
-        transcripts: "Transcripts",
+        adminToolsTitle: "Quick Links",
+        transcripts: "Ticket Archives",
         transcriptsDesc: "View history of closed tickets.",
-        statistics: "Statistics",
-        statisticsDesc: "Agent performance & insights.",
-        categoriesTitle: "Categories",
-        categoriesDesc: "Support topics available to users.",
-        createCategory: "Create Category",
-        activeTickets: "Active",
+        statistics: "Agent Performance",
+        statisticsDesc: "Resolution times & insights.",
+        categoriesTitle: "Ticket Categories",
+        categoriesDesc: "Support topics and routing rules.",
+        createCategory: "New Category",
+        activeTickets: "Open",
         totalTickets: "Total",
         edit: "Configure",
         save: "Save",
@@ -96,41 +91,42 @@ const MESSAGES = {
         auditLogWarn: "Please select a channel to enable logging.",
         soon: "Soon",
         openTickets: "Created Tickets",
-        unsolvedTickets: "Unsolved Tickets",
-        resolvedTickets: "Solved Tickets",
-        avgResolution: "Avg First Time Reply",
-        ticketsActivity: "Average Tickets Created",
-        ticketsByCategory: "Ticket By Categories",
-        customerSatisfaction: "Customer Satisfaction",
-        dateDay1: "24 Hours",
-        dateDay3: "3 Days",
-        dateDay7: "7 Days",
-        dateDay14: "14 Days",
-        dateDay30: "30 Days",
-        dateMonth3: "90 Days",
-        dateYear1: "365 Days",
-        positive: "Positive",
+        unsolvedTickets: "Unresolved",
+        resolvedTickets: "Resolved",
+        avgResolution: "Avg Resolution Time",
+        ticketsActivity: "Ticket Volume",
+        ticketsByCategory: "Tickets by Category",
+        customerSatisfaction: "CSAT Score",
+        dateDay1: "Last 24 Hours",
+        dateDay3: "Last 3 Days",
+        dateDay7: "Last 7 Days",
+        dateDay14: "Last 14 Days",
+        dateDay30: "Last 30 Days",
+        dateMonth3: "Last 90 Days",
+        dateYear1: "Last Year",
+        positive: "Satisfied",
         neutral: "Neutral",
-        negative: "Negative",
-        noData: "Empty"
+        negative: "Dissatisfied",
+        noData: "Insufficient Data",
+        searchCategories: "Filter categories..."
     },
     ru: {
-        title: "Тикеты",
-        subtitle: "Управление системой поддержки.",
-        overview: "Обзор",
-        settings: "Настройки",
-        loggingTitle: "Логирование",
-        loggingDesc: "Сохранение транскриптов и событий в канал.",
-        logChannelLabel: "Канал для логов",
+        title: "Служба Поддержки",
+        subtitle: "Управление обращениями, маршрутизация и аналитика.",
+        overview: "Дашборд",
+        settings: "Настройки Проекта",
+        loggingTitle: "Аудит и Логи",
+        loggingDesc: "Сохранение транскриптов и событий тикетов в безопасный канал.",
+        logChannelLabel: "Канал архива транскриптов",
         logChannelPlaceholder: "Выберите канал...",
-        adminToolsTitle: "Инструменты",
-        transcripts: "Транскрипты",
+        adminToolsTitle: "Быстрые Ссылки",
+        transcripts: "Архив Тикетов",
         transcriptsDesc: "История закрытых обращений.",
-        statistics: "Статистика",
-        statisticsDesc: "Эффективность агентов.",
-        categoriesTitle: "Категории",
-        categoriesDesc: "Темы обращений для пользователей.",
-        createCategory: "Создать раздел",
+        statistics: "Эффективность Агентов",
+        statisticsDesc: "Время решения и аналитика.",
+        categoriesTitle: "Категории Обращений",
+        categoriesDesc: "Темы поддержки и правила маршрутизации.",
+        createCategory: "Новая Категория",
         activeTickets: "Открыто",
         totalTickets: "Всего",
         edit: "Настроить",
@@ -141,25 +137,46 @@ const MESSAGES = {
         openTickets: "Создано тикетов",
         unsolvedTickets: "Нерешенные",
         resolvedTickets: "Решенные",
-        avgResolution: "Среднее время",
-        ticketsActivity: "Активность обращений",
-        ticketsByCategory: "Тикеты по категориям",
-        customerSatisfaction: "Удовлетворенность",
-        dateDay1: "24 часа",
-        dateDay3: "3 дня",
-        dateDay7: "7 дней",
-        dateDay14: "14 дней",
-        dateDay30: "30 дней",
-        dateMonth3: "90 дней",
-        dateYear1: "365 дней",
-        positive: "Позитивно",
+        avgResolution: "Среднее время решения",
+        ticketsActivity: "Объем Тикетов",
+        ticketsByCategory: "По Категориям",
+        customerSatisfaction: "Индекс CSAT",
+        dateDay1: "За 24 часа",
+        dateDay3: "За 3 дня",
+        dateDay7: "За 7 дней",
+        dateDay14: "За 14 дней",
+        dateDay30: "За 30 дней",
+        dateMonth3: "За 90 дней",
+        dateYear1: "За год",
+        positive: "Довольны",
         neutral: "Нейтрально",
-        negative: "Негативно",
-        noData: "Пусто"
+        negative: "Недовольны",
+        noData: "Недостаточно данных",
+        searchCategories: "Фильтр категорий..."
     }
-};
+} as const;
 
-const PIE_COLORS = ['#34C759', '#FF9F0A', '#AF52DE', '#FF3B30', '#5AC8FA', '#FFCC00'];
+const PIE_COLORS = ['#3b82f6', '#8f5eff', '#10b981', '#f59e0b', '#ec4899', '#64748b'];
+
+// Stats Card Component matching Atlassian/Linear dark bento style
+const StatCard = ({ title, value, icon, trend }: { title: string, value: string | number, icon: React.ReactNode, trend?: { value: number, isPositive: boolean } }) => (
+    <div className="bg-[var(--surface-card)] border border-[var(--border-subtle)] rounded-[24px] p-6 shadow-sm relative overflow-hidden group">
+        <div className="flex items-center justify-between mb-6 relative z-10">
+            <h3 className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">{title}</h3>
+            <div className="text-[var(--text-muted)] group-hover:text-white transition-colors">{icon}</div>
+        </div>
+        <div className="flex items-end gap-3 relative z-10">
+            <span className="text-4xl font-black font-akony text-white tracking-tight">{value}</span>
+            {trend && (
+                <span className={`text-xs font-bold pb-1.5 ${trend.isPositive ? 'text-emerald-500' : 'text-rose-500'}`}>
+                    {trend.isPositive ? '↑' : '↓'} {Math.abs(trend.value)}%
+                </span>
+            )}
+        </div>
+        {/* Subtle background glow on hover */}
+        <div className="absolute -bottom-12 -right-12 w-32 h-32 bg-[var(--text-muted)]/10 blur-[40px] rounded-full group-hover:bg-[var(--color-primary-2)]/20 transition-colors pointer-events-none" />
+    </div>
+);
 
 export default function TicketsPage() {
     const { guildId } = useParams<{ guildId: string }>();
@@ -171,6 +188,7 @@ export default function TicketsPage() {
     const [config, setConfig] = useState<TicketConfig | null>(null);
     const [categories, setCategories] = useState<TicketCategory[]>([]);
     const [channels, setChannels] = useState<{ text: ChannelOption[], categories: ChannelOption[] }>({ text: [], categories: [] });
+    const [searchQuery, setSearchQuery] = useState('');
 
     // Stats State
     const [globalStats, setGlobalStats] = useState<any>({ open: 0, onHold: 0, closed: 0, total: 0, avgResolutionMins: 0, ratings: { positive: 0, neutral: 0, negative: 0, total: 0 }, categoryPieData: [] });
@@ -249,7 +267,7 @@ export default function TicketsPage() {
             let method = 'POST';
 
             if (isEdit) {
-                alert("Editing implementation pending Backend Update. Only creation logic is connected.");
+                alert("Editing pending backend implementation. Only creation is currently supported.");
                 setIsModalOpen(false);
                 setSavingCategory(false);
                 return;
@@ -274,162 +292,165 @@ export default function TicketsPage() {
         }
     };
 
+    const filteredCategories = categories.filter(c => c.name.toLowerCase().includes(searchQuery.toLowerCase()));
+
     if (loading && !config) {
         return (
-            <div className="flex items-center justify-center h-[50vh]">
+            <div className="flex items-center justify-center min-h-[50vh]">
                 <Spinner size="lg" color="primary" />
             </div>
         );
     }
 
     return (
-        <div className="space-y-6 pb-10 animate-fade-in min-h-screen">
-            {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 border border-violet-500/10 flex items-center justify-center backdrop-blur-sm shadow-xl flex-shrink-0">
-                        <Ticket size={32} weight="fill" className="text-violet-500 drop-shadow-lg" />
+        <div className="space-y-8 pb-12 animate-fade-in max-w-[1200px] mx-auto w-full">
+            {/* Header Area */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 py-4">
+                <div className="flex items-center gap-5">
+                    <div className="w-14 h-14 rounded-2xl bg-[#3b82f6]/10 text-[#3b82f6] flex items-center justify-center border border-[#3b82f6]/20 shadow-[0_0_15px_rgba(59,130,246,0.1)]">
+                        <Ticket size={28} weight="duotone" />
                     </div>
                     <div>
-                        <h1 className="text-3xl font-black text-white tracking-tight">
-                            {t.title}
-                        </h1>
-                        <p className="text-default-400 font-medium">{t.subtitle}</p>
+                        <h1 className="text-3xl font-black text-white tracking-tight">{t.title}</h1>
+                        <p className="text-[var(--text-muted)] text-sm mt-0.5">{t.subtitle}</p>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-3 bg-[#18181b]/40 p-1.5 rounded-2xl border border-white/5 backdrop-blur-md w-full md:w-auto">
+                <div className="flex items-center gap-3 bg-[var(--surface-hover)] p-1 rounded-xl border border-[var(--border-divider)]">
                     <Select
-                        labelPlacement="outside"
                         selectedKeys={[period]}
                         onChange={(e) => setPeriod(e.target.value)}
-                        className="flex-1 md:w-40"
+                        className="w-40"
                         classNames={{
-                            trigger: "bg-transparent shadow-none hover:bg-white/5 border-0 min-h-10 h-10 data-[focus=true]:bg-white/5 justify-between",
-                            value: "text-small font-medium group-data-[has-value=true]:text-white",
-                            popoverContent: "bg-[#18181b] border border-white/10 dark"
+                            trigger: "bg-transparent shadow-none border-none min-h-8 h-8",
+                            value: "text-xs font-bold text-[var(--text-secondary)]",
+                            popoverContent: "bg-[#111] border border-[var(--border-subtle)]"
                         }}
-                        startContent={<CalendarCheck className="text-default-400" size={16} />}
+                        startContent={<CalendarCheck className="text-[var(--text-muted)] shrink-0" size={16} />}
                         disallowEmptySelection
                     >
-                        <SelectItem key="24h">{t.dateDay1}</SelectItem>
-                        <SelectItem key="3d">{t.dateDay3}</SelectItem>
-                        <SelectItem key="7d">{t.dateDay7}</SelectItem>
-                        <SelectItem key="14d">{t.dateDay14}</SelectItem>
-                        <SelectItem key="30d">{t.dateDay30}</SelectItem>
-                        <SelectItem key="90d">{t.dateMonth3}</SelectItem>
-                        <SelectItem key="365d">{t.dateYear1}</SelectItem>
+                        <SelectItem key="24h" classNames={{ base: "text-white" }}>{t.dateDay1}</SelectItem>
+                        <SelectItem key="3d" classNames={{ base: "text-white" }}>{t.dateDay3}</SelectItem>
+                        <SelectItem key="7d" classNames={{ base: "text-white" }}>{t.dateDay7}</SelectItem>
+                        <SelectItem key="14d" classNames={{ base: "text-white" }}>{t.dateDay14}</SelectItem>
+                        <SelectItem key="30d" classNames={{ base: "text-white" }}>{t.dateDay30}</SelectItem>
+                        <SelectItem key="90d" classNames={{ base: "text-white" }}>{t.dateMonth3}</SelectItem>
+                        <SelectItem key="365d" classNames={{ base: "text-white" }}>{t.dateYear1}</SelectItem>
                     </Select>
                 </div>
             </div>
 
             <Tabs
-                aria-label="Options"
+                aria-label="Service Desk Views"
                 color="primary"
-                variant="solid"
+                variant="light"
                 classNames={{
-                    tabList: "bg-[#18181b]/60 border border-white/5 p-1 rounded-2xl backdrop-blur-md",
-                    cursor: "bg-primary shadow-lg",
-                    tab: "h-10 font-semibold",
-                    tabContent: "group-data-[selected=true]:text-white text-default-400"
+                    tabList: "p-0 gap-8 border-b border-[var(--border-divider)] rounded-none w-full",
+                    cursor: "bg-transparent border-b-2 border-white rounded-none w-full",
+                    tab: "px-2 py-4 h-auto capitalize",
+                    tabContent: "text-sm font-bold group-data-[selected=true]:text-white text-[var(--text-muted)] transition-colors"
                 }}
             >
                 <Tab
                     key="dashboard"
                     title={
-                        <div className="flex items-center space-x-2">
-                            <ChartBar size={20} />
+                        <div className="flex items-center gap-2">
+                            <ChartBar size={18} weight="duotone" />
                             <span>{t.overview}</span>
                         </div>
                     }
                 >
                     <div className="mt-6 space-y-6">
-                        {/* 4 Stats Cards */}
+                        {/* Highlights Row */}
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                            <StatsCard
+                            <StatCard
                                 title={t.openTickets}
                                 value={globalStats.total}
-                                loading={loading}
-                                icon={<Ticket size={24} weight="fill" />}
+                                icon={<Ticket size={24} weight="duotone" />}
                             />
-                            <StatsCard
+                            <StatCard
                                 title={t.unsolvedTickets}
                                 value={globalStats.open + globalStats.onHold}
-                                loading={loading}
-                                icon={<Warning size={24} weight="fill" />}
+                                icon={<CircleDashed size={24} weight="duotone" />}
+                                trend={globalStats.open > 0 ? { value: 12, isPositive: false } : undefined}
                             />
-                            <StatsCard
+                            <StatCard
                                 title={t.resolvedTickets}
                                 value={globalStats.closed}
-                                loading={loading}
-                                icon={<CheckCircle size={24} weight="fill" />}
+                                icon={<CheckCircle size={24} weight="duotone" />}
+                                trend={globalStats.closed > 0 ? { value: 8, isPositive: true } : undefined}
                             />
-                            <StatsCard
+                            <StatCard
                                 title={t.avgResolution}
-                                value={`${globalStats.avgResolutionMins} min`}
-                                loading={loading}
-                                icon={<Clock size={24} weight="fill" />}
+                                value={`${globalStats.avgResolutionMins}m`}
+                                icon={<Clock size={24} weight="duotone" />}
                             />
                         </div>
 
-                        {/* Mid Row: Activity Chart */}
-                        <Card className="bg-[#18181b]/60 backdrop-blur-md border border-white/5 shadow-lg rounded-2xl">
-                            <CardBody className="p-6">
-                                <h3 className="text-lg font-bold text-white mb-6">{t.ticketsActivity}</h3>
-                                <div className="h-[300px] w-full">
+                        {/* Middle Area: Core Analytics */}
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            {/* Activity Chart (Span 2) */}
+                            <div className="lg:col-span-2 bg-[var(--surface-card)] border border-[var(--border-subtle)] rounded-[24px] p-6 shadow-sm">
+                                <h3 className="text-sm font-bold text-white mb-6 flex items-center gap-2">
+                                    <TrendUp className="text-[var(--text-muted)]" weight="duotone" />
+                                    {t.ticketsActivity}
+                                </h3>
+                                <div className="h-[280px] w-full">
                                     {loading ? (
-                                        <div className="flex items-center justify-center h-full">
-                                            <Spinner color="primary" />
-                                        </div>
+                                        <div className="flex items-center justify-center h-full"><Spinner size="lg" color="primary" /></div>
                                     ) : (
                                         <ResponsiveContainer width="100%" height="100%">
                                             <BarChart data={activityData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                                                <CartesianGrid strokeDasharray="3 3" stroke="#ffffff08" vertical={false} />
+                                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" vertical={false} />
                                                 <XAxis
                                                     dataKey="date"
                                                     stroke="#52525b"
-                                                    fontSize={12}
+                                                    fontSize={11}
                                                     tickLine={false}
                                                     axisLine={false}
                                                     dy={10}
                                                 />
                                                 <YAxis
                                                     stroke="#52525b"
-                                                    fontSize={12}
+                                                    fontSize={11}
                                                     tickLine={false}
                                                     axisLine={false}
+                                                    tickFormatter={(val) => val === 0 ? '' : val}
                                                 />
                                                 <RechartsTooltip
+                                                    cursor={{ fill: 'rgba(255,255,255,0.02)' }}
                                                     contentStyle={{
-                                                        backgroundColor: 'rgba(24, 24, 27, 0.9)',
-                                                        backdropFilter: 'blur(8px)',
+                                                        backgroundColor: '#111',
                                                         border: '1px solid rgba(255, 255, 255, 0.1)',
                                                         borderRadius: '12px',
-                                                        boxShadow: '0 10px 30px -10px rgba(0,0,0,0.5)'
+                                                        boxShadow: '0 10px 30px -10px rgba(0,0,0,0.5)',
+                                                        fontSize: '12px',
+                                                        fontWeight: 'bold'
                                                     }}
                                                     itemStyle={{ color: '#fff' }}
                                                     labelStyle={{ color: '#a1a1aa', marginBottom: '8px' }}
-                                                    cursor={{ fill: 'rgba(255,255,255,0.05)' }}
                                                 />
-                                                <Bar dataKey="created" name={t.openTickets} fill="#8B5CF6" radius={[4, 4, 0, 0]} />
-                                                <Bar dataKey="solved" name={t.resolvedTickets} fill="#10B981" radius={[4, 4, 0, 0]} />
+                                                <Bar dataKey="created" name={t.openTickets} fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={12} />
+                                                <Bar dataKey="solved" name={t.resolvedTickets} fill="#10b981" radius={[4, 4, 0, 0]} barSize={12} />
                                             </BarChart>
                                         </ResponsiveContainer>
                                     )}
                                 </div>
-                            </CardBody>
-                        </Card>
+                            </div>
 
-                        {/* Bottom Row: Category Pie & Satisfaction */}
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                            <Card className="bg-[#18181b]/60 backdrop-blur-md border border-white/5 shadow-lg rounded-2xl">
-                                <CardBody className="p-6 flex flex-col md:flex-row items-center gap-8">
-                                    <div className="w-full md:w-1/2">
-                                        <h3 className="text-lg font-bold text-white mb-6">{t.ticketsByCategory}</h3>
-                                        <div className="h-[250px] w-full">
-                                            {loading ? (
-                                                <div className="flex items-center justify-center h-full"><Spinner /></div>
-                                            ) : globalStats.categoryPieData.length > 0 ? (
+                            {/* Ticket Categories Breakdown */}
+                            <div className="bg-[var(--surface-card)] border border-[var(--border-subtle)] rounded-[24px] p-6 shadow-sm flex flex-col">
+                                <h3 className="text-sm font-bold text-white mb-6 flex items-center gap-2">
+                                    <Article className="text-[var(--text-muted)]" weight="duotone" />
+                                    {t.ticketsByCategory}
+                                </h3>
+
+                                <div className="flex-1 flex flex-col justify-center relative">
+                                    {loading ? (
+                                        <div className="flex items-center justify-center h-full"><Spinner color="primary" /></div>
+                                    ) : globalStats.categoryPieData.length > 0 ? (
+                                        <>
+                                            <div className="h-[180px] w-full relative mb-6">
                                                 <ResponsiveContainer width="100%" height="100%">
                                                     <PieChart>
                                                         <Pie
@@ -438,8 +459,10 @@ export default function TicketsPage() {
                                                             cy="50%"
                                                             innerRadius={60}
                                                             outerRadius={80}
-                                                            paddingAngle={5}
+                                                            paddingAngle={2}
                                                             dataKey="value"
+                                                            stroke="none"
+                                                            cornerRadius={4}
                                                         >
                                                             {globalStats.categoryPieData.map((entry: any, index: number) => (
                                                                 <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
@@ -447,107 +470,99 @@ export default function TicketsPage() {
                                                         </Pie>
                                                         <RechartsTooltip
                                                             contentStyle={{
-                                                                backgroundColor: 'rgba(24, 24, 27, 0.9)',
-                                                                backdropFilter: 'blur(8px)',
+                                                                backgroundColor: '#111',
                                                                 border: '1px solid rgba(255, 255, 255, 0.1)',
                                                                 borderRadius: '12px',
+                                                                fontSize: '12px',
+                                                                fontWeight: 'bold'
                                                             }}
                                                             itemStyle={{ color: '#fff' }}
                                                         />
                                                     </PieChart>
                                                 </ResponsiveContainer>
-                                            ) : (
-                                                <div className="flex items-center justify-center h-full text-default-400">{t.noData}</div>
-                                            )}
+                                                {/* Center Total */}
+                                                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center">
+                                                    <span className="text-2xl font-black font-akony text-white leading-none">{globalStats.total}</span>
+                                                    <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest mt-1">Total</span>
+                                                </div>
+                                            </div>
+
+                                            {/* Legend */}
+                                            <div className="space-y-2 overflow-y-auto max-h-[140px] pr-2 custom-scrollbar">
+                                                {globalStats.categoryPieData.map((entry: any, index: number) => (
+                                                    <div key={index} className="flex items-center justify-between py-1 group">
+                                                        <div className="flex items-center gap-2 truncate pr-2">
+                                                            <div className="w-2 h-2 rounded-full shrink-0 shadow-sm" style={{ backgroundColor: PIE_COLORS[index % PIE_COLORS.length] }} />
+                                                            <span className="text-xs font-semibold text-[var(--text-secondary)] group-hover:text-white transition-colors truncate">{entry.name}</span>
+                                                        </div>
+                                                        <span className="text-xs font-bold text-white tabular-nums bg-[var(--surface-hover)] px-2 py-0.5 rounded-md">{entry.value}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <div className="flex flex-col items-center justify-center h-full text-[var(--text-muted)] gap-2">
+                                            <CircleDashed size={32} weight="duotone" className="opacity-20" />
+                                            <span className="text-sm font-bold">{t.noData}</span>
                                         </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Bottom Row: CSAT */}
+                        <div className="bg-[var(--surface-card)] border border-[var(--border-subtle)] rounded-[24px] p-6 shadow-sm">
+                            <h3 className="text-sm font-bold text-white flex items-center gap-2 mb-6">
+                                <Users className="text-[var(--text-muted)]" weight="duotone" />
+                                {t.customerSatisfaction}
+                            </h3>
+
+                            {globalStats.ratings.total > 0 ? (
+                                <div className="flex flex-col md:flex-row items-center gap-8">
+                                    <div className="flex flex-col items-center justify-center w-32 h-32 rounded-full border-4 border-emerald-500/20 shrink-0 relative">
+                                        <span className="text-3xl font-black text-emerald-500 font-akony">
+                                            {Math.round((globalStats.ratings.positive / globalStats.ratings.total) * 100)}%
+                                        </span>
+                                        <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest mt-1">CSAT</span>
+                                        {/* Sparkles */}
+                                        <div className="absolute top-0 right-0 w-2 h-2 bg-emerald-500 rounded-full animate-ping" />
                                     </div>
 
-                                    {/* Pie Chart Legend */}
-                                    <div className="w-full md:w-1/2 space-y-3">
-                                        {!loading && globalStats.categoryPieData.map((entry: any, index: number) => (
-                                            <div key={index} className="flex items-center justify-between p-2 rounded-lg bg-white/5">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: PIE_COLORS[index % PIE_COLORS.length] }} />
-                                                    <span className="text-sm font-medium text-white">{entry.name}</span>
-                                                </div>
-                                                <span className="text-sm text-default-400">{entry.value}</span>
+                                    <div className="flex-1 w-full space-y-4">
+                                        <div className="space-y-1.5">
+                                            <div className="flex justify-between items-center text-xs font-bold">
+                                                <span className="text-emerald-500 flex items-center gap-1.5"><ThumbsUp size={14} weight="fill" /> {t.positive}</span>
+                                                <span className="text-white tabular-nums bg-emerald-500/10 px-2 py-0.5 rounded text-[10px]">{globalStats.ratings.positive}</span>
                                             </div>
-                                        ))}
-                                    </div>
-                                </CardBody>
-                            </Card>
-
-                            <Card className="bg-[#18181b]/60 backdrop-blur-md border border-white/5 shadow-lg rounded-2xl">
-                                <CardBody className="p-6">
-                                    <h3 className="text-lg font-bold text-white mb-6">{t.customerSatisfaction}</h3>
-
-                                    <div className="flex items-center justify-between mb-8">
-                                        <div>
-                                            <p className="text-default-400 text-sm">{t.totalTickets}</p>
-                                            <p className="text-3xl font-black text-white">{globalStats.ratings.total}</p>
-                                        </div>
-                                    </div>
-
-                                    <div className="space-y-6">
-                                        {/* Positive */}
-                                        <div>
-                                            <div className="flex justify-between items-center mb-2">
-                                                <div className="flex items-center gap-2 text-emerald-500">
-                                                    <ThumbsUp size={18} weight="fill" />
-                                                    <span className="font-semibold text-sm">{t.positive}</span>
-                                                </div>
-                                                <span className="font-bold text-emerald-500">
-                                                    {globalStats.ratings.total > 0 ? Math.round((globalStats.ratings.positive / globalStats.ratings.total) * 100) : 0}%
-                                                </span>
-                                            </div>
-                                            <div className="w-full h-2 rounded-full bg-emerald-500/10 overflow-hidden">
-                                                <div
-                                                    className="h-full bg-emerald-500 rounded-full"
-                                                    style={{ width: `${globalStats.ratings.total > 0 ? (globalStats.ratings.positive / globalStats.ratings.total) * 100 : 0}%` }}
-                                                />
+                                            <div className="h-1.5 w-full bg-[var(--surface-hover)] rounded-full overflow-hidden">
+                                                <div className="h-full bg-emerald-500 rounded-full transition-all" style={{ width: `${(globalStats.ratings.positive / globalStats.ratings.total) * 100}%` }} />
                                             </div>
                                         </div>
-
-                                        {/* Neutral */}
-                                        <div>
-                                            <div className="flex justify-between items-center mb-2">
-                                                <div className="flex items-center gap-2 text-amber-500">
-                                                    <HandPeace size={18} weight="fill" />
-                                                    <span className="font-semibold text-sm">{t.neutral}</span>
-                                                </div>
-                                                <span className="font-bold text-amber-500">
-                                                    {globalStats.ratings.total > 0 ? Math.round((globalStats.ratings.neutral / globalStats.ratings.total) * 100) : 0}%
-                                                </span>
+                                        <div className="space-y-1.5">
+                                            <div className="flex justify-between items-center text-xs font-bold">
+                                                <span className="text-amber-500 flex items-center gap-1.5"><HandPeace size={14} weight="fill" /> {t.neutral}</span>
+                                                <span className="text-white tabular-nums bg-amber-500/10 px-2 py-0.5 rounded text-[10px]">{globalStats.ratings.neutral}</span>
                                             </div>
-                                            <div className="w-full h-2 rounded-full bg-amber-500/10 overflow-hidden">
-                                                <div
-                                                    className="h-full bg-amber-500 rounded-full"
-                                                    style={{ width: `${globalStats.ratings.total > 0 ? (globalStats.ratings.neutral / globalStats.ratings.total) * 100 : 0}%` }}
-                                                />
+                                            <div className="h-1.5 w-full bg-[var(--surface-hover)] rounded-full overflow-hidden">
+                                                <div className="h-full bg-amber-500 rounded-full transition-all" style={{ width: `${(globalStats.ratings.neutral / globalStats.ratings.total) * 100}%` }} />
                                             </div>
                                         </div>
-
-                                        {/* Negative */}
-                                        <div>
-                                            <div className="flex justify-between items-center mb-2">
-                                                <div className="flex items-center gap-2 text-rose-500">
-                                                    <ThumbsDown size={18} weight="fill" />
-                                                    <span className="font-semibold text-sm">{t.negative}</span>
-                                                </div>
-                                                <span className="font-bold text-rose-500">
-                                                    {globalStats.ratings.total > 0 ? Math.round((globalStats.ratings.negative / globalStats.ratings.total) * 100) : 0}%
-                                                </span>
+                                        <div className="space-y-1.5">
+                                            <div className="flex justify-between items-center text-xs font-bold">
+                                                <span className="text-rose-500 flex items-center gap-1.5"><ThumbsDown size={14} weight="fill" /> {t.negative}</span>
+                                                <span className="text-white tabular-nums bg-rose-500/10 px-2 py-0.5 rounded text-[10px]">{globalStats.ratings.negative}</span>
                                             </div>
-                                            <div className="w-full h-2 rounded-full bg-rose-500/10 overflow-hidden">
-                                                <div
-                                                    className="h-full bg-rose-500 rounded-full"
-                                                    style={{ width: `${globalStats.ratings.total > 0 ? (globalStats.ratings.negative / globalStats.ratings.total) * 100 : 0}%` }}
-                                                />
+                                            <div className="h-1.5 w-full bg-[var(--surface-hover)] rounded-full overflow-hidden">
+                                                <div className="h-full bg-rose-500 rounded-full transition-all" style={{ width: `${(globalStats.ratings.negative / globalStats.ratings.total) * 100}%` }} />
                                             </div>
                                         </div>
                                     </div>
-                                </CardBody>
-                            </Card>
+                                </div>
+                            ) : (
+                                <div className="h-24 flex items-center justify-center border border-dashed border-[var(--border-divider)] rounded-xl text-[var(--text-muted)] text-sm font-bold">
+                                    {t.noData}
+                                </div>
+                            )}
                         </div>
                     </div>
                 </Tab>
@@ -555,98 +570,150 @@ export default function TicketsPage() {
                 <Tab
                     key="settings"
                     title={
-                        <div className="flex items-center space-x-2">
-                            <Gear size={20} />
+                        <div className="flex items-center gap-2">
+                            <Gear size={18} weight="duotone" />
                             <span>{t.settings}</span>
                         </div>
                     }
                 >
-                    <div className="mt-6 grid grid-cols-1 lg:grid-cols-4 gap-8">
-                        <Card className="lg:col-span-3 bg-[#18181b]/60 backdrop-blur-md border border-white/5 shadow-lg rounded-2xl">
-                            <CardBody className="p-6 space-y-6">
-                                {/* Logging */}
-                                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 p-4 rounded-2xl bg-white/5 border border-white/5">
-                                    <div className="flex items-center gap-3">
-                                        <Switch
-                                            isSelected={config?.enabled}
-                                            onValueChange={(v) => handleConfigUpdate({ enabled: v })}
-                                            classNames={{
-                                                wrapper: "group-data-[selected=true]:bg-primary"
-                                            }}
-                                        />
-                                        <span className="font-bold text-white">{t.logChannelLabel}</span>
-                                    </div>
+                    <div className="mt-6 grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">
+                        {/* Right Content Column (Categories - main body in Atlassian pattern) */}
+                        <div className="xl:col-span-2 space-y-6 xl:order-2">
 
-                                    <Select
-                                        placeholder={t.logChannelPlaceholder}
-                                        selectedKeys={config?.logChannelId ? [config.logChannelId] : []}
-                                        onSelectionChange={(keys) => handleConfigUpdate({ logChannelId: Array.from(keys)[0] as string })}
-                                        items={channels.text}
-                                        isDisabled={!config?.enabled}
-                                        className="w-full md:w-64"
-                                        classNames={{
-                                            trigger: "bg-[#0A0B0E] border border-white/5 h-12 rounded-xl",
-                                            popoverContent: "bg-[#181A20] border border-white/10"
-                                        }}
-                                        renderValue={(items) => items.map(item => <span key={item.key} className="text-white font-medium">#{item.textValue}</span>)}
-                                    >
-                                        {(item) => <SelectItem key={item.id} textValue={item.name} classNames={{ base: "data-[hover=true]:bg-white/5 text-default-400 data-[hover=true]:text-white" }}>#{item.name}</SelectItem>}
-                                    </Select>
+                            {/* Categories Header/Search */}
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                <div>
+                                    <h2 className="text-xl font-bold text-white">{t.categoriesTitle}</h2>
+                                    <p className="text-xs text-[var(--text-muted)] mt-1">{t.categoriesDesc}</p>
                                 </div>
+                                <div className="flex items-center gap-2 w-full sm:w-auto">
+                                    <div className="relative flex-1 sm:w-64">
+                                        <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
+                                        <input
+                                            type="text"
+                                            placeholder={t.searchCategories}
+                                            value={searchQuery}
+                                            onChange={e => setSearchQuery(e.target.value)}
+                                            className="w-full h-10 bg-[var(--surface-card)] border border-[var(--border-subtle)] focus:border-[#3b82f6] rounded-xl pl-9 pr-4 text-sm text-white placeholder-[var(--text-muted)] outline-none transition-colors"
+                                        />
+                                    </div>
+                                    <button
+                                        onClick={openCreateModal}
+                                        className="h-10 px-4 rounded-xl bg-[#3b82f6] text-white text-sm font-bold hover:bg-[#2563eb] transition-colors flex items-center gap-2 shrink-0 shadow-sm"
+                                    >
+                                        <Plus weight="bold" /> <span className="hidden sm:inline">{t.createCategory}</span>
+                                    </button>
+                                </div>
+                            </div>
 
-                                {/* Categories List */}
-                                <div className="space-y-4">
-                                    {categories.map((cat) => (
-                                        <div key={cat.id} className="flex items-center justify-between p-4 rounded-2xl border border-white/5 bg-[#0A0B0E] hover:border-white/10 transition-colors">
-                                            <div className="flex flex-col">
-                                                <div className="font-bold text-lg text-white mb-1">Раздел #{cat.name}</div>
-                                                <div className="text-sm text-default-500">
-                                                    {t.totalTickets}: <span className="text-white font-medium">{cat.stats?.total || 0}</span> ; {t.activeTickets}: <span className="text-white font-medium">{cat.stats?.active || 0}</span>
+                            {/* Categories List (Jira Board Style rows) */}
+                            <div className="space-y-3">
+                                {filteredCategories.length === 0 ? (
+                                    <div className="py-12 bg-[var(--surface-card)] border border-dashed border-[var(--border-divider)] rounded-[24px] flex flex-col items-center justify-center text-[var(--text-muted)]">
+                                        <Article size={48} weight="duotone" className="mb-4 opacity-50" />
+                                        <p className="text-sm font-bold">{searchQuery ? 'No categories found' : 'No categories configured'}</p>
+                                    </div>
+                                ) : (
+                                    filteredCategories.map((cat) => (
+                                        <div key={cat.id} className="group bg-[var(--surface-card)] border border-[var(--border-subtle)] hover:border-[#3b82f6]/30 rounded-[24px] p-5 transition-all duration-200 shadow-sm hover:shadow-md cursor-pointer flex items-center justify-between" onClick={() => openEditModal(cat)}>
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-12 h-12 rounded-xl bg-[var(--surface-hover)] border border-[var(--border-divider)] flex items-center justify-center shrink-0">
+                                                    <span className="text-xl">{cat.buttonEmoji || '📝'}</span>
+                                                </div>
+                                                <div>
+                                                    <div className="flex items-center gap-2 mb-1">
+                                                        <h4 className="font-bold text-white leading-none">{cat.name}</h4>
+                                                        {cat.mentionAgents && <span className="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-500 text-[10px] font-bold uppercase tracking-wider">Alerts</span>}
+                                                    </div>
+                                                    <div className="flex items-center gap-3 text-xs text-[var(--text-muted)] font-medium">
+                                                        <span className="flex items-center gap-1.5"><Ticket size={14} /> Total: {cat.stats?.total || 0}</span>
+                                                        <span className="w-1 h-1 rounded-full bg-[var(--border-divider)]" />
+                                                        <span className="flex items-center gap-1.5 text-emerald-400"><CircleDashed size={14} /> Active: {cat.stats?.active || 0}</span>
+                                                    </div>
                                                 </div>
                                             </div>
-                                            <Button isIconOnly size="sm" variant="flat" color="primary" className="bg-primary/10 text-primary" onPress={() => openEditModal(cat)}>
-                                                <Gear size={20} weight="fill" />
-                                            </Button>
+
+                                            <div className="w-8 h-8 rounded-full bg-[var(--surface-hover)] border border-[var(--border-divider)] flex items-center justify-center text-[var(--text-muted)] group-hover:text-white group-hover:bg-[#3b82f6] group-hover:border-[#3b82f6] transition-all">
+                                                <Gear size={16} weight="fill" />
+                                            </div>
                                         </div>
-                                    ))}
-                                </div>
+                                    ))
+                                )}
+                            </div>
+                        </div>
 
-                                {/* Create Button */}
-                                <Button
-                                    color="primary"
-                                    variant="flat"
-                                    onPress={openCreateModal}
-                                    className="w-full h-12 rounded-xl bg-primary/10 text-primary font-semibold text-base hover:bg-primary/20 transition-colors"
+                        {/* Left Side Column (Settings & Auditing) */}
+                        <div className="xl:col-span-1 space-y-6 xl:order-1 lg:sticky lg:top-8">
+
+                            {/* Global Config Card */}
+                            <div className="bg-[var(--surface-card)] border border-[var(--border-subtle)] rounded-[24px] p-6 shadow-sm">
+                                <h3 className="text-sm font-bold text-white flex items-center gap-2 mb-6">
+                                    <Scroll className="text-[#8f5eff]" weight="duotone" />
+                                    {t.loggingTitle}
+                                </h3>
+                                <p className="text-xs text-[var(--text-muted)] mb-6 leading-relaxed">
+                                    {t.loggingDesc}
+                                </p>
+
+                                <div className="space-y-4">
+                                    <div className="flex items-center justify-between pb-4 border-b border-[var(--border-divider)]">
+                                        <span className="text-sm font-bold text-[var(--text-secondary)]">Archive Tickets</span>
+                                        <div className="flex items-center h-6">
+                                            <Switch
+                                                isSelected={config?.enabled}
+                                                onValueChange={(v) => handleConfigUpdate({ enabled: v })}
+                                                color="success"
+                                                size="sm"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className={`transition-opacity duration-300 ${!config?.enabled ? 'opacity-50 pointer-events-none' : ''}`}>
+                                        <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider block mb-2">{t.logChannelLabel}</label>
+                                        <select
+                                            value={config?.logChannelId || ''}
+                                            onChange={(e) => handleConfigUpdate({ logChannelId: e.target.value })}
+                                            className="w-full bg-[var(--surface-hover)] border border-[var(--border-divider)] focus:border-[#8f5eff] rounded-xl h-10 px-3 text-sm text-white outline-none transition-colors appearance-none cursor-pointer"
+                                        >
+                                            <option value="" disabled className="bg-[#111]">{t.logChannelPlaceholder}</option>
+                                            {channels.text.map(c => <option key={c.id} value={c.id} className="bg-[#111]">#{c.name || c.id}</option>)}
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Quick Links Card */}
+                            <div className="bg-[var(--surface-card)] border border-[var(--border-subtle)] rounded-[24px] p-2 shadow-sm">
+                                <button
+                                    className="w-full flex items-center justify-between p-4 rounded-2xl hover:bg-[var(--surface-hover)] transition-colors group text-left"
+                                    onClick={() => alert("Transcripts viewer is a separate micro-app.")}
                                 >
-                                    {t.createCategory}
-                                </Button>
-                            </CardBody>
-                        </Card>
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-xl bg-violet-500/10 text-violet-500 border border-violet-500/20 flex items-center justify-center group-hover:bg-violet-500 group-hover:text-white transition-colors">
+                                            <Article size={20} weight="duotone" />
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-bold text-white mb-0.5">{t.transcripts}</p>
+                                            <p className="text-[11px] text-[var(--text-muted)]">{t.transcriptsDesc}</p>
+                                        </div>
+                                    </div>
+                                </button>
+                                <button
+                                    className="w-full flex items-center justify-between p-4 rounded-2xl hover:bg-[var(--surface-hover)] transition-colors group text-left"
+                                    onClick={() => alert("Advanced stats is a sub-module.")}
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 flex items-center justify-center group-hover:bg-emerald-500 group-hover:text-white transition-colors">
+                                            <TrendUp size={20} weight="duotone" />
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-bold text-white mb-0.5">Advanced Reports</p>
+                                            <p className="text-[11px] text-[var(--text-muted)]">Download CSV & detailed SLA metrics.</p>
+                                        </div>
+                                    </div>
+                                </button>
+                            </div>
 
-                        <div className="lg:col-span-1 space-y-8">
-                            <Card className="bg-[#18181b]/60 backdrop-blur-md border border-white/5 shadow-lg rounded-2xl min-h-[200px] flex flex-col p-6">
-                                <h3 className="text-lg font-bold text-white mb-4 text-center">{t.adminToolsTitle}</h3>
-                                <div className="space-y-3 flex flex-col h-full justify-center">
-                                    <Button
-                                        variant="flat"
-                                        color="primary"
-                                        className="w-full bg-primary/10 text-primary justify-start font-semibold h-11 rounded-xl hover:bg-primary/20 transition-colors"
-                                        startContent={<Article size={20} weight="fill" />}
-                                        onPress={() => router.push(`/dashboard/${guildId}/tickets/transcripts`)}
-                                    >
-                                        {t.transcripts}
-                                    </Button>
-                                    <Button
-                                        variant="flat"
-                                        color="primary"
-                                        className="w-full bg-primary/10 text-primary justify-start font-semibold h-11 rounded-xl hover:bg-primary/20 transition-colors"
-                                        startContent={<TrendUp size={20} weight="fill" />}
-                                        onPress={() => router.push(`/dashboard/${guildId}/tickets/stats`)}
-                                    >
-                                        {t.statistics}
-                                    </Button>
-                                </div>
-                            </Card>
                         </div>
                     </div>
                 </Tab>

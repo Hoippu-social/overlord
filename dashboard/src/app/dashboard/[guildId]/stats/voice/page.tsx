@@ -1,27 +1,25 @@
-'use client';
+﻿'use client';
 
 import React, { useState, useMemo } from 'react';
 import { useParams } from 'next/navigation';
-import { Button, Select, SelectItem, Avatar, ButtonGroup } from "@nextui-org/react";
 import {
     MicrophoneStage,
     SpeakerHigh,
-    User,
     Users,
     Hash,
     ArrowsClockwise,
     CalendarCheck,
     Clock,
-    Timer
 } from "@phosphor-icons/react";
-import { useGuildLocale } from "@/lib/i18n";
+import { useGuildLocale, useGuildTimezone } from "@/lib/i18n";
 import { useStats } from "@/hooks/useStats";
 import { usePersistentPeriod } from "@/hooks/usePersistentPeriod";
-import { formatYAxis } from "@/lib/utils";
+import { formatLocaleNumber, formatYAxis } from "@/lib/utils";
 import { StatsCard } from "@/components/stats/StatsCard";
 import { ChartContainer } from "@/components/stats/ChartContainer";
 import { StatsTopWidget } from "@/components/stats/StatsTopWidget";
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, ReferenceLine, Line } from 'recharts';
+import { ChartTooltip } from "@/components/stats/ChartTooltip";
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Line } from 'recharts';
 
 
 
@@ -32,14 +30,6 @@ const strings = {
         voiceActivity: 'Voice Activity',
         topChannels: 'Top Channels',
         topMembers: 'Top Speakers',
-        period: 'Period',
-        day1: '24 Hours',
-        day3: '3 Days',
-        day7: '7 Days',
-        day14: '14 Days',
-        day30: '30 Days',
-        month3: '90 Days',
-        year1: '365 Days',
         totalTime: 'Total Voice Time',
         avgSession: 'Avg. Session',
         mostActive: 'Peak Hour',
@@ -57,50 +47,59 @@ const strings = {
         saturday: 'Sat',
         sunday: 'Sun',
         median: 'Median',
+        other: 'Other',
+        activityTime: 'Activity Time',
     },
     ru: {
-        title: 'Голос',
-        subtitle: 'Активность в голосовых каналах',
-        voiceActivity: 'Голосовая активность',
-        topChannels: 'Топ каналов',
-        topMembers: 'Топ говорунов',
-        period: 'Период',
-        day1: '24 часа',
-        day3: '3 дня',
-        day7: '7 дней',
-        day14: '14 дней',
-        day30: '30 дней',
-        month3: '90 дней',
-        year1: '365 дней',
-        totalTime: 'Всего времени',
-        avgSession: 'Ср. сессия',
-        mostActive: 'Пик. час',
-        uniqueUsers: 'Уник. участников',
-        uniqueChannels: 'Уник. каналов',
-        minutes: 'мин',
-        hours: 'ч',
-        heatmap: 'Карта активности',
-        heatmapDesc: 'Почасовое распределение голоса',
-        monday: 'Пн',
-        tuesday: 'Вт',
-        wednesday: 'Ср',
-        thursday: 'Чт',
-        friday: 'Пт',
-        saturday: 'Сб',
-        sunday: 'Вс',
-        median: 'Медиана',
+        title: '\u0413\u043e\u043b\u043e\u0441',
+        subtitle: '\u0410\u043a\u0442\u0438\u0432\u043d\u043e\u0441\u0442\u044c \u0432 \u0433\u043e\u043b\u043e\u0441\u043e\u0432\u044b\u0445 \u043a\u0430\u043d\u0430\u043b\u0430\u0445',
+        voiceActivity: '\u0413\u043e\u043b\u043e\u0441\u043e\u0432\u0430\u044f \u0430\u043a\u0442\u0438\u0432\u043d\u043e\u0441\u0442\u044c',
+        topChannels: '\u0422\u043e\u043f \u043a\u0430\u043d\u0430\u043b\u043e\u0432',
+        topMembers: '\u0422\u043e\u043f \u0433\u043e\u0432\u043e\u0440\u0443\u043d\u043e\u0432',
+        totalTime: '\u0412\u0441\u0435\u0433\u043e \u0432\u0440\u0435\u043c\u0435\u043d\u0438',
+        avgSession: '\u0421\u0440. \u0441\u0435\u0441\u0441\u0438\u044f',
+        mostActive: '\u041f\u0438\u043a. \u0447\u0430\u0441',
+        uniqueUsers: '\u0423\u043d\u0438\u043a. \u0443\u0447\u0430\u0441\u0442\u043d\u0438\u043a\u043e\u0432',
+        uniqueChannels: '\u0423\u043d\u0438\u043a. \u043a\u0430\u043d\u0430\u043b\u043e\u0432',
+        minutes: '\u043c\u0438\u043d',
+        hours: '\u0447',
+        heatmap: '\u041a\u0430\u0440\u0442\u0430 \u0430\u043a\u0442\u0438\u0432\u043d\u043e\u0441\u0442\u0438',
+        heatmapDesc: '\u041f\u043e\u0447\u0430\u0441\u043e\u0432\u043e\u0435 \u0440\u0430\u0441\u043f\u0440\u0435\u0434\u0435\u043b\u0435\u043d\u0438\u0435 \u0433\u043e\u043b\u043e\u0441\u0430',
+        monday: '\u041f\u043d',
+        tuesday: '\u0412\u0442',
+        wednesday: '\u0421\u0440',
+        thursday: '\u0427\u0442',
+        friday: '\u041f\u0442',
+        saturday: '\u0421\u0431',
+        sunday: '\u0412\u0441',
+        median: '\u041c\u0435\u0434\u0438\u0430\u043d\u0430',
+        other: '\u041f\u0440\u043e\u0447\u0438\u0435',
+        activityTime: '\u0412\u0440\u0435\u043c\u044f \u0430\u043a\u0442\u0438\u0432\u043d\u043e\u0441\u0442\u0438',
     },
 } as const;
 
-type TimeUnit = 'minutes' | 'hours';
+/** Smart auto-format: if total minutes <= 59 -> "X min", else -> "X h Y min" */
+function autoFormatMinutes(minutes: number, text: { minutes: string; hours: string }): string {
+    if (minutes <= 59) return `${minutes}\u00A0${text.minutes}`;
+    const h = Math.floor(minutes / 60);
+    const m = minutes % 60;
+    // \u00A0 = non-breaking space: keeps number+unit together, allows wrap only between the two pairs
+    return m > 0 ? `${h}\u00A0${text.hours} ${m}\u00A0${text.minutes}` : `${h}\u00A0${text.hours}`;
+}
+
+/** Smart auto-format for seconds (raw voice values from top lists) */
+function autoFormatSeconds(seconds: number, text: { minutes: string; hours: string }): string {
+    const minutes = Math.floor(seconds / 60);
+    return autoFormatMinutes(minutes, text);
+}
 
 export default function VoicePage() {
     const { guildId } = useParams<{ guildId: string }>();
     const { locale } = useGuildLocale(guildId);
+    const guildTimezone = useGuildTimezone(guildId);
     const text = strings[locale];
 
     const [period, setPeriod] = usePersistentPeriod('7d');
-    const [timeUnit, setTimeUnit] = useState<TimeUnit>('hours');
     const { data, loading, refresh } = useStats({ guildId, type: 'voice', period });
     const [syncing, setSyncing] = useState(false);
 
@@ -136,15 +135,32 @@ export default function VoicePage() {
         if (data?.heatmap) {
             data.heatmap.forEach((h: any) => {
                 const date = new Date(h.date);
-                const jsDay = date.getDay(); // 0=Sun, 1=Mon...
-                const day = jsDay === 0 ? 6 : jsDay - 1;
-                const hour = date.getHours();
-                grid[day][hour] += h.voice; // voice is in seconds
+                const parts = new Intl.DateTimeFormat('en-US', {
+                    timeZone: guildTimezone,
+                    weekday: 'short',
+                    hour: 'numeric',
+                    hour12: false
+                }).formatToParts(date);
+
+                let day = 0;
+                let hour = 0;
+                parts.forEach(p => {
+                    if (p.type === 'weekday') {
+                        const daysMap = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+                        const jsDay = daysMap.indexOf(p.value);
+                        day = jsDay === 0 ? 6 : jsDay - 1;
+                    }
+                    if (p.type === 'hour') {
+                        hour = parseInt(p.value, 10);
+                        if (hour === 24) hour = 0;
+                    }
+                });
+                grid[day][hour] += h.voice;
             });
             max = Math.max(...grid.flat()) || 1;
         }
         return { heatmapGrid: grid, maxHeatmapValue: max };
-    }, [data]);
+    }, [data, guildTimezone]);
 
     const areaChartData = data?.areaChart || [];
     const topChannels = data?.topChannels || [];
@@ -152,120 +168,27 @@ export default function VoicePage() {
     const totalChannelValue = data?.totalChannelValue || 0;
     const totalMemberValue = data?.totalMemberValue || 0;
 
-    // Calculate metrics based on selected time unit
     const totalMinutes = areaChartData.reduce((acc: number, curr: any) => acc + curr.voice, 0);
     const uniqueUsers = data?.uniqueUsers ?? 0;
     const uniqueChannels = data?.uniqueChannels ?? 0;
 
-    const formatTime = (minutes: number) => {
-        if (timeUnit === 'hours') {
-            const hours = Math.floor(minutes / 60);
-            const mins = minutes % 60;
-            return `${hours}${text.hours} ${mins}${text.minutes}`;
-        }
-        return `${minutes} ${text.minutes}`;
-    };
-
-    const formatChartValue = (minutes: number) => {
-        if (timeUnit === 'hours') {
-            return Math.round(minutes / 60 * 10) / 10; // 1 decimal
-        }
-        return minutes;
-    };
-
-    // Transform chart data based on time unit
+    // Chart data (always in minutes, formatting handled by axis/tooltip)
     const chartData = areaChartData.map((d: any) => ({
         date: d.date,
-        voice: formatChartValue(d.voice),
-        weeklyMedian: d.weeklyMedian ? formatChartValue(d.weeklyMedian) : undefined
+        voice: d.voice,
+        weeklyMedian: d.weeklyMedian ?? undefined
     }));
-
-    // Format top lists value based on time unit
-    const formatTopValue = (seconds: number) => {
-        const mins = Math.floor(seconds / 60);
-        if (timeUnit === 'hours') {
-            const hours = Math.floor(mins / 60);
-            const remainingMins = mins % 60;
-            return `${hours}${text.hours} ${remainingMins}${text.minutes}`;
-        }
-        return `${mins} ${text.minutes}`;
-    };
 
     return (
         <div className="p-6 space-y-6 min-h-screen">
             {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-orange-500/20 to-amber-500/20 border border-orange-500/10 flex items-center justify-center backdrop-blur-sm shadow-xl flex-shrink-0">
-                        <MicrophoneStage size={32} weight="fill" className="text-orange-500 drop-shadow-lg" />
-                    </div>
-                    <div>
-                        <h1 className="text-3xl font-black text-white tracking-tight">{text.title}</h1>
-                        <p className="text-default-400 font-medium">{text.subtitle}</p>
-                    </div>
+            <div className="flex items-center gap-4 mb-2">
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-orange-500/20 to-amber-500/20 border border-orange-500/10 flex items-center justify-center backdrop-blur-sm shadow-xl flex-shrink-0">
+                    <MicrophoneStage size={32} weight="fill" className="text-orange-500 drop-shadow-lg" />
                 </div>
-
-                <div className="flex flex-col md:flex-row items-center gap-3 bg-[#18181b]/40 p-1.5 rounded-2xl border border-white/5 backdrop-blur-md w-full md:w-auto">
-                    {/* Time Unit Toggle */}
-                    <div className="w-full md:w-auto flex justify-center">
-                        <ButtonGroup size="sm" className="w-full md:w-auto">
-                            <Button
-                                variant={timeUnit === 'minutes' ? 'solid' : 'flat'}
-                                color={timeUnit === 'minutes' ? 'primary' : 'default'}
-                                onPress={() => setTimeUnit('minutes')}
-                                className={`flex-1 md:flex-none ${timeUnit === 'minutes' ? '' : 'bg-transparent hover:bg-white/5'}`}
-                            >
-                                <Timer size={16} weight="bold" />
-                                {text.minutes}
-                            </Button>
-                            <Button
-                                variant={timeUnit === 'hours' ? 'solid' : 'flat'}
-                                color={timeUnit === 'hours' ? 'primary' : 'default'}
-                                onPress={() => setTimeUnit('hours')}
-                                className={`flex-1 md:flex-none ${timeUnit === 'hours' ? '' : 'bg-transparent hover:bg-white/5'}`}
-                            >
-                                <Clock size={16} weight="bold" />
-                                {text.hours}
-                            </Button>
-                        </ButtonGroup>
-                    </div>
-
-                    <div className="hidden md:block h-6 w-px bg-white/10 mx-1" />
-
-                    <div className="flex items-center gap-2 w-full md:w-auto">
-                        <Button
-                            isIconOnly
-                            variant="flat"
-                            color="primary"
-                            isLoading={syncing}
-                            onPress={handleSync}
-                            className="bg-primary/10 text-primary w-10 h-10 flex-shrink-0"
-                        >
-                            {!syncing && <ArrowsClockwise size={20} weight="bold" />}
-                        </Button>
-                        <div className="hidden md:block h-6 w-px bg-white/10 mx-1" />
-                        <Select
-                            labelPlacement="outside"
-                            selectedKeys={[period]}
-                            onChange={(e) => setPeriod(e.target.value)}
-                            className="flex-1 md:w-40"
-                            classNames={{
-                                trigger: "bg-transparent shadow-none hover:bg-white/5 border-0 min-h-10 h-10 justify-between",
-                                value: "text-small font-medium group-data-[has-value=true]:text-white",
-                                popoverContent: "bg-[#18181b] border border-white/10 dark"
-                            }}
-                            startContent={<CalendarCheck className="text-default-400" size={16} />}
-                            disallowEmptySelection
-                        >
-                            <SelectItem key="24h">{text.day1}</SelectItem>
-                            <SelectItem key="3d">{text.day3}</SelectItem>
-                            <SelectItem key="7d">{text.day7}</SelectItem>
-                            <SelectItem key="14d">{text.day14}</SelectItem>
-                            <SelectItem key="30d">{text.day30}</SelectItem>
-                            <SelectItem key="90d">{text.month3}</SelectItem>
-                            <SelectItem key="365d">{text.year1}</SelectItem>
-                        </Select>
-                    </div>
+                <div>
+                    <h1 className="text-3xl font-black text-white tracking-tight">{text.title}</h1>
+                    <p className="text-default-400 font-medium">{text.subtitle}</p>
                 </div>
             </div>
 
@@ -273,31 +196,31 @@ export default function VoicePage() {
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
                 <StatsCard
                     title={text.totalTime}
-                    value={formatTime(totalMinutes)}
+                    value={autoFormatMinutes(totalMinutes, text)}
                     icon={<Clock size={24} weight="fill" />}
                     loading={loading}
                 />
                 <StatsCard
                     title={text.avgSession}
-                    value={data?.avgSession ? `${Math.floor(data.avgSession / 60)} ${text.minutes}` : '—'}
+                    value={data?.avgSession ? autoFormatSeconds(data.avgSession, text) : '-'}
                     icon={<SpeakerHigh size={24} weight="fill" />}
                     loading={loading}
                 />
                 <StatsCard
                     title={text.mostActive}
-                    value={data?.peakHour || '—'}
+                    value={data?.peakHour || '-'}
                     icon={<CalendarCheck size={24} weight="fill" />}
                     loading={loading}
                 />
                 <StatsCard
                     title={text.uniqueUsers}
-                    value={uniqueUsers.toLocaleString()}
+                    value={formatLocaleNumber(uniqueUsers, locale)}
                     icon={<Users size={24} weight="fill" />}
                     loading={loading}
                 />
                 <StatsCard
                     title={text.uniqueChannels}
-                    value={uniqueChannels.toLocaleString()}
+                    value={formatLocaleNumber(uniqueChannels, locale)}
                     icon={<Hash size={24} weight="fill" />}
                     loading={loading}
                 />
@@ -327,23 +250,31 @@ export default function VoicePage() {
                                 tickLine={false}
                                 axisLine={false}
                                 width={50}
-                                tickFormatter={(v) => timeUnit === 'hours' ? `${formatYAxis(v, locale as 'ru' | 'en')}${text.hours}` : `${formatYAxis(v, locale as 'ru' | 'en')}${text.minutes}`}
+                                tickFormatter={(v) => {
+                                    if (v >= 60) return `${formatYAxis(Math.floor(v / 60), locale as 'ru' | 'en')}\u00A0${text.hours}`;
+                                    return `${formatYAxis(v, locale as 'ru' | 'en')}\u00A0${text.minutes}`;
+                                }}
                             />
                             <RechartsTooltip
-                                contentStyle={{
-                                    backgroundColor: 'rgba(24, 24, 27, 0.9)',
-                                    backdropFilter: 'blur(8px)',
-                                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                                    borderRadius: '12px',
-                                }}
-                                itemStyle={{ color: '#fff' }}
-                                formatter={(value: number) => [timeUnit === 'hours' ? `${value}${text.hours}` : `${value} ${text.minutes}`, text.voiceActivity]}
+                                content={(props: any) => (
+                                    <ChartTooltip
+                                        {...props}
+                                        locale={locale}
+                                        order={['voice', 'weeklyMedian']}
+                                        colorOverrides={{ voice: '#F97316' }}
+                                        formatters={{
+                                            voice: (v) => autoFormatMinutes(v as number, text),
+                                            weeklyMedian: (v) => autoFormatMinutes(v as number, text)
+                                        }}
+                                    />
+                                )}
                             />
                             <Area
                                 type="monotone"
                                 dataKey="voice"
+                                name={text.activityTime}
                                 stroke="#F97316"
-                                strokeWidth={3}
+                                strokeWidth={4}
                                 fillOpacity={1}
                                 fill="url(#voiceColor)"
                                 activeDot={{ r: 6, stroke: '#fff', strokeWidth: 2 }}
@@ -396,17 +327,17 @@ export default function VoicePage() {
                                             return (
                                                 <div
                                                     key={`${dayIndex}-${hour}`}
-                                                    className="group/cell relative h-6 flex-1 mx-[1px] min-w-[12px] rounded-sm transition-transform hover:scale-110 hover:z-20 cursor-pointer"
+                                                    className="group/cell relative h-6 flex-1 mx-[1px] min-w-[12px] rounded-full transition-transform hover:scale-110 hover:z-20 cursor-pointer"
                                                     style={{
                                                         backgroundColor: value > 0
-                                                            ? `rgba(249, 115, 22, ${0.15 + intensity * 0.85})` // Orange for Voice
-                                                            : 'rgba(255, 255, 255, 0.02)',
+                                                            ? `rgba(249, 115, 22, ${0.15 + intensity * 0.85})`
+                                                            : 'rgba(255, 255, 255, 0.03)',
                                                     }}
                                                 >
-                                                    <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 rounded-lg bg-[#18181b]/95 border border-white/10 backdrop-blur-md shadow-xl opacity-0 scale-95 group-hover/cell:opacity-100 group-hover/cell:scale-100 transition-all duration-100 whitespace-nowrap z-50">
+                                                    <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-4 py-2 rounded-2xl bg-[#111111]/95 border border-white/[0.04] backdrop-blur-xl shadow-2xl opacity-0 scale-95 group-hover/cell:opacity-100 group-hover/cell:scale-100 transition-all duration-100 whitespace-nowrap z-50">
                                                         <div className="font-bold text-white text-sm">{days[dayIndex]} {hour}:00</div>
                                                         <div className="text-xs text-default-300">
-                                                            {formatTopValue(value)}
+                                                            {autoFormatSeconds(value, text)}
                                                         </div>
                                                     </div>
                                                 </div>
@@ -428,19 +359,14 @@ export default function VoicePage() {
                         id: c.channelId || c.id,
                         name: c.name || `#${c.channelId?.slice(-4) || 'unknown'}`,
                         value: c.value,
-                        discordUrl: c.discordUrl
+                        discordUrl: c.discordUrl,
+                        drilldownUrl: c.drilldownUrl
                     }))}
                     type="list"
-                    valueFormatter={(v) => {
-                        const mins = Math.floor(v / 60);
-                        if (timeUnit === 'hours') {
-                            const hours = Math.floor(mins / 60);
-                            const remainingMins = mins % 60;
-                            return `${hours}${text.hours} ${remainingMins}${text.minutes}`;
-                        }
-                        return `${mins} ${text.minutes}`;
-                    }}
+                    valueFormatter={(v) => autoFormatSeconds(v, text)}
                     totalValue={totalChannelValue}
+                    locale={locale}
+                    othersLabel={text.other}
                     isChannel
                 />
                 <StatsTopWidget
@@ -449,21 +375,21 @@ export default function VoicePage() {
                         id: m.userId || m.id,
                         name: m.name || m.userId?.slice(-6) || 'unknown',
                         value: m.value,
-                        avatar: m.avatar
+                        avatar: m.avatar,
+                        username: m.username,
+                        drilldownUrl: m.drilldownUrl
                     }))}
                     type="list"
-                    valueFormatter={(v) => {
-                        const mins = Math.floor(v / 60);
-                        if (timeUnit === 'hours') {
-                            const hours = Math.floor(mins / 60);
-                            const remainingMins = mins % 60;
-                            return `${hours}${text.hours} ${remainingMins}${text.minutes}`;
-                        }
-                        return `${mins} ${text.minutes}`;
-                    }}
+                    valueFormatter={(v) => autoFormatSeconds(v, text)}
                     totalValue={totalMemberValue}
+                    locale={locale}
+                    othersLabel={text.other}
                 />
             </div>
         </div>
     );
 }
+
+
+
+

@@ -1,26 +1,24 @@
 'use client';
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useParams } from 'next/navigation';
-import { Button, Select, SelectItem } from "@nextui-org/react";
+
 import {
-    SquaresFour,
     ChatsTeardrop,
     MicrophoneStage,
-    UsersThree,
-    ArrowsClockwise,
-    CalendarCheck,
-    TrendUp
+    TrendDown,
+    TrendUp,
 } from "@phosphor-icons/react";
-import { useGuildLocale } from "@/lib/i18n";
+
 import { useStats } from "@/hooks/useStats";
+import { useGuildLocale, useGuildTimezone } from "@/lib/i18n";
 import { usePersistentPeriod } from "@/hooks/usePersistentPeriod";
-import { formatYAxis } from "@/lib/utils";
+import { formatLocaleNumber, formatYAxis } from "@/lib/utils";
+import { buildStatsBucketLabels } from "@/lib/stats";
 import { StatsCard } from "@/components/stats/StatsCard";
 import { ChartContainer } from "@/components/stats/ChartContainer";
-import { HistoricalSyncModal } from "@/components/stats/HistoricalSyncModal";
+import { ChartTooltip } from "@/components/stats/ChartTooltip";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-
 
 
 const strings = {
@@ -35,17 +33,20 @@ const strings = {
         day30: '30 Days',
         month3: '90 Days',
         year1: '365 Days',
-        custom: 'Custom Range...',
         messages: 'Messages',
         voice: 'Voice',
         members: 'Members',
-        activity: 'Server Activity',
         totalMessages: 'Total Messages',
         totalVoice: 'Voice Time',
-        newMembers: 'New Members',
+        memberChange: 'Change',
         messagesDesc: 'sent in text channels',
         voiceDesc: 'spent in voice channels',
-        membersDesc: 'joined the server',
+        memberChangeDesc: 'member count change for the period',
+        synced: 'Synced',
+        activityChart: 'Server Activity',
+        activityChartDesc: 'Messages & Voice over time',
+        minutes: 'min',
+        hours: 'h',
     },
     ru: {
         title: 'Обзор',
@@ -58,217 +59,188 @@ const strings = {
         day30: '30 дней',
         month3: '90 дней',
         year1: '365 дней',
-        custom: 'Выбрать даты...',
         messages: 'Сообщения',
         voice: 'Голос',
         members: 'Участники',
-        activity: 'Активность сервера',
         totalMessages: 'Всего сообщений',
         totalVoice: 'Время в голосе',
-        newMembers: 'Новых участников',
+        memberChange: 'Изменение',
         messagesDesc: 'отправлено в текстовых каналах',
         voiceDesc: 'проведено в голосовых каналах',
-        membersDesc: 'присоединилось к серверу',
+        memberChangeDesc: 'изменение числа участников за период',
+        synced: 'Синхронизировано',
+        activityChart: 'Активность сервера',
+        activityChartDesc: 'Сообщения и голос за всё время',
+        minutes: 'мин',
+        hours: 'ч',
     },
 } as const;
+
 
 export default function StatsOverview() {
     const { guildId } = useParams<{ guildId: string }>();
     const { locale } = useGuildLocale(guildId);
+    const guildTimezone = useGuildTimezone(guildId);
     const text = strings[locale];
 
-    // Manage state via custom hook to persist in URL
     const [period, setPeriod] = usePersistentPeriod('7d');
-    const [syncModalOpen, setSyncModalOpen] = React.useState(false);
 
-    // Use the custom hook
-    const { data, loading, refresh } = useStats({ guildId, type: 'overview', period });
+    const { data, loading } = useStats({ guildId, type: 'overview', period });
 
-    // Calculate days from period for historical sync
-    const getDaysFromPeriod = (p: string): number => {
-        if (p === '24h') return 1;
-        if (p.endsWith('d')) return parseInt(p);
-        return 30;
-    };
+    const activityData = useMemo(() => {
+        if (data?.activityData?.length) {
+            return data.activityData;
+        }
 
-    const activityData = (data?.activityData?.length ? data.activityData : Array.from({ length: 7 }, (_, i) => {
-        const d = new Date(Date.now() - (6 - i) * 24 * 60 * 60 * 1000);
-        const dd = d.getDate().toString().padStart(2, '0');
-        const mm = (d.getMonth() + 1).toString().padStart(2, '0');
-        const yyyy = d.getFullYear();
-        return {
-            date: `${dd}.${mm}.${yyyy}`,
+        const now = new Date();
+        const start = new Date(now);
+        start.setDate(now.getDate() - 6);
+
+        return buildStatsBucketLabels(start, now, '7d', guildTimezone).map((date) => ({
+            date,
             messages: 0,
-            voice: 0
-        };
-    }));
-    const cards = data?.cards || { totalMessages: 0, totalVoice: 0, newMembers: 0 };
+            voice: 0,
+        }));
+    }, [data?.activityData, guildTimezone]);
+
+    const cards = data?.cards || { totalMessages: 0, totalVoiceSeconds: 0, memberChange: 0 };
+    const memberChange = Number(cards.memberChange || 0);
+    const memberChangeLabel = memberChange > 0
+        ? `+${formatLocaleNumber(memberChange, locale)}`
+        : formatLocaleNumber(memberChange, locale);
+    const isMemberChangePositive = memberChange >= 0;
 
     return (
-        <div className="p-6 space-y-6 min-h-screen bg-transparent">
-            {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-blue-500/10 flex items-center justify-center backdrop-blur-sm shadow-xl flex-shrink-0">
-                        <SquaresFour size={32} weight="fill" className="text-blue-500 drop-shadow-lg" />
-                    </div>
-                    <div>
-                        <h1 className="text-3xl font-black text-white tracking-tight">{text.title}</h1>
-                        <p className="text-default-400 font-medium">{text.subtitle}</p>
-                    </div>
-                </div>
-
-                <div className="flex items-center gap-3 bg-[#18181b]/40 p-1.5 rounded-2xl border border-white/5 backdrop-blur-md w-full md:w-auto">
-                    <Button
-                        isIconOnly
-                        variant="flat"
-                        color="primary"
-                        onPress={() => setSyncModalOpen(true)}
-                        className="bg-primary/10 text-primary w-10 h-10 flex-shrink-0"
-                        title="Собрать исторические данные"
-                    >
-                        <ArrowsClockwise size={20} weight="bold" />
-                    </Button>
-
-                    <div className="h-6 w-px bg-white/10 mx-1" />
-
-                    <Select
-                        labelPlacement="outside"
-                        selectedKeys={[period]}
-                        onChange={(e) => setPeriod(e.target.value)}
-                        className="flex-1 md:w-40"
-                        classNames={{
-                            trigger: "bg-transparent shadow-none hover:bg-white/5 border-0 min-h-10 h-10 data-[focus=true]:bg-white/5 justify-between",
-                            value: "text-small font-medium group-data-[has-value=true]:text-white",
-                            popoverContent: "bg-[#18181b] border border-white/10 dark"
-                        }}
-                        aria-label={text.period}
-                        startContent={<CalendarCheck className="text-default-400" size={16} />}
-                        disallowEmptySelection
-                    >
-                        <SelectItem key="24h">{text.day1}</SelectItem>
-                        <SelectItem key="3d">{text.day3}</SelectItem>
-                        <SelectItem key="7d">{text.day7}</SelectItem>
-                        <SelectItem key="14d">{text.day14}</SelectItem>
-                        <SelectItem key="30d">{text.day30}</SelectItem>
-                        <SelectItem key="90d">{text.month3}</SelectItem>
-                        <SelectItem key="365d">{text.year1}</SelectItem>
-                    </Select>
-                </div>
-            </div>
+        <div className="space-y-6 animate-fade-in">
 
             {/* Key Metrics Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 px-6">
                 <StatsCard
                     title={text.totalMessages}
-                    value={cards.totalMessages.toLocaleString()}
+                    value={formatLocaleNumber(cards.totalMessages, locale)}
                     description={text.messagesDesc}
-                    icon={<ChatsTeardrop size={24} weight="fill" />}
+                    icon={<ChatsTeardrop size={20} weight="fill" />}
                     loading={loading}
-                // trend={{ value: 0, isPositive: true }}
+                    accentColor="var(--color-primary-2)"
                 />
-
                 <StatsCard
                     title={text.totalVoice}
-                    value={`${Math.floor((cards.totalVoiceSeconds || 0) / 3600).toString().padStart(2, '0')}:${Math.floor(((cards.totalVoiceSeconds || 0) % 3600) / 60).toString().padStart(2, '0')}`}
+                    value={(() => {
+                        const s = cards.totalVoiceSeconds || 0;
+                        const h = Math.floor(s / 3600);
+                        const m = Math.floor((s % 3600) / 60);
+                        if (h > 0) return `${h}\u00A0${text.hours} ${m}\u00A0${text.minutes}`;
+                        return `${m}\u00A0${text.minutes}`;
+                    })()}
                     description={text.voiceDesc}
-                    icon={<MicrophoneStage size={24} weight="fill" />}
+                    icon={<MicrophoneStage size={20} weight="fill" />}
                     loading={loading}
-                // trend={{ value: 0, isPositive: true }}
+                    accentColor="var(--color-primary-1)"
                 />
-
                 <StatsCard
-                    title={text.newMembers}
-                    value={`+${cards.newMembers}`}
-                    description={text.membersDesc}
-                    icon={<UsersThree size={24} weight="fill" />}
+                    title={text.memberChange}
+                    value={memberChangeLabel}
+                    description={text.memberChangeDesc}
+                    icon={isMemberChangePositive ? <TrendUp size={20} weight="fill" /> : <TrendDown size={20} weight="fill" />}
                     loading={loading}
-                // trend={{ value: 0, isPositive: false }}
+                    accentColor={isMemberChangePositive ? "var(--color-success)" : "var(--color-danger)"}
                 />
             </div>
 
-            {/* Main Chart */}
-            <ChartContainer
-                title={text.activity}
-                subtitle={`${text.messages} & ${text.voice}`}
-                loading={loading}
-                height={400}
-            >
-                <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={activityData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
-                        <defs>
-                            <linearGradient id="colorMessages" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="#8B5CF6" stopOpacity={0.4} />
-                                <stop offset="95%" stopColor="#8B5CF6" stopOpacity={0} />
-                            </linearGradient>
-                            <linearGradient id="colorVoice" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="#F97316" stopOpacity={0.4} />
-                                <stop offset="95%" stopColor="#F97316" stopOpacity={0} />
-                            </linearGradient>
-                        </defs>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#ffffff08" vertical={false} />
-                        <XAxis
-                            dataKey="date"
-                            stroke="#52525b"
-                            fontSize={12}
-                            tickLine={false}
-                            axisLine={false}
-                            dy={10}
-                        />
-                        <YAxis
-                            stroke="#52525b"
-                            fontSize={12}
-                            tickLine={false}
-                            axisLine={false}
-                            width={50}
-                            tickFormatter={(value) => formatYAxis(value, locale as 'ru' | 'en')}
-                        />
-                        <Tooltip
-                            contentStyle={{
-                                backgroundColor: 'rgba(24, 24, 27, 0.9)',
-                                backdropFilter: 'blur(8px)',
-                                border: '1px solid rgba(255, 255, 255, 0.1)',
-                                borderRadius: '12px',
-                                boxShadow: '0 10px 30px -10px rgba(0,0,0,0.5)'
-                            }}
-                            itemStyle={{ color: '#fff' }}
-                            labelStyle={{ color: '#a1a1aa', marginBottom: '8px' }}
-                            cursor={{ stroke: 'rgba(255,255,255,0.1)', strokeWidth: 2 }}
-                        />
-                        <Area
-                            type="monotone"
-                            dataKey="messages"
-                            stroke="#8B5CF6"
-                            strokeWidth={3}
-                            fillOpacity={1}
-                            fill="url(#colorMessages)"
-                            name={text.messages}
-                            activeDot={{ r: 6, strokeWidth: 0, fill: '#8B5CF6', stroke: '#fff' }}
-                        />
-                        <Area
-                            type="monotone"
-                            dataKey="voice"
-                            stroke="#F97316"
-                            strokeWidth={3}
-                            fillOpacity={1}
-                            fill="url(#colorVoice)"
-                            name={text.voice}
-                            activeDot={{ r: 6, strokeWidth: 0, fill: '#F97316', stroke: '#fff' }}
-                        />
-                    </AreaChart>
-                </ResponsiveContainer>
-            </ChartContainer>
-
-            {/* Historical Sync Modal */}
-            <HistoricalSyncModal
-                isOpen={syncModalOpen}
-                onClose={() => {
-                    setSyncModalOpen(false);
-                    refresh(); // Refresh data after sync
-                }}
-                guildId={guildId}
-                selectedDays={getDaysFromPeriod(period)}
-            />
+            {/* Activity Chart */}
+            <div className="px-6">
+                <ChartContainer
+                    title={text.activityChart}
+                    subtitle={text.activityChartDesc}
+                    loading={loading}
+                >
+                    <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={activityData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                            <defs>
+                                <linearGradient id="colorMessages" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="var(--color-primary-2)" stopOpacity={0.3} />
+                                    <stop offset="95%" stopColor="var(--color-primary-2)" stopOpacity={0} />
+                                </linearGradient>
+                                <linearGradient id="colorVoice" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="var(--color-warning)" stopOpacity={0.3} />
+                                    <stop offset="95%" stopColor="var(--color-warning)" stopOpacity={0} />
+                                </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" stroke="var(--border-divider)" vertical={false} />
+                            <XAxis
+                                dataKey="date"
+                                stroke="var(--text-muted)"
+                                fontSize={12}
+                                tickLine={false}
+                                axisLine={false}
+                                dy={10}
+                            />
+                            <YAxis
+                                yAxisId="left"
+                                stroke="var(--text-muted)"
+                                fontSize={12}
+                                tickLine={false}
+                                axisLine={false}
+                                tickFormatter={(value) => formatYAxis(value, locale)}
+                            />
+                            <YAxis
+                                yAxisId="right"
+                                orientation="right"
+                                stroke="var(--text-muted)"
+                                fontSize={12}
+                                tickLine={false}
+                                axisLine={false}
+                                tickFormatter={(value) => {
+                                    if (value >= 60) return `${formatYAxis(Math.floor(value / 60), locale as 'ru' | 'en')}\u00A0${text.hours}`;
+                                    return `${formatYAxis(value, locale as 'ru' | 'en')}\u00A0${text.minutes}`;
+                                }}
+                            />
+                            <Tooltip 
+                                cursor={{ stroke: 'rgba(255,255,255,0.1)', strokeWidth: 2 }}
+                                content={(props: any) => (
+                                    <ChartTooltip
+                                        {...props}
+                                        locale={locale}
+                                        order={['messages', 'voice']}
+                                        colorOverrides={{
+                                            messages: 'var(--color-primary-2)',
+                                            voice: 'var(--color-warning)'
+                                        }}
+                                        formatters={{
+                                            voice: (v) => {
+                                                const h = Math.floor(v / 60);
+                                                const m = v % 60;
+                                                if (h > 0) return `${h}\u00A0${text.hours} ${m}\u00A0${text.minutes}`;
+                                                return `${m}\u00A0${text.minutes}`;
+                                            }
+                                        }}
+                                    />
+                                )}
+                            />
+                            <Area
+                                yAxisId="left"
+                                type="monotone"
+                                dataKey="messages"
+                                name={text.messages}
+                                stroke="var(--color-primary-2)"
+                                strokeWidth={3}
+                                fillOpacity={1}
+                                fill="url(#colorMessages)"
+                            />
+                            <Area
+                                yAxisId="right"
+                                type="monotone"
+                                dataKey="voice"
+                                name={text.voice}
+                                stroke="var(--color-warning)"
+                                strokeWidth={3}
+                                fillOpacity={1}
+                                fill="url(#colorVoice)"
+                            />
+                        </AreaChart>
+                    </ResponsiveContainer>
+                </ChartContainer>
+            </div>
         </div>
     );
 }

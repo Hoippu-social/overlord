@@ -16,7 +16,7 @@ export default async function StatsLayout({
             {/* Sync Progress Bar handles auto-sync logic internally */}
             <SyncProgressBar guildId={guildId} />
 
-            <div className="px-6 pt-6">
+            <div className="px-6 pt-6 pb-4">
                 <StatsNav guildId={guildId} />
             </div>
 

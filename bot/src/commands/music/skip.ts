@@ -5,6 +5,8 @@ const command: Command = {
     data: new SlashCommandBuilder()
         .setName('skip')
         .setDescription('Skips the current track'),
+    accessGroup: 'music',
+    accessKey: 'skip',
     execute: async (interaction) => {
         const member = interaction.member as GuildMember;
         const voiceChannel = member.voice.channel;

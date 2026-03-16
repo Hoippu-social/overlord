@@ -1,7 +1,9 @@
-import { Events, GuildMember } from 'discord.js';
+import { Events, GuildMember, AuditLogEvent } from 'discord.js';
 import logger from '../utils/logger';
-import { prisma } from '../utils/database';
+import { prisma, statsPrisma } from '../utils/database';
 import { logAuditEvent } from '../utils/auditLog';
+import { StatsService } from '../services/StatsService';
+import { syncGuildRealtimeCounts } from '../utils/guildSync';
 
 export default {
     name: Events.GuildMemberRemove,
@@ -10,7 +12,42 @@ export default {
         const guildId = member.guild.id;
         const leftAt = new Date();
 
-        const existing = await prisma.inviteUseEvent.findFirst({
+        await syncGuildRealtimeCounts(member.guild);
+
+        // Track member leave in stats
+        await StatsService.trackMemberLeave(guildId, member.id, leftAt);
+
+        // Check for Kick
+        try {
+            const auditLogs = await member.guild.fetchAuditLogs({
+                limit: 1,
+                type: AuditLogEvent.MemberKick,
+            });
+            const entry = auditLogs.entries.first();
+
+            if (entry && entry.targetId === member.id) {
+                if (Date.now() - entry.createdTimestamp < 5000) {
+                    if (entry.executorId !== member.client.user?.id) {
+                        await logAuditEvent(member.client, {
+                            guildId,
+                            tag: 'moderation',
+                            actorId: entry.executorId,
+                            targetId: member.id,
+                            payload: {
+                                event: 'member_kick',
+                                userId: member.id,
+                                reason: entry.reason ?? null,
+                            },
+                            severity: 'WARN',
+                        });
+                    }
+                }
+            }
+        } catch (error) {
+            // Missing permissions or other errors
+        }
+
+        const existing = await statsPrisma.inviteUseEvent.findFirst({
             where: {
                 guildId,
                 memberId: member.id,
@@ -27,7 +64,7 @@ export default {
         if (existing) {
             stayDurationSec = Math.max(0, Math.floor((leftAt.getTime() - existing.joinedAt.getTime()) / 1000));
             try {
-                await prisma.inviteUseEvent.update({
+                await statsPrisma.inviteUseEvent.update({
                     where: { id: existing.id },
                     data: {
                         leftAt,

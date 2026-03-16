@@ -71,6 +71,7 @@ interface TicketCategory {
 
 export default function TicketCategoryPage() {
     const { guildId, categoryId } = useParams<{ guildId: string, categoryId: string }>();
+    const { locale } = useGuildLocale(guildId);
     const router = useRouter();
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -86,6 +87,19 @@ export default function TicketCategoryPage() {
 
     // Modal for deleting
     const deleteModal = useDisclosure();
+    const text = {
+        delete: locale === 'ru' ? 'Удалить' : 'Delete',
+        saveChanges: locale === 'ru' ? 'Сохранить изменения' : 'Save Changes',
+        saveSuccess: locale === 'ru' ? 'Изменения сохранены' : 'Saved successfully',
+        saveTranscripts: locale === 'ru' ? 'Сохранять транскрипты' : 'Save Transcripts',
+        allowUserClose: locale === 'ru' ? 'Разрешить пользователям закрывать' : 'Allow Users to Close',
+        createTicket: locale === 'ru' ? 'Создать тикет' : 'Create Ticket',
+        deleteCategory: locale === 'ru' ? 'Удалить категорию?' : 'Delete Category?',
+        deleteWarning: locale === 'ru'
+            ? 'Вы уверены, что хотите удалить эту категорию? Это действие нельзя отменить.'
+            : 'Are you sure you want to delete this category? This action cannot be undone.',
+        cancel: locale === 'ru' ? 'Отмена' : 'Cancel',
+    };
 
     useEffect(() => {
         const load = async () => {
@@ -139,7 +153,7 @@ export default function TicketCategoryPage() {
 
             if (res.ok) {
                 // Show success toast or visual feedback
-                alert("Saved successfully");
+                alert(text.saveSuccess);
             }
         } catch (e) {
             console.error(e);
@@ -209,7 +223,7 @@ export default function TicketCategoryPage() {
                         startContent={<Trash weight="bold" />}
                         onPress={deleteModal.onOpen}
                     >
-                        Delete
+                        {text.delete}
                     </Button>
                     <Button
                         color="primary"
@@ -218,7 +232,7 @@ export default function TicketCategoryPage() {
                         onPress={handleSave}
                         className="font-bold shadow-lg shadow-primary/20"
                     >
-                        Save Changes
+                        {text.saveChanges}
                     </Button>
                 </div>
             </div>
@@ -297,7 +311,7 @@ export default function TicketCategoryPage() {
                                 <p className="text-tiny text-default-400 -mt-4 pl-14">Ping support roles when a new ticket is opened.</p>
 
                                 <Switch isSelected={formData.saveHistory} onValueChange={(v) => updateField('saveHistory', v)}>
-                                    Save Transcripts
+                                    {text.saveTranscripts}
                                 </Switch>
                                 <p className="text-tiny text-default-400 -mt-4 pl-14">Generate and save HTML transcripts after closing.</p>
 
@@ -307,7 +321,7 @@ export default function TicketCategoryPage() {
                                 <p className="text-tiny text-default-400 -mt-4 pl-14">Ask users to rate their support experience.</p>
 
                                 <Switch isSelected={formData.allowUserClose} onValueChange={(v) => updateField('allowUserClose', v)}>
-                                    Allow Users to Close
+                                    {text.allowUserClose}
                                 </Switch>
                                 <p className="text-tiny text-default-400 -mt-4 pl-14">Let the ticket creator close their own ticket.</p>
                             </CardBody>
@@ -350,7 +364,7 @@ export default function TicketCategoryPage() {
                                 <h3 className="text-lg font-bold text-white border-b border-white/5 pb-2">Button Style</h3>
                                 <Input
                                     label="Button Label"
-                                    value={formData.buttonText || 'Create Ticket'}
+                                    value={formData.buttonText || text.createTicket}
                                     onValueChange={(v) => updateField('buttonText', v)}
                                     variant="bordered"
                                 />
@@ -492,14 +506,18 @@ export default function TicketCategoryPage() {
                 <ModalContent className="bg-[#181A20] border border-white/10 text-white">
                     {(onClose) => (
                         <>
-                            <ModalHeader>Delete Category?</ModalHeader>
+                            <ModalHeader>{text.deleteCategory}</ModalHeader>
                             <ModalBody>
-                                <p>Are you sure you want to delete <strong>{category?.name}</strong>? This action cannot be undone.</p>
-                                <p className="text-sm text-default-400">All configurations for this category will be lost. Existing tickets will remain but may lose functionality.</p>
+                                <p>{text.deleteWarning} <strong>{category?.name}</strong>.</p>
+                                <p className="text-sm text-default-400">
+                                    {locale === 'ru'
+                                        ? 'Все настройки этой категории будут потеряны. Существующие тикеты останутся, но часть функциональности может исчезнуть.'
+                                        : 'All configurations for this category will be lost. Existing tickets will remain but may lose functionality.'}
+                                </p>
                             </ModalBody>
                             <ModalFooter>
-                                <Button variant="light" onPress={onClose}>Cancel</Button>
-                                <Button color="danger" onPress={handleDelete} isLoading={deleting}>Delete</Button>
+                                <Button variant="light" onPress={onClose}>{text.cancel}</Button>
+                                <Button color="danger" onPress={handleDelete} isLoading={deleting}>{text.delete}</Button>
                             </ModalFooter>
                         </>
                     )}

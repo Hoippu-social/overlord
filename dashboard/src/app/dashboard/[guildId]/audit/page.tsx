@@ -18,28 +18,11 @@ import {
     Avatar
 } from '@nextui-org/react';
 import {
-    Scroll,
-    ShieldCheck,
-    Users,
-    ChatCircleText,
-    Hash,
-    IdentificationBadge,
-    SpeakerHigh,
-    UserPlus,
-    Lock,
-    Robot,
-    CaretRight,
-    Plus,
-    Trash,
-    Circle,
-    CheckCircle,
-    Info,
-    Warning,
-    WarningCircle,
-    Clock
-} from '@phosphor-icons/react';
+    Plus, Trash, Circle, Hash, Shield, EnvelopeSimple, MagnifyingGlass, WarningCircle, CheckCircle, Warning, UserPlus, IdentificationBadge, SpeakerHigh, UserMinus, ShieldCheck, Door, MonitorPlay, UsersThree, Info, Key, Clock, ShieldStar, Eye, UserCircle, Wrench, X, AppWindow, Users, ChatsCircle, Crown, ChatCircleText, Robot, CaretRight, Folder, Lock, Scroll
+} from "@phosphor-icons/react";
 import { useParams } from 'next/navigation';
-import { useGuildLocale } from '@/lib/i18n';
+import { useGuildLocale, useGuildTimezone } from '@/lib/i18n';
+import { SectionBlock } from '@/components/SectionBlock';
 
 type AuditEvent = {
     id: number;
@@ -110,8 +93,14 @@ const strings = {
         addRoute: 'Add New Route',
         from: 'From',
         to: 'To',
+        user: 'User',
+        deletedBy: 'Deleted By',
+        messageAuthor: 'Message Author',
+        reason: 'Reason',
+        until: 'Timeout Until',
         status: 'Status',
         details: 'Details',
+        duration: 'Duration',
     },
     ru: {
         title: 'Журнал аудита',
@@ -133,8 +122,14 @@ const strings = {
         addRoute: 'Добавить маршрут',
         from: 'Отправитель',
         to: 'Получатель',
+        user: 'Пользователь',
+        deletedBy: 'Удалил',
+        messageAuthor: 'Автор сообщения',
+        reason: 'Причина',
+        until: 'Таймаут до',
         status: 'Статус',
         details: 'Детали',
+        duration: 'Длительность',
     },
 } as const;
 
@@ -144,28 +139,9 @@ const severityConfig: Record<string, { color: string; bgColor: string; icon: any
     ERROR: { color: 'text-rose-400', bgColor: 'bg-rose-400/10', icon: Warning },
 };
 
-function ListGroup({ children, title, description, action }: { children: React.ReactNode; title?: string; description?: string; action?: React.ReactNode }) {
-    return (
-        <div className="bg-[#181A20] rounded-[32px] border border-white/5 shadow-xl overflow-hidden">
-            {(title || description) && (
-                <div className="p-6 pb-2 flex items-start justify-between">
-                    <div>
-                        {title && <h2 className="text-xl font-bold text-white">{title}</h2>}
-                        {description && <p className="text-sm text-default-400">{description}</p>}
-                    </div>
-                    {action}
-                </div>
-            )}
-            <div className="p-4">
-                {children}
-            </div>
-        </div>
-    );
-}
-
 function ListItem({
     icon: Icon,
-    iconColor = "text-white",
+    iconColor = "text-[var(--text-primary)]",
     label,
     value,
     subvalue,
@@ -182,23 +158,23 @@ function ListItem({
 }) {
     return (
         <div
-            className={`flex items-center gap-4 p-4 rounded-2xl transition-all border border-transparent ${onClick ? 'cursor-pointer hover:bg-white/5 hover:border-white/5 active:bg-white/10' : 'hover:bg-white/[0.02]'}`}
+            className={`flex items-center gap-4 p-3 rounded-xl transition-all border border-transparent ${onClick ? 'cursor-pointer hover:bg-[var(--surface-hover)] active:bg-[var(--surface-card)]' : ''}`}
             onClick={onClick}
         >
             {Icon && (
-                <div className={`w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center shrink-0 ${iconColor}`}>
-                    <Icon size={24} weight="duotone" />
+                <div className={`w-10 h-10 rounded-xl bg-[var(--surface-card)] border border-[var(--border-subtle)] flex items-center justify-center shrink-0 ${iconColor}`}>
+                    <Icon size={20} weight="duotone" />
                 </div>
             )}
-            <div className="flex-1 flex flex-col justify-center min-w-0">
-                <div className="text-[17px] font-bold text-white truncate">{label}</div>
-                {subvalue && <div className="text-[14px] text-default-500 truncate font-medium">{subvalue}</div>}
+            <div className="flex-1 min-w-0">
+                <div className="text-sm font-semibold text-[var(--text-primary)] truncate">{label}</div>
+                {subvalue && <div className="text-xs text-[var(--text-muted)] truncate mt-0.5">{subvalue}</div>}
             </div>
             {(value || rightElement) && (
                 <div className="flex items-center gap-2">
-                    {value && <div className="text-[17px] text-default-500">{value}</div>}
+                    {value && <div className="text-sm text-[var(--text-secondary)]">{value}</div>}
                     {rightElement}
-                    {onClick && !rightElement && <CaretRight size={20} className="text-default-400" />}
+                    {onClick && !rightElement && <CaretRight size={16} className="text-[var(--text-muted)]" />}
                 </div>
             )}
         </div>
@@ -208,13 +184,13 @@ function ListItem({
 function renderAttachments(label: string, items?: any[]) {
     if (!items || !items.length) return null;
     return (
-        <div className="text-xs text-default-500 mt-3 space-y-2 bg-[#0A0B0E] p-3 rounded-xl border border-white/5">
-            <div className="font-bold text-default-400 uppercase tracking-widest text-[10px]">{label}</div>
+        <div className="text-xs text-[var(--text-muted)] mt-3 space-y-2 bg-[var(--surface-sidebar)] p-3 rounded-xl border border-[var(--border-divider)]">
+            <div className="font-bold text-[var(--text-secondary)] uppercase tracking-widest text-[10px]">{label}</div>
             <div className="flex flex-wrap gap-2">
                 {items.map((att: any) => (
                     <a
                         key={att.id || att.url}
-                        className="flex items-center gap-2 text-primary hover:text-primary-400 bg-primary/10 hover:bg-primary/20 px-3 py-1.5 rounded-lg max-w-full truncate transition-colors"
+                        className="flex items-center gap-2 text-[var(--color-primary-1)] hover:text-white bg-[var(--color-primary-1)]/10 hover:bg-[var(--color-primary-1)]/20 px-3 py-1.5 rounded-lg max-w-full truncate transition-colors"
                         href={att.url || att.proxyUrl}
                         target="_blank"
                         rel="noreferrer"
@@ -231,6 +207,7 @@ export default function AuditPage() {
     const params = useParams<{ guildId: string }>();
     const guildId = params.guildId;
     const { locale } = useGuildLocale(guildId);
+    const guildTimezone = useGuildTimezone(guildId);
     const text = strings[locale] || strings.en;
 
     const [events, setEvents] = useState<AuditEvent[]>([]);
@@ -238,20 +215,31 @@ export default function AuditPage() {
     const [channels, setChannels] = useState<Channel[]>([]);
     const [allChannels, setAllChannels] = useState<Channel[]>([]);
     const [enrichedUsers, setEnrichedUsers] = useState<Record<string, EnrichedUser>>({});
+    const [enrichedChannels, setEnrichedChannels] = useState<Record<string, Channel>>({});
     const [error, setError] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);
 
     const [selectedTag, setSelectedTag] = useState(TAGS[0].value);
     const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
     const [enabled, setEnabled] = useState(true);
+    const [mounted, setMounted] = useState(false);
     const isDirty = useRef(false);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+
+    const getChannelName = (id: string) => {
+        return enrichedChannels[id]?.name || allChannels.find(c => c.id === id)?.name || id;
+    };
 
     const fmtDate = (value: string) => {
         const d = new Date(value);
         return d.toLocaleTimeString(locale === 'ru' ? 'ru-RU' : 'en-US', {
             hour: '2-digit',
             minute: '2-digit',
-            hour12: false
+            hour12: false,
+            timeZone: guildTimezone
         });
     };
 
@@ -273,7 +261,6 @@ export default function AuditPage() {
             const textChannels: Channel[] = textChRes.ok ? (await textChRes.json()) : [];
             const voiceChannels: Channel[] = voiceChRes.ok ? (await voiceChRes.json()) : [];
 
-            // Merge all channels for name lookup (text + voice)
             const merged = new Map<string, Channel>();
             [...(Array.isArray(textChannels) ? textChannels : []),
             ...(Array.isArray(voiceChannels) ? voiceChannels : [])].forEach(c => merged.set(c.id, c));
@@ -284,20 +271,27 @@ export default function AuditPage() {
             setChannels(Array.isArray(textChannels) ? textChannels : []);
             setAllChannels(allCh);
 
-            // Enrich users referenced in events
-            const events: AuditEvent[] = evData.events || [];
-            const userIds = [...new Set(events.flatMap(ev => [ev.actorId, ev.targetId].filter(Boolean) as string[]))];
-            if (userIds.length > 0) {
+            const eventsData: AuditEvent[] = evData.events || [];
+            const userIds = [...new Set(eventsData.flatMap(ev => [ev.actorId, ev.targetId].filter(Boolean) as string[]))];
+            const channelIds = [...new Set([
+                ...eventsData.map(ev => ev.channelId).filter(Boolean),
+                ...routeData.routes?.map((r: Route) => r.channelId).filter(Boolean)
+            ] as string[])];
+
+            if (userIds.length > 0 || channelIds.length > 0) {
                 try {
                     const enrichRes = await fetch(`/api/guilds/${guildId}/enrich`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ userIds }),
+                        body: JSON.stringify({ userIds, channelIds }),
                     });
                     if (enrichRes.ok) {
                         const enrichData = await enrichRes.json();
                         if (enrichData.users) {
                             setEnrichedUsers(prev => ({ ...prev, ...enrichData.users }));
+                        }
+                        if (enrichData.channels) {
+                            setEnrichedChannels(prev => ({ ...prev, ...enrichData.channels }));
                         }
                     }
                 } catch { /* enrich is best-effort */ }
@@ -385,160 +379,139 @@ export default function AuditPage() {
         }
     };
 
+    if (!mounted) return null;
+
     return (
-        <div className="space-y-8 pb-10 animate-fade-in">
-            {/* Header */}
-            <div>
-                <h1 className="text-4xl font-extrabold tracking-tight bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent mb-2">
-                    {text.title}
-                </h1>
-                <div className="flex items-center gap-3 text-default-400">
-                    <p className="text-lg">{text.routesDesc}</p>
-                    <span className="w-1 h-1 rounded-full bg-white/20"></span>
-                    <p className="text-sm flex items-center gap-2">
-                        <span className="relative flex h-2 w-2">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                        </span>
-                        Live system monitoring
-                    </p>
-                </div>
-            </div>
+        <div className="space-y-6 pb-10 animate-fade-in">
 
             {error && (
-                <Card className="bg-rose-500/10 border border-rose-500/20 shadow-lg rounded-[24px]">
-                    <CardBody className="flex-row items-center gap-3 p-4">
-                        <WarningCircle size={24} weight="fill" className="text-rose-500" />
-                        <div className="text-rose-400 font-medium">{error}</div>
-                    </CardBody>
-                </Card>
+                <div className="bg-[var(--color-destructive)]/10 border border-[var(--color-destructive)]/20 rounded-2xl p-4 flex items-center gap-3">
+                    <WarningCircle size={20} weight="fill" className="text-[var(--color-destructive)]" />
+                    <div className="text-[var(--color-destructive)] text-sm font-medium">{error}</div>
+                </div>
             )}
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
                 {/* Left Column: Configuration */}
                 <div className="lg:col-span-5 space-y-6 lg:sticky lg:top-8">
                     {/* Add Route Form */}
-                    <Card className="bg-[#181A20] border border-white/5 shadow-xl rounded-[32px] overflow-visible">
-                        <CardBody className="p-8 space-y-6">
-                            <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shadow-inner-lg">
-                                    <Plus size={24} weight="bold" />
-                                </div>
-                                <h2 className="text-xl font-bold text-white">{text.addRoute}</h2>
+                    <div className="bg-[var(--surface-card)] border border-[var(--border-subtle)] rounded-2xl p-6 space-y-6 shadow-sm">
+                        <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 rounded-xl bg-[var(--color-primary-2)]/10 flex items-center justify-center text-[var(--color-primary-2)]">
+                                <Plus size={20} weight="bold" />
                             </div>
+                            <h2 className="text-lg font-bold text-[var(--text-primary)]">{text.addRoute}</h2>
+                        </div>
 
-                            <div className="space-y-5">
-                                <Select
-                                    label={text.selectTag}
-                                    variant="bordered"
-                                    classNames={{
-                                        trigger: "bg-[#0A0B0E] border border-white/5 min-h-[64px] rounded-2xl data-[hover=true]:bg-[#0A0B0E] data-[hover=true]:border-white/10 transition-all",
-                                        value: "text-lg font-medium pl-2 text-white",
-                                        popoverContent: "bg-[#181A20] border border-white/10 rounded-2xl shadow-2xl",
-                                        listbox: "bg-transparent p-2 gap-1"
-                                    }}
-                                    selectedKeys={new Set([selectedTag])}
-                                    onSelectionChange={(keys) => {
-                                        const [val] = Array.from(keys) as string[];
-                                        if (val) {
-                                            setSelectedTag(val);
-                                            isDirty.current = false;
-                                        }
-                                    }}
-                                    renderValue={(items) => items.map(item => {
-                                        const tag = TAGS.find(t => t.value === item.key);
-                                        const Icon = tag?.icon || Circle;
-                                        return (
-                                            <div key={item.key} className="flex items-center gap-3">
-                                                <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-primary"><Icon size={18} weight="duotone" /></div>
-                                                <span className="text-white font-medium">{tag?.label}</span>
-                                            </div>
-                                        );
-                                    })}
-                                >
-                                    {TAGS.map((tag) => (
-                                        <SelectItem key={tag.value} textValue={tag.label} className="rounded-xl data-[hover=true]:bg-white/5">
-                                            <div className="flex items-center gap-3">
-                                                <tag.icon size={20} weight="duotone" className="text-primary" />
-                                                <span className="text-base font-medium">{tag.label}</span>
-                                            </div>
-                                        </SelectItem>
-                                    ))}
-                                </Select>
+                        <div className="space-y-5">
+                            <Select
+                                label={text.selectTag}
+                                variant="bordered"
+                                classNames={{
+                                    trigger: "bg-[var(--surface-hover)] border border-[var(--border-subtle)] min-h-[64px] rounded-2xl data-[hover=true]:bg-[var(--surface-hover)] data-[hover=true]:border-[var(--border-focus)] transition-all",
+                                    value: "text-lg font-medium pl-2 text-[var(--text-primary)]",
+                                    popoverContent: "bg-[var(--surface-card)] border border-[var(--border-subtle)] rounded-2xl shadow-2xl",
+                                    listbox: "bg-transparent p-2 gap-1"
+                                }}
+                                selectedKeys={new Set([selectedTag])}
+                                onSelectionChange={(keys) => {
+                                    const [val] = Array.from(keys) as string[];
+                                    if (val) {
+                                        setSelectedTag(val);
+                                        isDirty.current = false;
+                                    }
+                                }}
+                                renderValue={(items) => items.map(item => {
+                                    const tag = TAGS.find(t => t.value === item.key);
+                                    const Icon = tag?.icon || Circle;
+                                    return (
+                                        <div key={item.key} className="flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded-lg bg-[var(--surface-sidebar)] border border-[var(--border-divider)] flex items-center justify-center text-[var(--color-primary-1)]"><Icon size={18} weight="duotone" /></div>
+                                            <span className="text-[var(--text-primary)] font-medium">{tag?.label}</span>
+                                        </div>
+                                    );
+                                })}
+                            >
+                                {TAGS.map((tag) => (
+                                    <SelectItem key={tag.value} textValue={tag.label} className="rounded-xl data-[hover=true]:bg-[var(--surface-hover)]">
+                                        <div className="flex items-center gap-3">
+                                            <tag.icon size={20} weight="duotone" className="text-[var(--color-primary-1)]" />
+                                            <span className="text-base font-medium">{tag.label}</span>
+                                        </div>
+                                    </SelectItem>
+                                ))}
+                            </Select>
 
-                                <Autocomplete
-                                    label={text.selectChannel}
-                                    variant="bordered"
-                                    allowsCustomValue={false}
-                                    defaultItems={channels}
-                                    selectedKey={selectedChannelId}
-                                    onSelectionChange={(key) => {
+                            <Autocomplete
+                                label={text.selectChannel}
+                                variant="bordered"
+                                allowsCustomValue={false}
+                                defaultItems={channels}
+                                selectedKey={selectedChannelId}
+                                onSelectionChange={(key) => {
+                                    isDirty.current = true;
+                                    setSelectedChannelId(key as string || null);
+                                }}
+                                classNames={{
+                                    base: "w-full",
+                                    listboxWrapper: "bg-[var(--surface-hover)] rounded-xl",
+                                    popoverContent: "bg-[var(--surface-card)] border border-[var(--border-subtle)] rounded-2xl shadow-2xl",
+                                }}
+                                inputProps={{
+                                    classNames: {
+                                        inputWrapper: "bg-[var(--surface-hover)] border border-[var(--border-subtle)] min-h-[64px] rounded-2xl data-[hover=true]:bg-[var(--surface-hover)] data-[hover=true]:border-[var(--border-focus)] transition-all px-4",
+                                        label: "hidden",
+                                        input: "text-lg font-medium text-[var(--text-primary)] placeholder:text-[var(--text-muted)]",
+                                    }
+                                }}
+                                listboxProps={{
+                                    itemClasses: {
+                                        base: "rounded-xl data-[hover=true]:bg-[var(--surface-hover)] text-[var(--text-secondary)] data-[hover=true]:text-[var(--text-primary)] p-3",
+                                    }
+                                }}
+                            >
+                                {(ch) => (
+                                    <AutocompleteItem key={ch.id} textValue={ch.name || ch.id}>
+                                        <div className="flex items-center gap-2">
+                                            <Hash size={18} className="text-default-400" />
+                                            <span className="text-base font-bold">{ch.name || ch.id}</span>
+                                        </div>
+                                    </AutocompleteItem>
+                                )}
+                            </Autocomplete>
+
+                            <div className="flex items-center justify-between p-4 bg-[var(--surface-hover)] rounded-2xl border border-[var(--border-divider)]">
+                                <span className="font-bold text-[var(--text-muted)] uppercase text-xs tracking-wider ml-1">{text.status}</span>
+                                <Switch
+                                    isSelected={enabled}
+                                    onValueChange={(val) => {
+                                        setEnabled(val);
                                         isDirty.current = true;
-                                        setSelectedChannelId(key as string || null);
                                     }}
-                                    classNames={{
-                                        base: "w-full",
-                                        listboxWrapper: "bg-[#1C1C1E] rounded-xl",
-                                        popoverContent: "bg-[#181A20] border border-white/10 rounded-2xl shadow-2xl",
-                                    }}
-                                    inputProps={{
-                                        classNames: {
-                                            inputWrapper: "bg-[#0A0B0E] border border-white/5 min-h-[64px] rounded-2xl data-[hover=true]:bg-[#0A0B0E] data-[hover=true]:border-white/10 transition-all px-4",
-                                            label: "hidden",
-                                            input: "text-lg font-medium text-white placeholder:text-default-400",
-                                        }
-                                    }}
-                                    listboxProps={{
-                                        itemClasses: {
-                                            base: "rounded-xl data-[hover=true]:bg-white/5 text-default-300 data-[hover=true]:text-white p-3",
-                                        }
-                                    }}
-                                >
-                                    {(ch) => (
-                                        <AutocompleteItem key={ch.id} textValue={ch.name || ch.id}>
-                                            <div className="flex items-center gap-2">
-                                                <Hash size={18} className="text-default-400" />
-                                                <span className="text-base font-bold">{ch.name || ch.id}</span>
-                                            </div>
-                                        </AutocompleteItem>
-                                    )}
-                                </Autocomplete>
-
-                                <div className="flex items-center justify-between p-4 bg-[#0A0B0E] rounded-2xl border border-white/5">
-                                    <span className="font-bold text-default-400 uppercase text-xs tracking-wider ml-1">{text.status}</span>
-                                    <Switch
-                                        isSelected={enabled}
-                                        onValueChange={(val) => {
-                                            setEnabled(val);
-                                            isDirty.current = true;
-                                        }}
-                                        size="lg"
-                                        color="success"
-                                        classNames={{ wrapper: "group-data-[selected=true]:bg-emerald-500" }}
-                                    />
-                                </div>
-                                <Button
-                                    color="primary"
                                     size="lg"
-                                    className="w-full h-14 rounded-2xl font-bold text-lg shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all"
-                                    isLoading={saving}
-                                    onPress={saveRoute}
-                                    startContent={!saving && <CheckCircle weight="fill" size={24} />}
-                                >
-                                    {text.saveRoute}
-                                </Button>
+                                    color="success"
+                                    classNames={{ wrapper: "group-data-[selected=true]:bg-[var(--color-primary-1)]" }}
+                                />
                             </div>
-                        </CardBody>
-                    </Card>
+                            <Button
+                                className="w-full h-14 rounded-2xl font-bold text-lg bg-[var(--color-primary-1)] text-black shadow-[0_0_20px_rgba(117,241,106,0.15)] hover:shadow-[0_0_25px_rgba(117,241,106,0.25)] transition-all"
+                                isLoading={saving}
+                                onPress={saveRoute}
+                                startContent={!saving && <CheckCircle weight="fill" size={24} />}
+                            >
+                                {text.saveRoute}
+                            </Button>
+                        </div>
+                    </div>
 
                     {/* Active Routes List */}
-                    <ListGroup title={text.routes} description={routes.length > 0 ? `${routes.length} active mappings` : text.noRoutes}>
+                    <SectionBlock title={text.routes} description={routes.length > 0 ? `${routes.length} active mappings` : text.noRoutes} noPadding>
                         {routes.length === 0 ? (
-                            <div className="p-8 text-center border-2 border-dashed border-white/5 rounded-2xl">
-                                <p className="text-default-500">{text.noRoutes}</p>
+                            <div className="p-6 text-center">
+                                <p className="text-sm text-white/30">{text.noRoutes}</p>
                             </div>
                         ) : (
-                            <div className="space-y-2">
+                            <div className="p-2 space-y-1">
                                 {routes.map((r) => {
                                     const tagInfo = TAGS.find(t => t.value === r.tag);
                                     const ch = channels.find(c => c.id === r.channelId);
@@ -546,9 +519,9 @@ export default function AuditPage() {
                                         <ListItem
                                             key={r.id}
                                             icon={tagInfo?.icon || Circle}
-                                            iconColor={r.enabled ? "text-primary" : "text-default-500"}
+                                            iconColor={r.enabled ? "text-[#75F16A]" : "text-white/20"}
                                             label={tagInfo?.label || r.tag}
-                                            subvalue={`#${ch?.name || r.channelId}`}
+                                            subvalue={`#${getChannelName(r.channelId)}`}
                                             rightElement={
                                                 <div className="flex items-center gap-2">
                                                     <Switch
@@ -556,17 +529,16 @@ export default function AuditPage() {
                                                         isSelected={r.enabled}
                                                         onValueChange={() => toggleRouteEnabled(r)}
                                                         isDisabled={saving}
-                                                        color="primary"
+                                                        color="success"
                                                     />
                                                     <Button
                                                         isIconOnly
                                                         variant="light"
-                                                        color="danger"
                                                         size="sm"
                                                         onPress={() => deleteRoute(r.tag)}
-                                                        className="text-default-400 hover:text-rose-500 hover:bg-rose-500/10 rounded-lg"
+                                                        className="text-[var(--text-muted)] hover:text-[var(--color-destructive)] rounded-lg min-w-8 w-8 h-8"
                                                     >
-                                                        <Trash size={18} weight="bold" />
+                                                        <Trash size={16} />
                                                     </Button>
                                                 </div>
                                             }
@@ -575,27 +547,28 @@ export default function AuditPage() {
                                 })}
                             </div>
                         )}
-                    </ListGroup>
+                    </SectionBlock>
                 </div>
 
                 {/* Right Column: Feed */}
                 <div className="lg:col-span-7 space-y-6">
-                    <ListGroup
+                    <SectionBlock
                         title={text.events}
                         description={text.eventsDesc}
                         action={
-                            saving && (
-                                <div className="flex items-center gap-2 px-3 py-1.5 bg-primary/10 rounded-full">
-                                    <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-                                    <span className="text-[10px] font-bold uppercase tracking-wider text-primary">Syncing</span>
+                            saving ? (
+                                <div className="flex items-center gap-2 px-3 py-1.5 bg-[var(--color-primary-2)]/10 rounded-full">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-[var(--color-primary-2)] animate-pulse" />
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-primary-2)]">Syncing</span>
                                 </div>
-                            )
+                            ) : undefined
                         }
+                        className="bg-transparent border-none shadow-none"
                     >
                         {events.length === 0 ? (
-                            <div className="p-24 text-center text-default-500 flex flex-col items-center">
-                                <Clock size={48} className="mb-4 opacity-20" weight="duotone" />
-                                <p className="text-lg font-medium">{text.noEvents}</p>
+                            <div className="py-12 text-center flex flex-col items-center">
+                                <Clock size={32} className="mb-3 text-[var(--text-muted)]" weight="duotone" />
+                                <p className="text-sm text-[var(--text-secondary)]">{text.noEvents}</p>
                             </div>
                         ) : (
                             <div className="space-y-4">
@@ -604,33 +577,37 @@ export default function AuditPage() {
                                     const sev = ev.severity ? severityConfig[ev.severity] : null;
 
                                     return (
-                                        <div key={ev.id} className="relative pl-6 pb-2 group">
+                                        <div key={ev.id} className="relative pl-12 pb-2 group">
                                             {/* Timeline line */}
                                             {index !== events.length - 1 && (
-                                                <div className="absolute left-[11px] top-12 bottom-0 w-[2px] bg-white/5 group-hover:bg-white/10 transition-colors rounded-full" />
+                                                <div className="absolute left-[11px] top-12 bottom-0 w-[2px] bg-[var(--border-divider)] group-hover:bg-[var(--border-subtle)] transition-colors rounded-full" />
                                             )}
 
                                             {/* Timeline dot */}
-                                            <div className={`absolute left-0 top-3 w-6 h-6 rounded-full border-4 border-[#181A20] z-10 ${sev ? sev.bgColor.replace('/10', '') : 'bg-primary'}`} />
+                                            <div className={`absolute left-0 top-3 w-6 h-6 rounded-full border-4 border-[var(--surface-sidebar)] z-10 ${sev ? sev.bgColor.replace('/10', '') : 'bg-[var(--color-primary-1)]'}`} />
 
-                                            <div className="bg-[#1F2128] rounded-[24px] p-6 border border-white/5 hover:border-white/10 transition-all shadow-md group-hover:shadow-xl group-hover:translate-x-1">
+                                            <div className="bg-[var(--surface-card)] rounded-[24px] p-6 border border-[var(--border-subtle)] hover:border-[var(--border-focus)] transition-all shadow-md group-hover:shadow-xl group-hover:translate-x-1">
                                                 {/* Header */}
                                                 <div className="flex items-start justify-between gap-4 mb-4">
                                                     <div className="flex items-center gap-3">
-                                                        <div className={`w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center shrink-0 ${sev ? sev.color : 'text-primary'}`}>
+                                                        <div className={`w-10 h-10 rounded-xl bg-[var(--surface-hover)] flex items-center justify-center shrink-0 ${sev ? sev.color : 'text-[var(--color-primary-1)]'}`}>
                                                             <TagIcon size={20} weight="duotone" />
                                                         </div>
                                                         <div>
                                                             <div className="flex items-center gap-2">
-                                                                <span className="font-bold text-white text-lg leading-none">{ev.payload?.event || 'Audit Event'}</span>
+                                                                <span className="font-bold text-[var(--text-primary)] text-lg leading-none">
+                                                                    {typeof (ev.payload?.event || ev.payload?.action || ev.tag) === 'string'
+                                                                        ? (ev.payload?.event || ev.payload?.action || ev.tag).replace(/_/g, ' ')
+                                                                        : (ev.payload?.event || ev.payload?.action || ev.tag)}
+                                                                </span>
                                                                 {sev && (
                                                                     <Chip size="sm" variant="flat" classNames={{ base: `${sev.bgColor} h-5`, content: `${sev.color} font-bold text-[10px] uppercase tracking-wider` }}>
                                                                         {ev.severity}
                                                                     </Chip>
                                                                 )}
                                                             </div>
-                                                            <div className="flex items-center gap-2 text-xs text-default-400 mt-1 font-mono">
-                                                                <span className="uppercase tracking-wider font-bold text-primary/80">{ev.tag}</span>
+                                                            <div className="flex items-center gap-2 text-xs text-[var(--text-muted)] mt-1 font-mono">
+                                                                <span className="uppercase tracking-wider font-bold text-[var(--color-primary-1)]/80">{ev.tag}</span>
                                                                 <span>•</span>
                                                                 <span>{fmtDate(ev.createdAt)}</span>
                                                             </div>
@@ -638,99 +615,155 @@ export default function AuditPage() {
                                                     </div>
                                                 </div>
 
-                                                {/* Actors Grid */}
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
-                                                    {ev.actorId && (() => {
-                                                        const user = enrichedUsers[ev.actorId];
-                                                        return (
-                                                            <div className="bg-[#141519] p-3 rounded-2xl border border-white/5 flex items-center gap-3">
-                                                                {user ? (
-                                                                    <Avatar
-                                                                        src={user.avatar || undefined}
-                                                                        name={user.name}
-                                                                        size="sm"
-                                                                        className="w-8 h-8 flex-shrink-0"
-                                                                    />
-                                                                ) : (
-                                                                    <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-default-400 flex-shrink-0">
-                                                                        <UserPlus size={16} />
-                                                                    </div>
-                                                                )}
+                                                {/* Actors & Channel Grid */}
+                                                {(ev.actorId || ev.targetId || ev.channelId) && (
+                                                    <div className={`grid ${[ev.actorId && ev.actorId !== ev.targetId, ev.targetId, ev.channelId && ev.payload?.event !== 'voice_move'].filter(Boolean).length === 1 ? 'grid-cols-1 max-w-xs' :
+                                                        [ev.actorId && ev.actorId !== ev.targetId, ev.targetId, ev.channelId && ev.payload?.event !== 'voice_move'].filter(Boolean).length === 2 ? 'grid-cols-1 md:grid-cols-2' :
+                                                            'grid-cols-1 md:grid-cols-3'
+                                                        } gap-3 mb-4`}>
+                                                        {ev.actorId === ev.targetId && ev.actorId && (
+                                                            <div className="bg-[var(--surface-hover)] p-3 rounded-2xl border border-[var(--border-divider)] flex items-center gap-3">
+                                                                <div className="w-8 h-8 rounded-lg overflow-hidden bg-[var(--surface-card)] flex items-center justify-center text-[var(--text-muted)] shrink-0">
+                                                                    {enrichedUsers[ev.actorId]?.avatar ? <img src={enrichedUsers[ev.actorId].avatar || undefined} className="w-full h-full object-cover" alt="" /> : <UserCircle size={16} />}
+                                                                </div>
                                                                 <div className="min-w-0">
-                                                                    <div className="text-[10px] uppercase font-bold text-default-500 tracking-wider mb-0.5">{text.from}</div>
-                                                                    <div className="text-xs text-white truncate max-w-full font-semibold" title={ev.actorId}>
-                                                                        {user?.name || ev.payload?.actorTag || ev.actorId}
-                                                                    </div>
-                                                                    {user && (
-                                                                        <div className="text-[10px] text-default-500 truncate font-mono">
-                                                                            {user.tag || user.username}
-                                                                        </div>
-                                                                    )}
+                                                                    <div className="text-[10px] uppercase font-bold text-[var(--text-muted)] tracking-wider mb-0.5">{text.user}</div>
+                                                                    <span className="font-mono text-xs text-[var(--text-primary)] truncate max-w-full block" title={ev.actorId || undefined}>
+                                                                        {ev.payload?.actorTag || enrichedUsers[ev.actorId]?.tag || ev.actorId}
+                                                                    </span>
                                                                 </div>
                                                             </div>
-                                                        );
-                                                    })()}
-                                                    {ev.targetId && ev.targetId !== ev.actorId && (() => {
-                                                        const user = enrichedUsers[ev.targetId];
-                                                        return (
-                                                            <div className="bg-[#141519] p-3 rounded-2xl border border-white/5 flex items-center gap-3">
-                                                                {user ? (
-                                                                    <Avatar
-                                                                        src={user.avatar || undefined}
-                                                                        name={user.name}
-                                                                        size="sm"
-                                                                        className="w-8 h-8 flex-shrink-0"
-                                                                    />
-                                                                ) : (
-                                                                    <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-default-400 flex-shrink-0">
-                                                                        <IdentificationBadge size={16} />
-                                                                    </div>
-                                                                )}
+                                                        )}
+                                                        {ev.actorId !== ev.targetId && ev.actorId && (
+                                                            <div className="bg-[var(--surface-hover)] p-3 rounded-2xl border border-[var(--border-divider)] flex items-center gap-3">
+                                                                <div className="w-8 h-8 rounded-lg overflow-hidden bg-[var(--surface-card)] flex items-center justify-center text-[var(--text-muted)] shrink-0">
+                                                                    {enrichedUsers[ev.actorId]?.avatar ? <img src={enrichedUsers[ev.actorId].avatar || undefined} className="w-full h-full object-cover" alt="" /> : <UserCircle size={16} />}
+                                                                </div>
                                                                 <div className="min-w-0">
-                                                                    <div className="text-[10px] uppercase font-bold text-default-500 tracking-wider mb-0.5">{text.to}</div>
-                                                                    <div className="text-xs text-white truncate max-w-full font-semibold" title={ev.targetId}>
-                                                                        {user?.name || ev.payload?.targetTag || ev.targetId}
+                                                                    <div className="text-[10px] uppercase font-bold text-[var(--text-muted)] tracking-wider mb-0.5">
+                                                                        {ev.payload?.event === 'message_delete' ? text.deletedBy : (ev.targetId ? text.from : text.user)}
                                                                     </div>
-                                                                    {user && (
-                                                                        <div className="text-[10px] text-default-500 truncate font-mono">
-                                                                            {user.tag || user.username}
-                                                                        </div>
-                                                                    )}
+                                                                    <span className="font-mono text-xs text-[var(--text-primary)] truncate max-w-full block" title={ev.actorId || undefined}>
+                                                                        {ev.payload?.actorTag || enrichedUsers[ev.actorId]?.tag || ev.actorId}
+                                                                    </span>
                                                                 </div>
                                                             </div>
-                                                        );
-                                                    })()}
-                                                </div>
+                                                        )}
+                                                        {ev.actorId !== ev.targetId && ev.targetId && (
+                                                            <div className="bg-[var(--surface-hover)] p-3 rounded-2xl border border-[var(--border-divider)] flex items-center gap-3">
+                                                                <div className="w-8 h-8 rounded-lg overflow-hidden bg-[var(--surface-card)] flex items-center justify-center text-[var(--text-muted)] shrink-0">
+                                                                    {enrichedUsers[ev.targetId]?.avatar ? <img src={enrichedUsers[ev.targetId].avatar || undefined} className="w-full h-full object-cover" alt="" /> : <UserCircle size={16} />}
+                                                                </div>
+                                                                <div className="min-w-0">
+                                                                    <div className="text-[10px] uppercase font-bold text-[var(--text-muted)] tracking-wider mb-0.5">
+                                                                        {(ev.payload?.event === 'message_delete' || ev.payload?.event === 'message_edit') ? text.messageAuthor : (ev.actorId ? text.to : text.user)}
+                                                                    </div>
+                                                                    <span className="font-mono text-xs text-[var(--text-primary)] truncate max-w-full block" title={ev.targetId || undefined}>
+                                                                        {ev.payload?.targetTag || enrichedUsers[ev.targetId]?.tag || ev.targetId}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                        {ev.channelId && ev.payload?.event !== 'voice_move' && (
+                                                            <div className="bg-[var(--surface-hover)] p-3 rounded-2xl border border-[var(--border-divider)] flex items-center gap-3">
+                                                                <div className="w-8 h-8 rounded-lg bg-[var(--surface-card)] flex items-center justify-center text-[var(--color-primary-1)] shrink-0">
+                                                                    {(() => {
+                                                                        const ch = allChannels.find(c => c.id === ev.channelId);
+                                                                        const isVoice = ch?.type === 2 || ch?.type === 13 || ch?.type === '2' || ch?.type === '13';
+                                                                        return isVoice ? <SpeakerHigh size={16} /> : <Hash size={16} />;
+                                                                    })()}
+                                                                </div>
+                                                                <div className="min-w-0">
+                                                                    <div className="text-[10px] uppercase font-bold text-[var(--text-muted)] tracking-wider mb-0.5">{text.channel}</div>
+                                                                    <span className="font-bold text-xs text-[var(--color-primary-1)] truncate block">
+                                                                        {getChannelName(ev.channelId)}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
 
-                                                {ev.channelId && (() => {
-                                                    const ch = allChannels.find(c => c.id === ev.channelId);
-                                                    const isVoice = ch?.type === 2 || ch?.type === 'voice';
-                                                    return (
-                                                        <div className="flex items-center gap-2 mb-4 px-3 py-2 bg-primary/5 rounded-xl w-fit border border-primary/10">
-                                                            {isVoice
-                                                                ? <SpeakerHigh size={14} className="text-primary" />
-                                                                : <Hash size={14} className="text-primary" />
-                                                            }
-                                                            <a href={`https://discord.com/channels/${guildId}/${ev.channelId}`} target="_blank" rel="noreferrer" className="text-xs font-bold text-primary hover:underline">
-                                                                {ch?.name || ev.channelId}
-                                                            </a>
+                                                {/* Voice Move Specifics */}
+                                                {ev.payload?.event === 'voice_move' && (
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+                                                        <div className="bg-[var(--surface-hover)] p-3 rounded-2xl border border-[var(--border-divider)]">
+                                                            <div className="text-[10px] uppercase font-bold text-[var(--text-muted)] tracking-wider mb-2">From</div>
+                                                            <div className="flex items-center gap-2 px-3 py-2 bg-[var(--color-primary-1)]/5 rounded-xl border border-[var(--color-primary-1)]/10 w-fit">
+                                                                <SpeakerHigh size={14} className="text-[var(--text-muted)]" />
+                                                                <a href={`/dashboard/${guildId}/stats/channels?channelId=${ev.payload.fromChannelId}`} className="text-xs font-bold text-[var(--color-primary-1)] hover:underline">
+                                                                    {getChannelName(ev.payload.fromChannelId)}
+                                                                </a>
+                                                            </div>
                                                         </div>
-                                                    );
-                                                })()}
+                                                        <div className="bg-[var(--surface-hover)] p-3 rounded-2xl border border-[var(--border-divider)]">
+                                                            <div className="text-[10px] uppercase font-bold text-[var(--text-muted)] tracking-wider mb-2">To</div>
+                                                            <div className="flex items-center gap-2 px-3 py-2 bg-[var(--color-primary-1)]/5 rounded-xl border border-[var(--color-primary-1)]/10 w-fit">
+                                                                <SpeakerHigh size={14} className="text-[var(--color-primary-1)]" />
+                                                                <a href={`/dashboard/${guildId}/stats/channels?channelId=${ev.payload.toChannelId}`} className="text-xs font-bold text-[var(--color-primary-1)] hover:underline">
+                                                                    {getChannelName(ev.payload.toChannelId)}
+                                                                </a>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* Reason & Timeout Info */}
+                                                {(ev.payload?.reason || ev.payload?.until) && (
+                                                    <div className="space-y-3 mb-4">
+                                                        {ev.payload?.reason && (
+                                                            <div className="bg-[var(--surface-hover)] p-4 rounded-2xl border border-[var(--border-divider)]">
+                                                                <div className="text-[10px] uppercase font-bold text-[var(--text-muted)] tracking-wider mb-1">{text.reason}</div>
+                                                                <div className="text-sm text-[var(--text-primary)]">{ev.payload.reason}</div>
+                                                            </div>
+                                                        )}
+                                                        {ev.payload?.until && (() => {
+                                                            const untilTime = new Date(ev.payload.until).getTime();
+                                                            const now = new Date(ev.createdAt).getTime();
+                                                            const durationMs = untilTime - now;
+                                                            let durationStr = '';
+                                                            if (durationMs > 0) {
+                                                                const minutes = Math.round(durationMs / 60000);
+                                                                const hours = Math.floor(minutes / 60);
+                                                                const days = Math.floor(hours / 24);
+                                                                if (days > 0) durationStr = `${days}д ${hours % 24}ч`;
+                                                                else if (hours > 0) durationStr = `${hours}ч ${minutes % 60}м`;
+                                                                else durationStr = `${minutes}м`;
+                                                            }
+
+                                                            return (
+                                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                                    <div className="bg-[var(--surface-hover)] p-3 rounded-2xl border border-[var(--border-divider)]">
+                                                                        <div className="text-[10px] uppercase font-bold text-[var(--text-muted)] tracking-wider mb-1">{text.until}</div>
+                                                                        <div className="text-sm font-mono text-[var(--text-primary)]">
+                                                                            {new Date(ev.payload.until).toLocaleString(locale === 'ru' ? 'ru' : 'en')}
+                                                                        </div>
+                                                                    </div>
+                                                                    {durationStr && (
+                                                                        <div className="bg-[var(--surface-hover)] p-3 rounded-2xl border border-[var(--border-divider)]">
+                                                                            <div className="text-[10px] uppercase font-bold text-[var(--text-muted)] tracking-wider mb-1">{text.duration}</div>
+                                                                            <div className="text-sm font-bold text-[var(--text-primary)]">{durationStr}</div>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            );
+                                                        })()}
+                                                    </div>
+                                                )}
 
                                                 {/* Content Diff */}
                                                 {(ev.payload?.contentBefore || ev.payload?.contentAfter) && (
-                                                    <div className="rounded-2xl border border-white/5 overflow-hidden font-mono text-sm">
+                                                    <div className="rounded-2xl border border-[var(--border-subtle)] overflow-hidden font-mono text-sm">
                                                         {ev.payload?.contentBefore && (
-                                                            <div className="bg-[#2A1818] p-3 border-b border-white/5">
+                                                            <div className="bg-rose-500/5 p-3 border-b border-[var(--border-divider)]">
                                                                 <div className="text-[10px] font-bold text-rose-400 uppercase tracking-wider mb-1 opacity-75">Before</div>
-                                                                <div className="text-rose-100/80 leading-relaxed break-words">{ev.payload.contentBefore}</div>
+                                                                <div className="text-rose-200/80 leading-relaxed break-words">{ev.payload.contentBefore}</div>
                                                             </div>
                                                         )}
                                                         {ev.payload?.contentAfter && (
-                                                            <div className="bg-[#14261E] p-3">
+                                                            <div className="bg-emerald-500/5 p-3">
                                                                 <div className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-1 opacity-75">After</div>
-                                                                <div className="text-emerald-100/80 leading-relaxed break-words">{ev.payload.contentAfter}</div>
+                                                                <div className="text-emerald-200/80 leading-relaxed break-words">{ev.payload.contentAfter}</div>
                                                             </div>
                                                         )}
                                                     </div>
@@ -747,7 +780,7 @@ export default function AuditPage() {
                                 })}
                             </div>
                         )}
-                    </ListGroup>
+                    </SectionBlock>
                 </div>
             </div>
         </div>

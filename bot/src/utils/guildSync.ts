@@ -2,6 +2,39 @@ import type { Guild } from 'discord.js';
 import logger from './logger';
 import { prisma } from './database';
 
+export function getOnlineCount(guild: Guild) {
+    if (guild.presences.cache.size > 0) {
+        return guild.presences.cache.filter((presence) => presence.status !== 'offline').size;
+    }
+
+    return guild.members.cache.filter((member) =>
+        member.presence?.status === 'online' ||
+        member.presence?.status === 'idle' ||
+        member.presence?.status === 'dnd'
+    ).size;
+}
+
+export async function syncGuildRealtimeCounts(guild: Guild) {
+    const onlineCount = getOnlineCount(guild);
+
+    await prisma.guild.upsert({
+        where: { id: guild.id },
+        update: {
+            name: guild.name,
+            icon: guild.icon,
+            memberCount: guild.memberCount,
+            onlineCount,
+        },
+        create: {
+            id: guild.id,
+            name: guild.name,
+            icon: guild.icon,
+            memberCount: guild.memberCount,
+            onlineCount,
+        },
+    });
+}
+
 export async function syncGuildData(guild: Guild) {
     if (guild.memberCount !== guild.members.cache.size) {
         try {
@@ -28,11 +61,7 @@ export async function syncGuildData(guild: Guild) {
         position: r.position,
     }));
 
-    const onlineCount = guild.members.cache.filter(m =>
-        m.presence?.status === 'online' ||
-        m.presence?.status === 'idle' ||
-        m.presence?.status === 'dnd'
-    ).size;
+    const onlineCount = getOnlineCount(guild);
 
     await prisma.guild.upsert({
         where: { id: guild.id },
@@ -75,4 +104,3 @@ export async function cleanupGuildData(guildId: string) {
         logger.error(`[GuildSync] Failed to cleanup guild ${guildId}:`, error);
     }
 }
-

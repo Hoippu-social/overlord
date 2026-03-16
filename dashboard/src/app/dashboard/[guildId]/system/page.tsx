@@ -3,10 +3,23 @@
 import React, { useEffect, useState } from 'react';
 import { Card, CardBody, Button, Progress, Chip } from "@nextui-org/react";
 import { AreaChart, Card as TremorCard, Title } from "@tremor/react";
-import { Power, ArrowClockwise, StopCircle, Cpu, HardDrives, Pulse } from "@phosphor-icons/react";
+import {
+    Power,
+    ArrowClockwise,
+    StopCircle,
+    Cpu,
+    HardDrives,
+    Pulse,
+    Gauge,
+    WarningCircle,
+    ClockCounterClockwise,
+    Graph,
+} from "@phosphor-icons/react";
 import { useGuildLocale } from "@/lib/i18n";
+import { formatLocaleNumber } from "@/lib/utils";
 
 type BotStatus = 'ONLINE' | 'OFFLINE' | 'PARTIAL';
+type TelemetryWindow = '24h' | '7d';
 
 interface SystemStats {
     cpu: number;
@@ -19,6 +32,41 @@ interface SystemStats {
         discord: boolean;
         lavalink: boolean;
         database: boolean;
+    };
+}
+
+interface StatsTelemetryResponse {
+    window: TelemetryWindow;
+    summary: {
+        requests: number;
+        avgMs: number;
+        p50Ms: number;
+        p95Ms: number;
+        p99Ms: number;
+        errorCount: number;
+        slowRequests: number;
+        distinctEndpoints: number;
+        errorRate: number;
+    };
+    endpoints: Array<{
+        endpoint: string;
+        requests: number;
+        p95Ms: number;
+        errorRate: number;
+    }>;
+    timeline: Array<{
+        date: string;
+        requests: number;
+        p95Ms: number;
+        errorRate: number;
+    }>;
+    ingestion: {
+        activeGuilds30d: number;
+        rebuildRequired: boolean;
+        jobStatus: string;
+        lastSourceEventAt: string | null;
+        lastReadModelSyncAt: string | null;
+        readModelLagMinutes: number | null;
     };
 }
 
@@ -46,10 +94,39 @@ const strings = {
         statusPartial: 'PARTIAL',
         cpuHistory: 'CPU History',
         memoryHistory: 'Memory History',
+        statsOps: 'Stats Operations',
+        statsOpsDesc: 'Latency, errors and read-model health for the statistics module',
+        requests: 'Requests',
+        p95: 'p95 Latency',
+        errorRate: 'Error Rate',
+        readModelLag: 'Read Model Lag',
+        activeGuilds: 'Active Guilds',
+        last24h: '24 Hours',
+        last7d: '7 Days',
+        requestsHistory: 'Request Volume',
+        latencyHistory: 'Latency p95',
+        endpointHotspots: 'Endpoint Hotspots',
+        endpoint: 'Endpoint',
+        requestCount: 'Requests',
+        avgLatency: 'Avg',
+        slowRequests: 'Slow Requests',
+        syncStatus: 'Sync Status',
+        rebuildRequired: 'Rebuild required',
+        yes: 'Yes',
+        no: 'No',
+        noTelemetry: 'No telemetry recorded yet.',
+        moduleHealthy: 'Healthy',
+        minutes: 'min',
+        milliseconds: 'ms',
+        percent: '%',
+        jobIdle: 'Idle',
+        lastSourceEvent: 'Last source event',
+        lastReadSync: 'Last read-model sync',
+        unknown: 'Unknown',
     },
     ru: {
         title: 'Состояние системы',
-        subtitle: 'Мониторинг производительности и ресурсов',
+        subtitle: 'Мониторинг производительности бота и статистического контура',
         start: 'Запустить бота',
         restart: 'Перезапуск',
         stop: 'Остановить',
@@ -70,8 +147,50 @@ const strings = {
         statusPartial: 'ЧАСТИЧНО',
         cpuHistory: 'История CPU',
         memoryHistory: 'История памяти',
+        statsOps: 'Операции статистики',
+        statsOpsDesc: 'Задержки, ошибки и состояние агрегированных витрин модуля статистики',
+        requests: 'Запросы',
+        p95: 'p95 задержка',
+        errorRate: 'Доля ошибок',
+        readModelLag: 'Лаг витрин',
+        activeGuilds: 'Активных серверов',
+        last24h: '24 часа',
+        last7d: '7 дней',
+        requestsHistory: 'Объём запросов',
+        latencyHistory: 'Задержка p95',
+        endpointHotspots: 'Тяжёлые эндпоинты',
+        endpoint: 'Эндпоинт',
+        requestCount: 'Запросы',
+        avgLatency: 'Средняя',
+        slowRequests: 'Медленные',
+        syncStatus: 'Статус синка',
+        rebuildRequired: 'Нужен rebuild',
+        yes: 'Да',
+        no: 'Нет',
+        noTelemetry: 'Telemetry ещё не накоплена.',
+        moduleHealthy: 'Норма',
+        minutes: 'мин',
+        milliseconds: 'мс',
+        percent: '%',
+        jobIdle: 'Ожидание',
+        lastSourceEvent: 'Последнее source-событие',
+        lastReadSync: 'Последний sync витрин',
+        unknown: 'Неизвестно',
     },
 } as const;
+
+const formatDateTime = (value: string | null, locale: 'ru' | 'en') => {
+    if (!value) return '—';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '—';
+    return new Intl.DateTimeFormat(locale === 'ru' ? 'ru-RU' : 'en-GB', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+    }).format(date);
+};
 
 export default function SystemPage({ params }: { params: Promise<{ guildId: string }> }) {
     const { guildId } = React.use(params);
@@ -91,18 +210,30 @@ export default function SystemPage({ params }: { params: Promise<{ guildId: stri
             database: false,
         },
     });
-
-    const [cpuHistory, setCpuHistory] = useState<{ date: string, CPU: number }[]>([]);
-    const [ramHistory, setRamHistory] = useState<{ date: string, RAM: number }[]>([]);
+    const [telemetryWindow, setTelemetryWindow] = useState<TelemetryWindow>('24h');
+    const [telemetry, setTelemetry] = useState<StatsTelemetryResponse | null>(null);
+    const [cpuHistory, setCpuHistory] = useState<{ date: string; CPU: number }[]>([]);
+    const [ramHistory, setRamHistory] = useState<{ date: string; RAM: number }[]>([]);
     const [loading, setLoading] = useState(false);
+    const [telemetryLoading, setTelemetryLoading] = useState(false);
 
     useEffect(() => {
-        fetchStats();
-        const interval = setInterval(fetchStats, 5000);
+        void fetchSystemStats();
+        const interval = setInterval(() => {
+            void fetchSystemStats();
+        }, 5000);
         return () => clearInterval(interval);
     }, [locale]);
 
-    const fetchStats = async () => {
+    useEffect(() => {
+        void fetchTelemetry();
+        const interval = setInterval(() => {
+            void fetchTelemetry();
+        }, 30000);
+        return () => clearInterval(interval);
+    }, [telemetryWindow, guildId]);
+
+    const fetchSystemStats = async () => {
         try {
             const res = await fetch('/api/system');
             if (!res.ok) return;
@@ -112,17 +243,28 @@ export default function SystemPage({ params }: { params: Promise<{ guildId: stri
             const localeTag = locale === 'ru' ? 'ru-RU' : 'en-US';
             const now = new Date().toLocaleTimeString(localeTag, { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
-            setCpuHistory(prev => {
-                const newHistory = [...prev, { date: now, CPU: data.cpu }];
-                return newHistory.slice(-20);
-            });
-
-            setRamHistory(prev => {
-                const newHistory = [...prev, { date: now, RAM: data.memory }];
-                return newHistory.slice(-20);
-            });
+            setCpuHistory((prev) => [...prev, { date: now, CPU: data.cpu }].slice(-20));
+            setRamHistory((prev) => [...prev, { date: now, RAM: data.memory }].slice(-20));
         } catch (error) {
-            console.error('Failed to fetch stats:', error);
+            console.error('Failed to fetch system stats:', error);
+        }
+    };
+
+    const fetchTelemetry = async () => {
+        setTelemetryLoading(true);
+        try {
+            const res = await fetch(`/api/guilds/${guildId}/stats/telemetry?window=${telemetryWindow}`);
+            if (!res.ok) {
+                setTelemetry(null);
+                return;
+            }
+            const data = await res.json();
+            setTelemetry(data);
+        } catch (error) {
+            console.error('Failed to fetch stats telemetry:', error);
+            setTelemetry(null);
+        } finally {
+            setTelemetryLoading(false);
         }
     };
 
@@ -134,7 +276,7 @@ export default function SystemPage({ params }: { params: Promise<{ guildId: stri
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action })
             });
-            setTimeout(fetchStats, 2000);
+            setTimeout(() => void fetchSystemStats(), 2000);
         } catch (error) {
             console.error('Action failed:', error);
         } finally {
@@ -302,6 +444,197 @@ export default function SystemPage({ params }: { params: Promise<{ guildId: stri
                         />
                     </TremorCard>
                 </div>
+
+                <Card className="bg-surface border border-divider">
+                    <CardBody className="p-6 space-y-6">
+                        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                            <div>
+                                <div className="flex items-center gap-3">
+                                    <h2 className="text-2xl font-bold">{text.statsOps}</h2>
+                                    <Chip size="sm" variant="flat" color={telemetry?.ingestion.rebuildRequired ? 'warning' : 'success'}>
+                                        {telemetry?.ingestion.rebuildRequired ? text.rebuildRequired : text.moduleHealthy}
+                                    </Chip>
+                                </div>
+                                <p className="text-default-500">{text.statsOpsDesc}</p>
+                            </div>
+                            <div className="flex gap-2">
+                                <Button
+                                    size="sm"
+                                    variant={telemetryWindow === '24h' ? 'solid' : 'flat'}
+                                    color={telemetryWindow === '24h' ? 'primary' : 'default'}
+                                    onPress={() => setTelemetryWindow('24h')}
+                                >
+                                    {text.last24h}
+                                </Button>
+                                <Button
+                                    size="sm"
+                                    variant={telemetryWindow === '7d' ? 'solid' : 'flat'}
+                                    color={telemetryWindow === '7d' ? 'primary' : 'default'}
+                                    onPress={() => setTelemetryWindow('7d')}
+                                >
+                                    {text.last7d}
+                                </Button>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
+                            <Card className="bg-default-50/5 border border-divider">
+                                <CardBody className="p-5">
+                                    <div className="flex items-center gap-3 mb-2">
+                                        <Graph size={20} className="text-primary" />
+                                        <span className="text-default-500 text-sm">{text.requests}</span>
+                                    </div>
+                                    <div className="text-3xl font-bold">
+                                        {formatLocaleNumber(telemetry?.summary.requests || 0, locale)}
+                                    </div>
+                                    <div className="text-xs text-default-400 mt-2">
+                                        {formatLocaleNumber(telemetry?.summary.distinctEndpoints || 0, locale)} endpoints
+                                    </div>
+                                </CardBody>
+                            </Card>
+
+                            <Card className="bg-default-50/5 border border-divider">
+                                <CardBody className="p-5">
+                                    <div className="flex items-center gap-3 mb-2">
+                                        <Gauge size={20} className="text-warning" />
+                                        <span className="text-default-500 text-sm">{text.p95}</span>
+                                    </div>
+                                    <div className="text-3xl font-bold">
+                                        {formatLocaleNumber(Math.round(telemetry?.summary.p95Ms || 0), locale)} {text.milliseconds}
+                                    </div>
+                                    <div className="text-xs text-default-400 mt-2">
+                                        p50 {formatLocaleNumber(Math.round(telemetry?.summary.p50Ms || 0), locale)} {text.milliseconds}
+                                    </div>
+                                </CardBody>
+                            </Card>
+
+                            <Card className="bg-default-50/5 border border-divider">
+                                <CardBody className="p-5">
+                                    <div className="flex items-center gap-3 mb-2">
+                                        <WarningCircle size={20} className="text-danger" />
+                                        <span className="text-default-500 text-sm">{text.errorRate}</span>
+                                    </div>
+                                    <div className="text-3xl font-bold">
+                                        {formatLocaleNumber(Math.round((telemetry?.summary.errorRate || 0) * 10) / 10, locale)} {text.percent}
+                                    </div>
+                                    <div className="text-xs text-default-400 mt-2">
+                                        {formatLocaleNumber(telemetry?.summary.errorCount || 0, locale)} / {formatLocaleNumber(telemetry?.summary.requests || 0, locale)}
+                                    </div>
+                                </CardBody>
+                            </Card>
+
+                            <Card className="bg-default-50/5 border border-divider">
+                                <CardBody className="p-5">
+                                    <div className="flex items-center gap-3 mb-2">
+                                        <ClockCounterClockwise size={20} className="text-secondary" />
+                                        <span className="text-default-500 text-sm">{text.readModelLag}</span>
+                                    </div>
+                                    <div className="text-3xl font-bold">
+                                        {telemetry?.ingestion.readModelLagMinutes != null
+                                            ? `${formatLocaleNumber(telemetry.ingestion.readModelLagMinutes, locale)} ${text.minutes}`
+                                            : '—'}
+                                    </div>
+                                    <div className="text-xs text-default-400 mt-2">
+                                        {text.syncStatus}: {telemetry?.ingestion.jobStatus || text.unknown}
+                                    </div>
+                                </CardBody>
+                            </Card>
+
+                            <Card className="bg-default-50/5 border border-divider">
+                                <CardBody className="p-5">
+                                    <div className="flex items-center gap-3 mb-2">
+                                        <Pulse size={20} className="text-success" />
+                                        <span className="text-default-500 text-sm">{text.activeGuilds}</span>
+                                    </div>
+                                    <div className="text-3xl font-bold">
+                                        {formatLocaleNumber(telemetry?.ingestion.activeGuilds30d || 0, locale)}
+                                    </div>
+                                    <div className="text-xs text-default-400 mt-2">
+                                        {text.slowRequests}: {formatLocaleNumber(telemetry?.summary.slowRequests || 0, locale)}
+                                    </div>
+                                </CardBody>
+                            </Card>
+                        </div>
+
+                        {telemetryLoading && !telemetry ? (
+                            <div className="text-default-400">{text.noTelemetry}</div>
+                        ) : telemetry ? (
+                            <>
+                                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                                    <TremorCard className="bg-default-50/5 border border-divider ring-0">
+                                        <Title className="text-foreground">{text.requestsHistory}</Title>
+                                        <AreaChart
+                                            className="h-72 mt-4"
+                                            data={telemetry.timeline}
+                                            index="date"
+                                            categories={["requests"]}
+                                            colors={["indigo"]}
+                                            valueFormatter={(value) => formatLocaleNumber(value, locale)}
+                                            showAnimation
+                                        />
+                                    </TremorCard>
+
+                                    <TremorCard className="bg-default-50/5 border border-divider ring-0">
+                                        <Title className="text-foreground">{text.latencyHistory}</Title>
+                                        <AreaChart
+                                            className="h-72 mt-4"
+                                            data={telemetry.timeline}
+                                            index="date"
+                                            categories={["p95Ms"]}
+                                            colors={["amber"]}
+                                            valueFormatter={(value) => `${formatLocaleNumber(Math.round(value), locale)} ${text.milliseconds}`}
+                                            showAnimation
+                                        />
+                                    </TremorCard>
+                                </div>
+
+                                <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                                    <Card className="xl:col-span-2 bg-default-50/5 border border-divider">
+                                        <CardBody className="p-6">
+                                            <h3 className="text-lg font-semibold mb-4">{text.endpointHotspots}</h3>
+                                            <div className="space-y-3">
+                                                {telemetry.endpoints.map((row) => (
+                                                    <div key={row.endpoint} className="grid grid-cols-[1.6fr_0.8fr_0.8fr_0.8fr] gap-3 items-center rounded-xl border border-white/5 bg-white/[0.02] px-4 py-3">
+                                                        <div className="font-mono text-sm text-white truncate">{row.endpoint}</div>
+                                                        <div className="text-sm text-default-300">{formatLocaleNumber(row.requests, locale)}</div>
+                                                        <div className="text-sm text-warning">{formatLocaleNumber(Math.round(row.p95Ms), locale)} {text.milliseconds}</div>
+                                                        <div className="text-sm text-danger">{formatLocaleNumber(Math.round(row.errorRate * 10) / 10, locale)}%</div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </CardBody>
+                                    </Card>
+
+                                    <Card className="bg-default-50/5 border border-divider">
+                                        <CardBody className="p-6 space-y-4">
+                                            <h3 className="text-lg font-semibold">{text.syncStatus}</h3>
+                                            <div className="space-y-2 text-sm">
+                                                <div className="flex items-center justify-between gap-4">
+                                                    <span className="text-default-400">{text.rebuildRequired}</span>
+                                                    <span className="font-semibold">{telemetry.ingestion.rebuildRequired ? text.yes : text.no}</span>
+                                                </div>
+                                                <div className="flex items-center justify-between gap-4">
+                                                    <span className="text-default-400">{text.syncStatus}</span>
+                                                    <span className="font-semibold">{telemetry.ingestion.jobStatus || text.jobIdle}</span>
+                                                </div>
+                                                <div className="flex items-center justify-between gap-4">
+                                                    <span className="text-default-400">{text.lastSourceEvent}</span>
+                                                    <span className="font-semibold text-right">{formatDateTime(telemetry.ingestion.lastSourceEventAt, locale)}</span>
+                                                </div>
+                                                <div className="flex items-center justify-between gap-4">
+                                                    <span className="text-default-400">{text.lastReadSync}</span>
+                                                    <span className="font-semibold text-right">{formatDateTime(telemetry.ingestion.lastReadModelSyncAt, locale)}</span>
+                                                </div>
+                                            </div>
+                                        </CardBody>
+                                    </Card>
+                                </div>
+                            </>
+                        ) : (
+                            <div className="text-default-400">{text.noTelemetry}</div>
+                        )}
+                    </CardBody>
+                </Card>
             </div>
         </div>
     );

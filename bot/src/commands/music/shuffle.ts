@@ -5,6 +5,8 @@ const command: Command = {
     data: new SlashCommandBuilder()
         .setName('shuffle')
         .setDescription('Shuffles the queue'),
+    accessGroup: 'music',
+    accessKey: 'shuffle',
     execute: async (interaction) => {
         const member = interaction.member as GuildMember;
         const voiceChannel = member.voice.channel;

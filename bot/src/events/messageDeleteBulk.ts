@@ -1,6 +1,6 @@
 import { Collection, Events, Message } from 'discord.js';
 import logger from '../utils/logger';
-import { prisma } from '../utils/database';
+import { prisma, statsPrisma } from '../utils/database';
 import { logAuditEvent } from '../utils/auditLog';
 
 function serializeAttachments(message: Message) {
@@ -41,7 +41,7 @@ export default {
 
         if (rows.length) {
             try {
-                await prisma.messageEvent.createMany({ data: rows });
+                await statsPrisma.messageEvent.createMany({ data: rows });
             } catch (error) {
                 logger.error('[AuditLog] Failed to persist bulk delete events:', error);
             }
