@@ -3,6 +3,13 @@ import { prisma } from '@/lib/prisma';
 import { getAuthToken } from '@/lib/auth';
 import { canAccessGuild } from '@/lib/discordAccess';
 
+type GuildChannel = {
+    id: string;
+    parentId?: string | null;
+    type?: string | number | null;
+    position?: number | string | null;
+};
+
 export async function GET(
     request: NextRequest,
     { params }: { params: Promise<{ guildId: string }> }
@@ -30,11 +37,11 @@ export async function GET(
             return NextResponse.json([]);
         }
 
-        let channels: any[] = [];
+        let channels: GuildChannel[] = [];
         try {
             const parsed = JSON.parse(guild.channels);
             if (Array.isArray(parsed)) {
-                channels = parsed;
+                channels = parsed as GuildChannel[];
             }
         } catch (error) {
             console.error('Failed to parse channels JSON:', error);
@@ -43,15 +50,21 @@ export async function GET(
 
         // Create a map of categories for sorting
         // Type 4 is GuildCategory
-        const categories = channels.filter((c: any) => c.type === 4 || c.type === 'category');
-        const categoryMap = new Map();
-        categories.forEach((c: any) => categoryMap.set(c.id, parseInt(c.position) || 0));
+        const categories = channels.filter((c) => c.type === 4 || c.type === 'category');
+        const categoryMap = new Map<string, number>();
+        categories.forEach((c) => categoryMap.set(c.id, Number.parseInt(String(c.position ?? 0), 10) || 0));
 
-        // Filter only voice channels (Type 2 is GuildVoice)
-        const voiceChannels = channels.filter((c: any) => c.type === 'voice' || c.type === 2);
+        // Filter voice-like channels that can still have associated chat
+        const voiceChannels = channels.filter((c) =>
+            c.type === 'voice' ||
+            c.type === 'stage_voice' ||
+            c.type === 'cast' ||
+            c.type === 2 ||
+            c.type === 13
+        );
 
         // Sort by Category Position then Channel Position
-        voiceChannels.sort((a: any, b: any) => {
+        voiceChannels.sort((a, b) => {
             // Get category positions (default to -1 for channels without category, putting them at top)
             // Or check Discord behavior: channels without category usually at top
             const catPosA = a.parentId ? (categoryMap.get(a.parentId) ?? -1) : -1;
@@ -63,7 +76,7 @@ export async function GET(
             }
 
             // Compare channel positions within the same category (or no category)
-            return (parseInt(a.position) || 0) - (parseInt(b.position) || 0);
+            return (Number.parseInt(String(a.position ?? 0), 10) || 0) - (Number.parseInt(String(b.position ?? 0), 10) || 0);
         });
 
         return NextResponse.json(voiceChannels);

@@ -8,7 +8,7 @@ import {
     getHelpModules,
     resolveGuildHelpCommand,
 } from '../utils/helpMenu';
-import { getInteractionLocale } from '../utils/i18n';
+import { getInteractionLocale, t } from '../utils/i18n';
 import { Command } from '../utils/types';
 
 const command: Command = {
@@ -45,7 +45,7 @@ const command: Command = {
             : null;
 
         if (interaction.guildId && interaction.guild && !member) {
-            await interaction.reply({ content: 'Unable to resolve your guild member state.', ephemeral: true });
+            await interaction.reply({ content: t(locale, 'general.memberResolveFailed'), ephemeral: true });
             return;
         }
 

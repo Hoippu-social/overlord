@@ -1,5 +1,6 @@
 import { Events, GuildMember, Interaction } from 'discord.js';
 import logger from '../utils/logger';
+import { getCommandDefaultMemberPermissions } from '../utils/commandPermissions';
 import {
     buildGuildHelpView,
     buildHelpModuleEmbed,
@@ -56,7 +57,6 @@ export default {
             return;
         }
 
-        // ----- Slash command handling -----
         if (interaction.isChatInputCommand()) {
             const { commands } = await import('../handlers/commandHandler');
             const command = commands.get(interaction.commandName);
@@ -66,13 +66,14 @@ export default {
             }
 
             if ((command.accessGroup || command.accessKey || command.requiredAccessLevel !== undefined) && interaction.guildId && interaction.guild) {
+                const locale = await getInteractionLocale(interaction);
                 const { ensureModeratorAccess } = await import('../services/ModerationService');
                 const member = interaction.member instanceof GuildMember
                     ? interaction.member
                     : await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
 
                 if (!member) {
-                    await interaction.reply({ content: 'Unable to resolve your guild member state.', ephemeral: true });
+                    await interaction.reply({ content: t(locale, 'general.memberResolveFailed'), ephemeral: true });
                     return;
                 }
 
@@ -80,22 +81,24 @@ export default {
                     accessGroup: command.accessGroup,
                     accessKey: command.accessKey ?? interaction.commandName,
                     requiredAccessLevel: command.requiredAccessLevel,
+                    requiredDiscordPermissions: getCommandDefaultMemberPermissions(command),
+                    channelId: interaction.channelId,
+                    parentChannelId: interaction.channel && 'parentId' in interaction.channel ? interaction.channel.parentId : null,
                 });
 
                 if (!allowed) {
-                    await interaction.reply({ content: 'You do not have access to this moderation command.', ephemeral: true });
+                    await interaction.reply({ content: t(locale, 'general.noModerationAccess'), ephemeral: true });
                     return;
                 }
             }
 
-            // Music Command Restrictions
             const musicCommands = ['play', 'skip', 'stop', 'pause', 'resume', 'queue', 'volume', 'loop', 'shuffle', 'nowplaying'];
             if (musicCommands.includes(interaction.commandName) && interaction.guildId) {
+                const locale = await getInteractionLocale(interaction);
                 const { prisma } = await import('../utils/database');
                 const musicConfig = await prisma.musicConfig.findUnique({ where: { guildId: interaction.guildId } });
 
                 if (musicConfig) {
-                    // Channel Check
                     if (musicConfig.allowedChannels) {
                         const allowedChannels = JSON.parse(musicConfig.allowedChannels) as string[];
                         const member = interaction.member as GuildMember;
@@ -103,26 +106,25 @@ export default {
 
                         if (musicConfig.channelMode === 'WHITELIST') {
                             if (!voiceChannelId || !allowedChannels.includes(voiceChannelId)) {
-                                await interaction.reply({ content: `❌ You must be in a whitelisted Voice Channel to use music commands.`, ephemeral: true });
+                                await interaction.reply({ content: t(locale, 'interactions.musicChannelWhitelist'), ephemeral: true });
                                 return;
                             }
                         } else if (musicConfig.channelMode === 'BLACKLIST') {
                             if (voiceChannelId && allowedChannels.includes(voiceChannelId)) {
-                                await interaction.reply({ content: `❌ Music commands are not allowed in this Voice Channel.`, ephemeral: true });
+                                await interaction.reply({ content: t(locale, 'interactions.musicChannelBlacklist'), ephemeral: true });
                                 return;
                             }
                         }
                     }
 
-                    // DJ Role Check
                     if (musicConfig.djMode && musicConfig.djRoles) {
                         const member = interaction.member as GuildMember;
                         const djRoles = JSON.parse(musicConfig.djRoles) as string[];
-                        const hasDJRole = member.roles.cache.some(r => djRoles.includes(r.id));
+                        const hasDJRole = member.roles.cache.some((role) => djRoles.includes(role.id));
                         const isAdmin = member.permissions.has('Administrator');
 
                         if (!hasDJRole && !isAdmin) {
-                            await interaction.reply({ content: `❌ DJ Mode is enabled. You need a DJ role to use music commands.`, ephemeral: true });
+                            await interaction.reply({ content: t(locale, 'interactions.djOnly'), ephemeral: true });
                             return;
                         }
                     }
@@ -133,7 +135,8 @@ export default {
                 await command.execute(interaction);
             } catch (error) {
                 logger.error(`Error executing ${interaction.commandName}:`, error);
-                const replyOpts = { content: 'There was an error while executing this command!', ephemeral: true };
+                const locale = await getInteractionLocale(interaction);
+                const replyOpts = { content: t(locale, 'general.commandError'), ephemeral: true };
                 if (interaction.replied || interaction.deferred) await interaction.followUp(replyOpts);
                 else await interaction.reply(replyOpts);
             }
@@ -200,8 +203,6 @@ export default {
                     await interaction.reply(replyOpts).catch(() => null);
                 }
             }
-            return;
         }
-
     },
 };

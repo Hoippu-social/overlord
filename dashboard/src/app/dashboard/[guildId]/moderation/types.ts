@@ -9,6 +9,126 @@ export type ModerationConfig = {
     commandOnlyChannels: string[];
 };
 
+export type AutomodFloodWindowUnit = 'seconds' | 'minutes' | 'hours' | 'days';
+
+export type AutomodFloodAction = {
+    messageCount: number;
+    action: string;
+    durationText: string;
+};
+
+export type AutomodActionConfig = {
+    action: string;
+    durationText: string;
+};
+
+export type AutomodFloodConfig = {
+    windowValue: number;
+    windowUnit: AutomodFloodWindowUnit;
+    actions: AutomodFloodAction[];
+    ignoredChannels: string[];
+    ignoredRoles: string[];
+};
+
+export type AutomodZalgoConfig = {
+    percent: number;
+    ignoredChannels: string[];
+    actions: AutomodFloodAction[];
+};
+
+export type AutomodEmojiConfig = {
+    emojiOnlyChannelIds: string[];
+    denyEmojiChannelIds: string[];
+    actions: AutomodFloodAction[];
+};
+
+export type AutomodEmojiSpamConfig = {
+    count: number;
+    ignoredChannels: string[];
+    actions: AutomodFloodAction[];
+};
+
+export type AutomodSpamScope = 'channel' | 'server';
+
+export type AutomodSpamConfig = {
+    scope: AutomodSpamScope;
+    windowValue: number;
+    windowUnit: AutomodFloodWindowUnit;
+    ignoredChannels: string[];
+    actions: AutomodFloodAction[];
+};
+
+export type AutomodMentionSpamConfig = {
+    userMentions: boolean;
+    roleMentions: boolean;
+    ignoredChannels: string[];
+    windowValue: number;
+    windowUnit: AutomodFloodWindowUnit;
+    actions: AutomodFloodAction[];
+};
+
+export type AutomodLinesConfig = {
+    count: number;
+    ignoredChannels: string[];
+    actions: AutomodActionConfig[];
+};
+
+export type AutomodLinksMode = 'allowlist' | 'blocklist';
+
+export type AutomodLinksConfig = {
+    mode: AutomodLinksMode;
+    ignoredChannels: string[];
+    domains: string[];
+    actions: AutomodActionConfig[];
+};
+
+export type AutomodBanwordsConfig = {
+    ignoredChannels: string[];
+    ignoredRoles: string[];
+    words: string[];
+    matchWholeWordsOnly: boolean;
+    ignoreCase: boolean;
+    actions: AutomodActionConfig[];
+};
+
+export type AutomodCommandChannelsMode = 'allowlist' | 'blocklist';
+
+export type AutomodCommandChannelsConfig = {
+    mode: AutomodCommandChannelsMode;
+    channelIds: string[];
+    actions: AutomodActionConfig[];
+};
+
+export type AutomodAdvertisingCategoryConfig = {
+    enabled: boolean;
+    actions: AutomodActionConfig[];
+};
+
+export type AutomodAdvertisingReferralConfig = AutomodAdvertisingCategoryConfig & {
+    customDomains: string[];
+    customPhrases: string[];
+    customCodeTokens: string[];
+};
+
+export type AutomodAdvertisingScamLinksConfig = AutomodAdvertisingCategoryConfig & {
+    customDomains: string[];
+    customPhrases: string[];
+};
+
+export type AutomodAdvertisingConfig = {
+    ignoredChannels: string[];
+    discordInvites: AutomodAdvertisingCategoryConfig;
+    referrals: AutomodAdvertisingReferralConfig;
+    scamLinks: AutomodAdvertisingScamLinksConfig;
+};
+
+export type AutomodImageFilterConfig = {
+    ignoredChannels: string[];
+    imageOnlyChannelIds: string[];
+    denyImageChannelIds: string[];
+    actions: AutomodActionConfig[];
+};
+
 export type RoleBinding = {
     roleId: string;
     title: string;
@@ -40,6 +160,18 @@ export type AutomodRule = {
     ruleKey: string;
     enabled: boolean;
     configText: string;
+    floodConfig?: AutomodFloodConfig;
+    zalgoConfig?: AutomodZalgoConfig;
+    emojiConfig?: AutomodEmojiConfig;
+    emojiSpamConfig?: AutomodEmojiSpamConfig;
+    spamConfig?: AutomodSpamConfig;
+    mentionSpamConfig?: AutomodMentionSpamConfig;
+    linesConfig?: AutomodLinesConfig;
+    linksConfig?: AutomodLinksConfig;
+    banwordsConfig?: AutomodBanwordsConfig;
+    advertisingConfig?: AutomodAdvertisingConfig;
+    commandChannelsConfig?: AutomodCommandChannelsConfig;
+    imageFilterConfig?: AutomodImageFilterConfig;
 };
 
 export type CustomRule = {

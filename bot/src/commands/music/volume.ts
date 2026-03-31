@@ -1,55 +1,56 @@
-import { SlashCommandBuilder, GuildMember } from 'discord.js';
+import { GuildMember, SlashCommandBuilder } from 'discord.js';
+import { localizeDescription } from '../../utils/commandLocalizations';
+import { getInteractionLocale, t } from '../../utils/i18n';
 import { Command } from '../../utils/types';
 
 const command: Command = {
-    data: new SlashCommandBuilder()
-        .setName('volume')
-        .setDescription('Sets the player volume')
-        .addIntegerOption(option =>
-            option.setName('level')
-                .setDescription('Volume level (0-100)')
-                .setMinValue(0)
-                .setMaxValue(100)
-                .setRequired(false)
-        ) as any,
+    data: localizeDescription(
+        new SlashCommandBuilder()
+            .setName('volume')
+            .addIntegerOption((option) =>
+                localizeDescription(option.setName('level').setMinValue(0).setMaxValue(100).setRequired(false), {
+                    en: 'Volume level 0-100',
+                    ru: 'Уровень громкости 0-100',
+                })
+            ) as any,
+        {
+            en: 'Set the player volume',
+            ru: 'Изменить громкость плеера',
+        }
+    ),
     accessGroup: 'music',
     accessKey: 'volume',
     execute: async (interaction) => {
+        const locale = await getInteractionLocale(interaction);
         const member = interaction.member as GuildMember;
         const voiceChannel = member.voice.channel;
 
         if (!voiceChannel) {
-            await interaction.reply({ content: '❌ Вы должны быть в голосовом канале!', ephemeral: true });
+            await interaction.reply({ content: t(locale, 'general.notVoice'), ephemeral: true });
             return;
         }
 
         const player = interaction.client.lavalink.getPlayer(interaction.guildId!);
 
         if (!player) {
-            await interaction.reply({ content: '❌ Плеер не активен!', ephemeral: true });
+            await interaction.reply({ content: t(locale, 'general.playerMissing'), ephemeral: true });
             return;
         }
 
         if (player.voiceChannelId !== voiceChannel.id) {
-            await interaction.reply({ content: '❌ Вы должны быть в том же канале, что и бот!', ephemeral: true });
+            await interaction.reply({ content: t(locale, 'general.notSameVoice'), ephemeral: true });
             return;
         }
 
         const level = interaction.options.getInteger('level');
 
         if (level === null) {
-            // Show current volume
-            const volumeBar = '█'.repeat(Math.floor(player.volume / 10)) + '░'.repeat(10 - Math.floor(player.volume / 10));
-            await interaction.reply(`🔊 Текущая громкость: **${player.volume}%**\n\`[${volumeBar}]\``);
+            await interaction.reply({ content: t(locale, 'music.volume.current', { value: player.volume }), ephemeral: true });
             return;
         }
 
         await player.setVolume(level);
-
-        const emoji = level === 0 ? '🔇' : level < 30 ? '🔈' : level < 70 ? '🔉' : '🔊';
-        const volumeBar = '█'.repeat(Math.floor(level / 10)) + '░'.repeat(10 - Math.floor(level / 10));
-
-        await interaction.reply(`${emoji} Громкость установлена на **${level}%**\n\`[${volumeBar}]\``);
+        await interaction.reply({ content: t(locale, 'music.volume.set', { value: level }), ephemeral: true });
     },
 };
 

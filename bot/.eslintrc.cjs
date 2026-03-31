@@ -1,0 +1,35 @@
+module.exports = {
+    root: true,
+    env: {
+        node: true,
+        es2021: true,
+    },
+    parser: '@typescript-eslint/parser',
+    parserOptions: {
+        ecmaVersion: 'latest',
+        sourceType: 'module',
+    },
+    plugins: ['@typescript-eslint'],
+    extends: ['eslint:recommended', 'plugin:@typescript-eslint/recommended'],
+    ignorePatterns: [
+        'dist/**',
+        'node_modules/**',
+        'prisma/**',
+        'scripts/**',
+        'src/generated/**',
+        'backups/**',
+        '*.log',
+        '*.txt',
+        '*.db',
+    ],
+    rules: {
+        'no-empty': 'warn',
+        'no-case-declarations': 'warn',
+        'no-irregular-whitespace': 'warn',
+        'prefer-const': 'warn',
+        '@typescript-eslint/ban-types': 'off',
+        '@typescript-eslint/no-unnecessary-type-constraint': 'off',
+        '@typescript-eslint/no-explicit-any': 'warn',
+        '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+    },
+};

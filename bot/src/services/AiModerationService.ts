@@ -9,6 +9,7 @@ import {
 } from 'discord.js';
 import { logAuditEvent } from '../utils/auditLog';
 import { prisma } from '../utils/database';
+import { getGuildLocale, t } from '../utils/i18n';
 import {
     AI_CATEGORIES,
     createModerationCase,
@@ -36,21 +37,21 @@ const AI_ACTION_PREFIX = 'ai_mod:';
 const AI_ALERT_COOLDOWN_MS = 5 * 60_000;
 const alertState = new Map<string, { signature: string; sentAt: number }>();
 
-function buildAiActionRow(messageId: string) {
+function buildAiActionRow(locale: 'ru' | 'en', messageId: string) {
     return new ActionRowBuilder<ButtonBuilder>().addComponents(
-        new ButtonBuilder().setCustomId(`${AI_ACTION_PREFIX}dismiss:${messageId}`).setLabel('Dismiss').setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder().setCustomId(`${AI_ACTION_PREFIX}false_positive:${messageId}`).setLabel('False Positive').setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder().setCustomId(`${AI_ACTION_PREFIX}warn:${messageId}`).setLabel('Delete + Warn').setStyle(ButtonStyle.Primary),
-        new ButtonBuilder().setCustomId(`${AI_ACTION_PREFIX}timeout:${messageId}`).setLabel('Delete + Timeout 1h').setStyle(ButtonStyle.Danger)
+        new ButtonBuilder().setCustomId(`${AI_ACTION_PREFIX}dismiss:${messageId}`).setLabel(t(locale, 'ai.action.dismiss')).setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId(`${AI_ACTION_PREFIX}false_positive:${messageId}`).setLabel(t(locale, 'ai.action.falsePositive')).setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId(`${AI_ACTION_PREFIX}warn:${messageId}`).setLabel(t(locale, 'ai.action.deleteWarn')).setStyle(ButtonStyle.Primary),
+        new ButtonBuilder().setCustomId(`${AI_ACTION_PREFIX}timeout:${messageId}`).setLabel(t(locale, 'ai.action.deleteTimeout')).setStyle(ButtonStyle.Danger)
     );
 }
 
-function buildDisabledAiActionRow(messageId: string, action: string) {
+function buildDisabledAiActionRow(locale: 'ru' | 'en', messageId: string, action: string) {
     return new ActionRowBuilder<ButtonBuilder>().addComponents(
-        new ButtonBuilder().setCustomId(`${AI_ACTION_PREFIX}done_dismiss:${messageId}`).setLabel(action === 'dismiss' ? 'Dismissed' : 'Dismiss').setStyle(ButtonStyle.Secondary).setDisabled(true),
-        new ButtonBuilder().setCustomId(`${AI_ACTION_PREFIX}done_false_positive:${messageId}`).setLabel(action === 'false_positive' ? 'False Positive' : 'False Positive').setStyle(ButtonStyle.Secondary).setDisabled(true),
-        new ButtonBuilder().setCustomId(`${AI_ACTION_PREFIX}done_warn:${messageId}`).setLabel(action === 'warn' ? 'Warned' : 'Delete + Warn').setStyle(ButtonStyle.Primary).setDisabled(true),
-        new ButtonBuilder().setCustomId(`${AI_ACTION_PREFIX}done_timeout:${messageId}`).setLabel(action === 'timeout' ? 'Timed Out' : 'Delete + Timeout 1h').setStyle(ButtonStyle.Danger).setDisabled(true)
+        new ButtonBuilder().setCustomId(`${AI_ACTION_PREFIX}done_dismiss:${messageId}`).setLabel(action === 'dismiss' ? t(locale, 'ai.action.dismissed') : t(locale, 'ai.action.dismiss')).setStyle(ButtonStyle.Secondary).setDisabled(true),
+        new ButtonBuilder().setCustomId(`${AI_ACTION_PREFIX}done_false_positive:${messageId}`).setLabel(t(locale, 'ai.action.falsePositive')).setStyle(ButtonStyle.Secondary).setDisabled(true),
+        new ButtonBuilder().setCustomId(`${AI_ACTION_PREFIX}done_warn:${messageId}`).setLabel(action === 'warn' ? t(locale, 'ai.action.warned') : t(locale, 'ai.action.deleteWarn')).setStyle(ButtonStyle.Primary).setDisabled(true),
+        new ButtonBuilder().setCustomId(`${AI_ACTION_PREFIX}done_timeout:${messageId}`).setLabel(action === 'timeout' ? t(locale, 'ai.action.timedOut') : t(locale, 'ai.action.deleteTimeout')).setStyle(ButtonStyle.Danger).setDisabled(true)
     );
 }
 
@@ -191,6 +192,7 @@ function buildAlertSignature(triggered: AiSignal[], summary: string) {
 }
 
 async function sendAiAlert(message: Message, assessment: AiAssessment, triggered: AiSignal[], provider: string, model: string) {
+    const locale = await getGuildLocale(message.guild?.id);
     const route = await prisma.auditTagRoute.findUnique({
         where: {
             guildId_tag: {
@@ -217,22 +219,22 @@ async function sendAiAlert(message: Message, assessment: AiAssessment, triggered
 
     const embed = new EmbedBuilder()
         .setColor(0x1abc9c)
-        .setTitle('AI Moderation Alert')
-        .setDescription(assessment.summary || 'Potential moderation issue detected.')
+        .setTitle(t(locale, 'ai.alert.title'))
+        .setDescription(assessment.summary || t(locale, 'ai.alert.summaryFallback'))
         .addFields(
-            { name: 'Author', value: `<@${message.author.id}> (\`${message.author.id}\`)`, inline: false },
-            { name: 'Channel', value: `<#${message.channel.id}>`, inline: true },
-            { name: 'Confidence', value: `${assessment.confidence}`, inline: true },
-            { name: 'Categories', value: categories || 'none', inline: false },
-            { name: 'Excerpt', value: `\`\`\`${excerpt(message.content, 900)}\`\`\``.slice(0, 1024), inline: false },
-            { name: 'Jump', value: `[Open message](${message.url})`, inline: false },
+            { name: t(locale, 'ai.alert.author'), value: `<@${message.author.id}> (\`${message.author.id}\`)`, inline: false },
+            { name: t(locale, 'ai.alert.channel'), value: `<#${message.channel.id}>`, inline: true },
+            { name: t(locale, 'ai.alert.confidence'), value: `${assessment.confidence}`, inline: true },
+            { name: t(locale, 'ai.alert.categories'), value: categories || t(locale, 'ai.alert.none'), inline: false },
+            { name: t(locale, 'ai.alert.excerpt'), value: `\`\`\`${excerpt(message.content, 900)}\`\`\``.slice(0, 1024), inline: false },
+            { name: t(locale, 'ai.alert.jump'), value: `[${t(locale, 'ai.alert.openMessage')}](${message.url})`, inline: false },
         )
         .setFooter({ text: `${provider}/${model}` })
         .setTimestamp();
 
     await (channel as { send: (payload: unknown) => Promise<unknown> }).send({
         embeds: [embed],
-        components: [buildAiActionRow(message.id)],
+        components: [buildAiActionRow(locale, message.id)],
     });
 }
 
@@ -241,8 +243,9 @@ export function isAiModerationButton(customId: string) {
 }
 
 export async function handleAiModerationButton(interaction: ButtonInteraction) {
+    const locale = await getGuildLocale(interaction.guildId);
     if (!interaction.guildId || !interaction.guild || !(interaction.member instanceof GuildMember)) {
-        await interaction.reply({ content: 'Guild context is required.', ephemeral: true });
+        await interaction.reply({ content: t(locale, 'ai.error.guildRequired'), ephemeral: true });
         return;
     }
 
@@ -256,7 +259,7 @@ export async function handleAiModerationButton(interaction: ButtonInteraction) {
     }).catch(() => false);
 
     if (!allowed) {
-        await interaction.reply({ content: 'You do not have access to AI moderation actions.', ephemeral: true });
+        await interaction.reply({ content: t(locale, 'ai.error.accessDenied'), ephemeral: true });
         return;
     }
 
@@ -276,18 +279,18 @@ export async function handleAiModerationButton(interaction: ButtonInteraction) {
     });
 
     if (!incident) {
-        await interaction.reply({ content: 'AI incident not found or moderation tables are unavailable.', ephemeral: true });
+        await interaction.reply({ content: t(locale, 'ai.error.incidentMissing'), ephemeral: true });
         return;
     }
 
     const existingStatus = incident.status?.toUpperCase();
     if (existingStatus !== 'OPEN') {
-        await interaction.reply({ content: `This incident is already resolved as ${incident.status}.`, ephemeral: true });
+        await interaction.reply({ content: t(locale, 'ai.error.alreadyResolved', { status: incident.status ?? 'UNKNOWN' }), ephemeral: true });
         return;
     }
 
     let decision = 'DISMISSED';
-    let decisionText = 'Dismissed';
+    let decisionText = t(locale, 'ai.action.dismissed');
 
     const targetChannel = await interaction.guild.channels.fetch(incident.channelId).catch(() => null);
     const targetMessage =
@@ -302,7 +305,7 @@ export async function handleAiModerationButton(interaction: ButtonInteraction) {
     switch (action) {
         case 'false_positive':
             decision = 'FALSE_POSITIVE';
-            decisionText = 'False positive';
+            decisionText = t(locale, 'ai.action.falsePositiveMarked');
             break;
         case 'warn':
             if (targetMessage?.deletable) {
@@ -326,7 +329,7 @@ export async function handleAiModerationButton(interaction: ButtonInteraction) {
                 }
             });
             decision = 'CONFIRMED_WARN';
-            decisionText = 'Deleted + Warned';
+            decisionText = t(locale, 'ai.action.deleteWarned');
             break;
         case 'timeout':
             if (targetMessage?.deletable) {
@@ -345,11 +348,11 @@ export async function handleAiModerationButton(interaction: ButtonInteraction) {
                 });
             }
             decision = 'CONFIRMED_TIMEOUT';
-            decisionText = 'Deleted + Timeout 1h';
+            decisionText = t(locale, 'ai.action.deleteTimedOut');
             break;
         default:
             decision = 'DISMISSED';
-            decisionText = 'Dismissed';
+            decisionText = t(locale, 'ai.action.dismissed');
             break;
     }
 
@@ -368,16 +371,16 @@ export async function handleAiModerationButton(interaction: ButtonInteraction) {
 
     const originalEmbed = interaction.message.embeds[0]
         ? EmbedBuilder.from(interaction.message.embeds[0])
-        : new EmbedBuilder().setTitle('AI Moderation Alert');
+        : new EmbedBuilder().setTitle(t(locale, 'ai.alert.title'));
     originalEmbed.addFields({
-        name: 'Review',
-        value: `${decisionText} by <@${interaction.user.id}>`,
+        name: t(locale, 'ai.review.field'),
+        value: t(locale, 'ai.review.value', { decision: decisionText, userId: interaction.user.id }),
         inline: false,
     });
 
     await interaction.update({
         embeds: [originalEmbed],
-        components: [buildDisabledAiActionRow(messageId, action)],
+        components: [buildDisabledAiActionRow(locale, messageId, action)],
     });
 
     await logAuditEvent(interaction.client, {

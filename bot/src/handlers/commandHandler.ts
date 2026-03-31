@@ -5,6 +5,44 @@ import logger from '../utils/logger';
 import { Command } from '../utils/types';
 
 export const commands = new Collection<string, Command<any>>();
+const LEGACY_COMMAND_NAMES = new Set(['warnings']);
+
+type RegisteredCommand = {
+    id: string;
+    name: string;
+};
+
+async function deleteLegacyCommands(rest: REST, clientId: string, guildId?: string) {
+    type ListRoute = ReturnType<typeof Routes.applicationCommands> | ReturnType<typeof Routes.applicationGuildCommands>;
+    type DeleteRoute = ReturnType<typeof Routes.applicationCommand> | ReturnType<typeof Routes.applicationGuildCommand>;
+
+    const deleteFromScope = async (
+        listRoute: ListRoute,
+        deleteRouteFactory: (commandId: string) => DeleteRoute,
+        scopeLabel: string,
+    ) => {
+        const registered = await rest.get(listRoute) as RegisteredCommand[];
+        const legacy = registered.filter((command) => LEGACY_COMMAND_NAMES.has(command.name));
+        for (const command of legacy) {
+            await rest.delete(deleteRouteFactory(command.id));
+            logger.info(`Deleted legacy command /${command.name} from ${scopeLabel} scope.`);
+        }
+    };
+
+    if (guildId) {
+        await deleteFromScope(
+            Routes.applicationGuildCommands(clientId, guildId),
+            (commandId) => Routes.applicationGuildCommand(clientId, guildId, commandId),
+            `guild ${guildId}`,
+        );
+    }
+
+    await deleteFromScope(
+        Routes.applicationCommands(clientId),
+        (commandId) => Routes.applicationCommand(clientId, commandId),
+        'global',
+    );
+}
 
 export async function loadCommands(client: Client) {
     const commandsPath = path.join(__dirname, '../commands');
@@ -40,7 +78,11 @@ export async function loadCommands(client: Client) {
             if (command.hidden) {
                 logger.info(`Loaded hidden command (not registered): ${command.data.name}`);
             } else {
-                commandsData.push(command.data.toJSON());
+                const payload = command.data.toJSON() as unknown as Record<string, unknown>;
+                if (command.accessGroup === 'moderation') {
+                    delete payload.default_member_permissions;
+                }
+                commandsData.push(payload);
                 logger.info(`Loaded command: ${command.data.name}`);
             }
         } else {
@@ -62,12 +104,14 @@ export async function loadCommands(client: Client) {
                     Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID),
                     { body: commandsData },
                 );
+                await deleteLegacyCommands(rest, process.env.CLIENT_ID, process.env.GUILD_ID);
                 logger.info(`Successfully reloaded application (/) commands for guild ${process.env.GUILD_ID}.`);
             } else {
                 await rest.put(
                     Routes.applicationCommands(process.env.CLIENT_ID),
                     { body: commandsData },
                 );
+                await deleteLegacyCommands(rest, process.env.CLIENT_ID);
                 logger.info('Successfully reloaded application (/) commands globally.');
             }
         } else {

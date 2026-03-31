@@ -2,9 +2,12 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { use } from 'react';
-import { Switch, Slider, Select, SelectItem, SelectedItems } from "@nextui-org/react";
-import { MusicNote, SpeakerHigh, Clock, Users, ArrowClockwise, FadersHorizontal, Waveform, PlayCircle, PauseCircle, SkipForward, SkipBack, Repeat, Shuffle } from "@phosphor-icons/react";
+import { Switch, Slider } from "@nextui-org/react";
+import { MusicNote, Users, FadersHorizontal, PlayCircle, PauseCircle, SkipForward, SkipBack, Repeat, Shuffle } from "@phosphor-icons/react";
 import { useGuildLocale } from "@/lib/i18n";
+import { MultiSelectField } from "@/components/moderation/ui";
+import { buildChannelSelectOptions } from "@/lib/channelSelectOptions";
+import { FloatingSaveBar } from "@/components/common/FloatingSaveBar";
 
 interface Role {
     id: string;
@@ -19,6 +22,9 @@ interface Channel {
     name: string;
     type: string;
     position: number;
+    parentId?: string | null;
+    isCategory?: boolean;
+    categoryName?: string | null;
 }
 
 const strings = {
@@ -77,6 +83,7 @@ export default function MusicSettingsPage({ params }: { params: Promise<{ guildI
 
     const [roles, setRoles] = useState<Role[]>([]);
     const [channels, setChannels] = useState<Channel[]>([]);
+    const [channelCategories, setChannelCategories] = useState<Channel[]>([]);
 
     const [djRoles, setDjRoles] = useState<Set<string>>(new Set([]));
     const [defaultVolume, setDefaultVolume] = useState<number>(50);
@@ -102,13 +109,20 @@ export default function MusicSettingsPage({ params }: { params: Promise<{ guildI
         maxDuration: 30,
     });
 
+    const channelOptions = useMemo(() => buildChannelSelectOptions({
+        channels,
+        categories: channelCategories,
+        includeCategories: true,
+    }), [channels, channelCategories]);
+
     useEffect(() => {
         fetch(`/api/guilds/${guildId}/roles`).then(res => res.json()).then(data => {
             if (Array.isArray(data)) setRoles(data);
         }).catch(() => { });
 
-        fetch(`/api/guilds/${guildId}/channels`).then(res => res.json()).then(data => {
-            if (Array.isArray(data)) setChannels(data);
+        fetch(`/api/guilds/${guildId}/channel-tree`).then(res => res.json()).then(data => {
+            setChannels(Array.isArray(data?.voice) ? data.voice : []);
+            setChannelCategories(Array.isArray(data?.categories) ? data.categories : []);
         }).catch(() => { });
 
         const loadConfig = async () => {
@@ -317,30 +331,13 @@ export default function MusicSettingsPage({ params }: { params: Promise<{ guildI
 
                     <div className="space-y-3">
                         <h4 className="font-bold text-sm text-[var(--text-primary)]">{text.djTitle}</h4>
-                        <Select
-                            items={roles}
-                            aria-label={text.djTitle}
-                            variant="bordered"
-                            isMultiline={true}
-                            selectionMode="multiple"
+                        <MultiSelectField
+                            label={text.djTitle}
+                            options={roles}
+                            selected={Array.from(djRoles)}
+                            onChange={(keys) => setDjRoles(new Set(keys))}
                             placeholder={text.djSelectPlaceholder}
-                            selectedKeys={djRoles}
-                            onSelectionChange={(keys) => setDjRoles(keys as Set<string>)}
-                            classNames={{
-                                trigger: "bg-[var(--surface-hover)] border border-[var(--border-divider)] rounded-xl hover:bg-[#1a1a1a] min-h-12",
-                                value: "text-sm",
-                                popoverContent: "bg-[var(--surface-card)] border border-[var(--border-subtle)]",
-                            }}
-                        >
-                            {(role) => (
-                                <SelectItem key={role.id} textValue={role.name}>
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: role.color && role.color !== '#000000' ? role.color : '#ffffff' }}></div>
-                                        <span className="text-sm">{role.name}</span>
-                                    </div>
-                                </SelectItem>
-                            )}
-                        </Select>
+                        />
                     </div>
 
                     <div className="space-y-3">
@@ -361,54 +358,27 @@ export default function MusicSettingsPage({ params }: { params: Promise<{ guildI
                                 </button>
                             </div>
                         </div>
-                        <Select
-                            items={channels}
-                            aria-label={text.channelsTitle}
-                            variant="bordered"
-                            isMultiline={true}
-                            selectionMode="multiple"
+                        <MultiSelectField
+                            label={text.channelsTitle}
+                            options={channelOptions}
+                            selected={Array.from(selectedChannels)}
+                            onChange={(keys) => setSelectedChannels(new Set(keys))}
                             placeholder={text.channelsSelectPlaceholder}
-                            selectedKeys={selectedChannels}
-                            onSelectionChange={(keys) => setSelectedChannels(keys as Set<string>)}
-                            classNames={{
-                                trigger: "bg-[var(--surface-hover)] border border-[var(--border-divider)] rounded-xl hover:bg-[#1a1a1a] min-h-12",
-                                value: "text-sm",
-                                popoverContent: "bg-[var(--surface-card)] border border-[var(--border-subtle)]",
-                            }}
-                        >
-                            {(channel) => (
-                                <SelectItem key={channel.id} textValue={channel.name}>
-                                    <div className="flex items-center gap-2">
-                                        <SpeakerHigh size={16} className="text-[var(--text-muted)]" />
-                                        <span className="text-sm">{channel.name}</span>
-                                    </div>
-                                </SelectItem>
-                            )}
-                        </Select>
+                        />
                     </div>
                 </div>
 
             </div>
 
-            {/* Floating Action Bar */}
-            <div className={`fixed bottom-8 left-1/2 -translate-x-1/2 z-50 flex justify-center px-4 w-full max-w-lg transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${isDirty ? 'translate-y-0 opacity-100 scale-100' : 'translate-y-24 opacity-0 scale-95 pointer-events-none'}`}>
-                <div className="bg-[var(--surface-card)]/90 backdrop-blur-2xl border border-[var(--border-subtle)] shadow-2xl rounded-full p-2 flex gap-2 w-full">
-                    <button
-                        className="flex-1 h-12 rounded-full font-bold text-sm bg-[var(--color-primary-1)] text-black hover:bg-[#86f27d] transition-colors flex items-center justify-center gap-2"
-                        onClick={handleSave}
-                        disabled={isSaving}
-                    >
-                        {isSaving ? text.saving : text.saveChanges}
-                    </button>
-                    <button
-                        className="h-12 w-12 min-w-12 rounded-full bg-[var(--surface-hover)] hover:bg-[var(--border-divider)] text-[var(--text-secondary)] hover:text-white transition-colors flex items-center justify-center"
-                        onClick={handleReset}
-                        title={text.resetDefaults}
-                    >
-                        <ArrowClockwise size={20} weight="bold" />
-                    </button>
-                </div>
-            </div>
+            <FloatingSaveBar
+                visible={isDirty}
+                saving={isSaving}
+                saveLabel={text.saveChanges}
+                savingLabel={text.saving}
+                resetLabel={text.resetDefaults}
+                onSave={handleSave}
+                onReset={handleReset}
+            />
         </div>
     );
 }

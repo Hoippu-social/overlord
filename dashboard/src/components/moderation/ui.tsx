@@ -1,19 +1,109 @@
 import React, { useMemo, useState } from 'react';
 import { Autocomplete, AutocompleteItem } from "@nextui-org/react";
-import { Check, FolderSimple, Hash, Tag, X } from "@phosphor-icons/react";
+import { Check, FolderSimple, X } from "@phosphor-icons/react";
+import deleteIcon from '../../../icons/action_icons/delete.svg';
+import banIcon from '../../../icons/action_icons/ban.svg';
+import kickIcon from '../../../icons/action_icons/kick.svg';
+import muteIcon from '../../../icons/action_icons/mute.svg';
+import timeoutIcon from '../../../icons/action_icons/timeout.svg';
+import warnIcon from '../../../icons/action_icons/warn.svg';
+import castChannelIcon from '../../../icons/channels_icons/cast_channel.svg';
+import forumChannelIcon from '../../../icons/channels_icons/forum_channel.svg';
+import mediaChannelIcon from '../../../icons/channels_icons/media_channel.svg';
+import newsChannelIcon from '../../../icons/channels_icons/news_channel.svg';
+import voiceChannelIcon from '../../../icons/channels_icons/voice_channel.svg';
+import textChannelIcon from '../../../icons/channels_icons/text_channel.svg';
+import roleIcon from '../../../icons/objects_icons/role.svg';
 
 type SelectOption = {
     id: string;
-    name: string;
+    name?: string | null;
     color?: string | number;
-    type?: number | string;
-    position?: number;
+    type?: number | string | null;
+    position?: number | null;
     parentId?: string | null;
     isCategory?: boolean;
     categoryName?: string | null;
     disabled?: boolean;
     isSeparator?: boolean;
+    isAction?: boolean;
+    actionVariant?: 'create' | 'edit';
 };
+
+const ACTION_TONE_MAP: Record<string, { item: string; text: string; triggerText: string }> = {
+    DELETE: {
+        item: 'border-rose-400/25 bg-rose-500/[0.08] data-[hover=true]:bg-rose-500/[0.14] data-[selected=true]:border-rose-400/60 data-[selected=true]:bg-rose-500/[0.18]',
+        text: 'text-rose-300',
+        triggerText: 'text-rose-300',
+    },
+    BAN: {
+        item: 'border-rose-400/25 bg-rose-500/[0.08] data-[hover=true]:bg-rose-500/[0.14] data-[selected=true]:border-rose-400/60 data-[selected=true]:bg-rose-500/[0.18]',
+        text: 'text-rose-300',
+        triggerText: 'text-rose-300',
+    },
+    KICK: {
+        item: 'border-orange-400/25 bg-orange-500/[0.08] data-[hover=true]:bg-orange-500/[0.14] data-[selected=true]:border-orange-400/60 data-[selected=true]:bg-orange-500/[0.18]',
+        text: 'text-orange-200',
+        triggerText: 'text-orange-200',
+    },
+    TIMEOUT: {
+        item: 'border-sky-400/25 bg-sky-500/[0.08] data-[hover=true]:bg-sky-500/[0.14] data-[selected=true]:border-sky-400/60 data-[selected=true]:bg-sky-500/[0.18]',
+        text: 'text-sky-200',
+        triggerText: 'text-sky-200',
+    },
+    MUTE: {
+        item: 'border-violet-400/25 bg-violet-500/[0.08] data-[hover=true]:bg-violet-500/[0.14] data-[selected=true]:border-violet-400/60 data-[selected=true]:bg-violet-500/[0.18]',
+        text: 'text-violet-200',
+        triggerText: 'text-violet-200',
+    },
+    WARN: {
+        item: 'border-amber-400/25 bg-amber-500/[0.08] data-[hover=true]:bg-amber-500/[0.14] data-[selected=true]:border-amber-400/60 data-[selected=true]:bg-amber-500/[0.18]',
+        text: 'text-amber-200',
+        triggerText: 'text-amber-200',
+    },
+};
+
+const ACTION_ICON_MAP = {
+    DELETE: deleteIcon,
+    BAN: banIcon,
+    KICK: kickIcon,
+    MUTE: muteIcon,
+    TIMEOUT: timeoutIcon,
+    WARN: warnIcon,
+} as const;
+
+const getActionTone = (optionId: string | undefined) => {
+    if (!optionId) return null;
+    return ACTION_TONE_MAP[optionId.toUpperCase()] ?? null;
+};
+
+const getActionIconSrc = (optionId: string | undefined) => {
+    if (!optionId) return null;
+    const icon = ACTION_ICON_MAP[optionId.toUpperCase() as keyof typeof ACTION_ICON_MAP];
+    if (!icon) return null;
+    return typeof icon === 'string' ? icon : icon.src;
+};
+
+const getAssetSrc = (asset: string | { src: string }) => (typeof asset === 'string' ? asset : asset.src);
+
+const renderMaskedIcon = (iconSrc: string, className: string, style?: React.CSSProperties) => (
+    <span
+        aria-hidden="true"
+        className={`block shrink-0 ${className}`}
+        style={{
+            ...style,
+            backgroundColor: 'currentColor',
+            maskImage: `url(${iconSrc})`,
+            maskRepeat: 'no-repeat',
+            maskPosition: 'center',
+            maskSize: 'contain',
+            WebkitMaskImage: `url(${iconSrc})`,
+            WebkitMaskRepeat: 'no-repeat',
+            WebkitMaskPosition: 'center',
+            WebkitMaskSize: 'contain',
+        }}
+    />
+);
 
 // --- Layout & Containers ---
 
@@ -66,8 +156,55 @@ const parseColor = (col?: string | number) => {
     return null;
 };
 
+const withAlpha = (color: string, alpha: string) => {
+    if (color.startsWith('#')) {
+        return `${color}${alpha}`;
+    }
+
+    const rgbMatch = color.match(/\d+(\.\d+)?/g);
+    if (rgbMatch && rgbMatch.length >= 3) {
+        const [r, g, b] = rgbMatch;
+        return `rgba(${r}, ${g}, ${b}, ${parseInt(alpha, 16) / 255})`;
+    }
+
+    return color;
+};
+
 const isChannelOption = (option: SelectOption) =>
     option.isCategory !== undefined || option.categoryName !== undefined || option.parentId !== undefined;
+
+const isRoleOption = (option: SelectOption) =>
+    !option.isSeparator && !option.isAction && !isChannelOption(option) && !getActionTone(option.id);
+
+const getChannelPresentation = (type?: string | number | null) => {
+    switch (type) {
+        case 2:
+        case 'voice':
+        case 'GUILD_VOICE':
+            return { icon: voiceChannelIcon, className: 'h-4 w-4 text-cyan-300' };
+        case 13:
+        case 'stage':
+        case 'stage_voice':
+        case 'GUILD_STAGE_VOICE':
+        case 'cast':
+            return { icon: castChannelIcon, className: 'h-4 w-4 text-indigo-300' };
+        case 5:
+        case 'announcement':
+        case 'news':
+        case 'GUILD_NEWS':
+            return { icon: newsChannelIcon, className: 'h-4 w-4 text-amber-300' };
+        case 15:
+        case 'forum':
+        case 'GUILD_FORUM':
+            return { icon: forumChannelIcon, className: 'h-4 w-4 text-emerald-300' };
+        case 16:
+        case 'media':
+        case 'GUILD_MEDIA':
+            return { icon: mediaChannelIcon, className: 'h-4 w-4 text-fuchsia-300' };
+        default:
+            return { icon: textChannelIcon, className: 'h-4 w-4 text-sky-300' };
+    }
+};
 
 const matchesQuery = (option: SelectOption, query: string) => {
     const normalizedQuery = query.trim().toLocaleLowerCase();
@@ -84,7 +221,7 @@ function SelectionMarker({ isSelected = false }: { isSelected?: boolean }) {
             <div
                 className={`flex items-center justify-center w-5 h-5 rounded-md border transition-all duration-200 ${
                     isSelected
-                        ? 'border-[var(--color-primary-1)] bg-[var(--color-primary-1)] text-black shadow-[0_0_10px_rgba(var(--color-primary-1-rgb),0.35)]'
+                        ? 'border-[#7AAA7A] bg-[#7AAA7A] text-black shadow-[0_0_10px_rgba(122,170,122,0.3)]'
                         : 'border-white/10 bg-white/[0.03] text-transparent'
                 }`}
             >
@@ -99,22 +236,32 @@ function OptionIcon({ option }: { option: SelectOption }) {
         return null;
     }
 
+    if (option.isAction) {
+        return null;
+    }
+
     const color = parseColor(option.color);
 
     if (isChannelOption(option)) {
         if (option.isCategory) {
             return <FolderSimple size={16} weight="fill" className="text-amber-300" />;
         }
-        return <Hash size={16} weight="bold" className="text-sky-300" />;
+
+        const presentation = getChannelPresentation(option.type);
+        return renderMaskedIcon(getAssetSrc(presentation.icon), presentation.className);
     }
 
-    return (
-        <Tag
-            size={16}
-            weight="fill"
-            style={color ? { color } : undefined}
-            className={!color ? 'text-white/50' : undefined}
-        />
+    const actionIconSrc = getActionIconSrc(option.id);
+    const actionTone = getActionTone(option.id);
+
+    if (actionIconSrc && actionTone) {
+        return renderMaskedIcon(actionIconSrc, `h-4 w-4 ${actionTone.text}`);
+    }
+
+    return renderMaskedIcon(
+        getAssetSrc(roleIcon),
+        `h-4 w-4 ${!color ? 'text-white/50' : ''}`,
+        color ? { color } : undefined
     );
 }
 
@@ -160,19 +307,50 @@ function SelectedChip({ option, onRemove }: { option: SelectOption; onRemove: ()
     );
 }
 
-export function InteractiveSelect({ label, value, options, placeholder, onChange }: { label?: string; value: string; options: SelectOption[]; placeholder?: string; onChange: (v: string) => void }) {
+function getRoleOptionTone(option: SelectOption) {
+    if (!isRoleOption(option)) {
+        return null;
+    }
+
+    const color = parseColor(option.color);
+    if (!color) {
+        return null;
+    }
+
+    return {
+        itemStyle: {
+            ['--role-item-border' as string]: withAlpha(color, '88'),
+            ['--role-item-bg' as string]: withAlpha(color, '20'),
+            ['--role-item-bg-hover' as string]: withAlpha(color, '2d'),
+            } as React.CSSProperties,
+        textStyle: {
+            color,
+        } as React.CSSProperties,
+    };
+}
+
+export function InteractiveSelect({ label, value, options, placeholder, onChange, icon, disabled = false }: { label?: string; value: string; options: SelectOption[]; placeholder?: string; onChange: (v: string) => void; icon?: React.ReactNode; disabled?: boolean }) {
+    const selectedOption = options.find((option) => option.id === value);
+    const selectedActionTone = getActionTone(selectedOption?.id);
+
     return (
-        <div className="space-y-2 group relative">
+        <div className="space-y-2 group relative min-w-0">
             {label && <span className="text-sm font-semibold tracking-wide text-white/50 transition-colors group-hover:text-white/80">{label}</span>}
-            <div className="w-full rounded-2xl border border-white/10 bg-black/20 backdrop-blur-md shadow-inner transition-all duration-300 hover:bg-black/40 hover:border-white/20 focus-within:border-[var(--color-primary-1)] focus-within:ring-2 focus-within:ring-[var(--color-primary-1)]/20">
+            <div className={`relative w-full rounded-2xl border border-white/10 bg-black/20 backdrop-blur-md shadow-inner transition-all duration-300 ${disabled ? 'cursor-not-allowed opacity-45' : 'hover:bg-black/40 hover:border-white/20 focus-within:border-[var(--color-primary-1)] focus-within:ring-2 focus-within:ring-[var(--color-primary-1)]/20'} ${icon ? 'pl-11' : ''}`}>
+                {icon && <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-white/40">{icon}</div>}
                 <Autocomplete
                     aria-label={label || placeholder || 'Select option'}
                     defaultItems={options}
                     selectedKey={value || null}
-                    onSelectionChange={(key) => onChange(key ? String(key) : '')}
+                    onSelectionChange={(key) => {
+                        if (!disabled) {
+                            onChange(key ? String(key) : '');
+                        }
+                    }}
                     isClearable={Boolean(placeholder)}
                     isVirtualized={false}
                     allowsCustomValue={false}
+                    isDisabled={disabled}
                     placeholder={placeholder || 'Type to search...'}
                     classNames={{
                         base: "w-full",
@@ -181,8 +359,8 @@ export function InteractiveSelect({ label, value, options, placeholder, onChange
                     }}
                     inputProps={{
                         classNames: {
-                            inputWrapper: "min-h-[52px] rounded-2xl border-0 bg-transparent shadow-none px-4 data-[hover=true]:bg-transparent",
-                            input: "text-sm font-medium text-white/90 placeholder:text-white/30",
+                            inputWrapper: `min-h-[52px] rounded-2xl border-0 bg-transparent shadow-none ${icon ? 'pl-0 pr-4' : 'px-4'} data-[hover=true]:bg-transparent`,
+                            input: `text-sm font-medium ${disabled ? 'text-white/35 placeholder:text-white/18' : selectedActionTone ? `${selectedActionTone.triggerText} placeholder:text-white/30` : 'text-white/90 placeholder:text-white/30'}`,
                             clearButton: "text-white/50 hover:text-white"
                         }
                     }}
@@ -196,11 +374,15 @@ export function InteractiveSelect({ label, value, options, placeholder, onChange
                         }
                     }}
                 >
-                    {(option) => (
+                    {(option) => {
+                        const roleTone = getRoleOptionTone(option);
+
+                        return (
                         <AutocompleteItem
                             key={option.id}
                             isDisabled={option.disabled || option.isSeparator}
                             textValue={`${option.name} ${option.categoryName || ''}`}
+                            style={roleTone?.itemStyle}
                             startContent={option.isSeparator ? null : <OptionIcon option={option} />}
                             endContent={
                                 option.isSeparator
@@ -211,28 +393,44 @@ export function InteractiveSelect({ label, value, options, placeholder, onChange
                                         ? <CategoryHint name={option.categoryName} />
                                         : undefined
                             }
-                            selectedIcon={option.isSeparator ? undefined : ({ isSelected }) => <SelectionMarker isSelected={Boolean(isSelected)} />}
+                            selectedIcon={option.isSeparator || option.isAction ? undefined : ({ isSelected }) => <SelectionMarker isSelected={Boolean(isSelected)} />}
                             classNames={{
                                 base: option.isSeparator
                                     ? 'min-h-[30px] cursor-default rounded-none border-0 bg-transparent px-2 py-1 opacity-80'
-                                    : `min-h-[46px] items-center rounded-xl border px-3 py-2 data-[hover=true]:bg-white/[0.04] ${option.isCategory ? 'border-amber-300/20 bg-amber-300/[0.06]' : 'border-white/10 bg-white/[0.01]'} data-[selected=true]:border-[var(--color-primary-1)] data-[selected=true]:bg-[var(--color-primary-1)]/[0.08]`,
+                                    : option.isAction
+                                    ? option.actionVariant === 'edit'
+                                        ? 'min-h-[44px] items-center rounded-xl border border-amber-300/70 bg-amber-500/14 px-3 py-2 data-[hover=true]:bg-amber-500/22'
+                                        : 'min-h-[44px] items-center rounded-xl border border-sky-300/75 bg-sky-500/14 px-3 py-2 data-[hover=true]:bg-sky-500/22'
+                                    : `min-h-[46px] items-center rounded-xl border px-3 py-2 data-[hover=true]:bg-white/[0.04] ${
+                                        option.isCategory
+                                            ? 'border-amber-300/20 bg-amber-300/[0.06]'
+                                            : getActionTone(option.id)?.item ?? (roleTone ? '!border-[var(--role-item-border)] !bg-[var(--role-item-bg)] data-[hover=true]:!bg-[var(--role-item-bg-hover)] data-[selected=true]:!border-[var(--role-item-border)] data-[selected=true]:!bg-[var(--role-item-bg-hover)]' : 'border-white/10 bg-white/[0.01] data-[selected=true]:border-[#7AAA7A] data-[selected=true]:bg-[#7AAA7A]/[0.08]')
+                                    }`,
                                 wrapper: option.isSeparator ? 'min-w-0 flex flex-1 items-center justify-center overflow-hidden' : 'min-w-0 flex flex-1 items-center justify-start overflow-hidden',
-                                title: option.isSeparator ? 'truncate text-[10px] font-bold uppercase tracking-[0.2em] text-white/25' : option.isCategory ? 'truncate text-sm font-bold tracking-wide text-amber-100' : 'truncate text-sm font-medium text-white/90',
-                                selectedIcon: option.isSeparator ? 'hidden' : 'order-[-1] mr-2 ml-0 flex h-6 w-6 shrink-0 items-center justify-center self-center'
+                                title: option.isSeparator
+                                    ? 'truncate text-[10px] font-bold uppercase tracking-[0.2em] text-white/25'
+                                    : option.isAction
+                                    ? option.actionVariant === 'edit'
+                                        ? 'truncate text-sm font-semibold tracking-wide text-amber-100'
+                                        : 'truncate text-sm font-semibold tracking-wide text-sky-100'
+                                    : option.isCategory
+                                    ? 'truncate text-sm font-bold tracking-wide text-amber-100'
+                                    : `truncate text-sm font-medium ${getActionTone(option.id)?.text ?? (roleTone ? '' : 'text-white/90')}`,
+                                selectedIcon: option.isSeparator || option.isAction ? 'hidden' : 'order-[-1] mr-2 ml-0 flex h-6 w-6 shrink-0 items-center justify-center self-center'
                             }}
                         >
-                            {option.name}
+                            <span style={roleTone?.textStyle}>{option.name}</span>
                         </AutocompleteItem>
-                    )}
+                    )}}
                 </Autocomplete>
             </div>
         </div>
     );
 }
 
-export function TextField({ label, value, type = 'text', placeholder, onChange, icon }: { label?: string; value: string; type?: 'text' | 'number' | 'password'; placeholder?: string; onChange: (v: string) => void; icon?: React.ReactNode }) {
+export function TextField({ label, value, type = 'text', placeholder, onChange, icon, inputClassName, disabled = false }: { label?: string; value: string; type?: 'text' | 'number' | 'password'; placeholder?: string; onChange: (v: string) => void; icon?: React.ReactNode; inputClassName?: string; disabled?: boolean }) {
     return (
-        <label className="block space-y-2 group">
+        <label className="block space-y-2 group min-w-0">
             {label && <span className="text-sm font-semibold tracking-wide text-white/50 transition-colors group-hover:text-white/80">{label}</span>}
             <div className="relative">
                 {icon && <div className="absolute inset-y-0 left-0 flex items-center pl-4 text-white/40">{icon}</div>}
@@ -241,8 +439,9 @@ export function TextField({ label, value, type = 'text', placeholder, onChange, 
                     value={value}
                     onChange={(e) => onChange(e.target.value)}
                     placeholder={placeholder}
+                    disabled={disabled}
                     aria-label={label || placeholder || 'Input field'}
-                    className={`w-full rounded-2xl border border-white/10 bg-black/20 backdrop-blur-md ${icon ? 'pl-11' : 'px-4'} py-3.5 text-sm text-white/90 outline-none transition-all duration-300 hover:bg-black/40 hover:border-white/20 focus:border-[var(--color-primary-1)] focus:ring-2 focus:ring-[var(--color-primary-1)]/20 shadow-inner placeholder:text-white/30`}
+                    className={`w-full rounded-2xl border border-white/10 bg-black/20 backdrop-blur-md ${icon ? 'pl-11' : 'px-4'} py-3.5 text-sm outline-none transition-all duration-300 shadow-inner ${disabled ? 'cursor-not-allowed bg-white/[0.03] text-white/30 placeholder:text-white/18' : 'text-white/90 hover:bg-black/40 hover:border-white/20 focus:border-[var(--color-primary-1)] focus:ring-2 focus:ring-[var(--color-primary-1)]/20 placeholder:text-white/30'} ${inputClassName ?? ''}`}
                 />
             </div>
         </label>
@@ -250,22 +449,30 @@ export function TextField({ label, value, type = 'text', placeholder, onChange, 
 }
 
 export function SmoothToggle({ label, checked, onChange, description }: { label: string; checked: boolean; onChange: (v: boolean) => void; description?: string }) {
+    const isCompact = !label && !description;
+
     return (
         <div
             onClick={() => onChange(!checked)}
-            className={`group relative flex items-center justify-between gap-4 rounded-2xl border p-4 cursor-pointer transition-all duration-500 overflow-hidden ${checked ? 'border-[var(--color-primary-1)]/30 bg-[var(--color-primary-1)]/5 shadow-[0_4px_20px_rgba(var(--color-primary-1-rgb),0.05)]' : 'border-white/5 bg-white/[0.02] hover:bg-white/[0.04] hover:border-white/10'}`}
+            className={`group relative flex cursor-pointer items-center overflow-hidden rounded-2xl transition-all duration-500 ${
+                isCompact
+                    ? `justify-center border border-white/10 px-4 py-3 ${checked ? 'bg-[#7AAA7A]/[0.08] shadow-[0_4px_20px_rgba(122,170,122,0.08)]' : 'bg-white/[0.02] hover:bg-white/[0.04] hover:border-white/15'}`
+                    : `justify-between gap-4 border p-4 ${checked ? 'border-[#7AAA7A]/40 bg-[#7AAA7A]/[0.05] shadow-[0_4px_20px_rgba(122,170,122,0.05)]' : 'border-white/5 bg-white/[0.02] hover:bg-white/[0.04] hover:border-white/10'}`
+            }`}
         >
-            {checked && <div className="absolute inset-0 bg-gradient-to-r from-[var(--color-primary-1)]/10 to-transparent opacity-50 pointer-events-none" />}
+            {checked && <div className="absolute inset-0 bg-gradient-to-r from-[#7AAA7A]/10 to-transparent opacity-50 pointer-events-none" />}
 
-            <div className="relative flex flex-col">
-                <span className={`text-sm font-bold tracking-wide transition-colors duration-300 ${checked ? 'text-white/90' : 'text-white/60 group-hover:text-white/80'}`}>{label}</span>
-                {description && <span className="text-xs text-white/40 mt-0.5">{description}</span>}
-            </div>
+            {!isCompact ? (
+                <div className="relative flex flex-col">
+                    <span className={`text-sm font-bold tracking-wide transition-colors duration-300 ${checked ? 'text-white/90' : 'text-white/60 group-hover:text-white/80'}`}>{label}</span>
+                    {description && <span className="text-xs text-white/40 mt-0.5">{description}</span>}
+                </div>
+            ) : null}
 
             <button
                 type="button"
                 aria-label={label || description || 'Toggle setting'}
-                className={`relative flex h-7 w-12 shrink-0 cursor-pointer items-center rounded-full border-2 transition-all duration-300 ease-spring focus:outline-none ${checked ? 'border-[var(--color-primary-1)] bg-[var(--color-primary-1)] shadow-[0_0_15px_rgba(var(--color-primary-1-rgb),0.4)]' : 'border-white/20 bg-black/30'}`}
+                className={`relative flex h-7 w-12 shrink-0 cursor-pointer items-center rounded-full border-2 transition-all duration-300 ease-spring focus:outline-none ${checked ? 'border-[#7AAA7A] bg-[#7AAA7A] shadow-[0_0_15px_rgba(122,170,122,0.3)]' : 'border-white/20 bg-black/30'}`}
             >
                 <span className="sr-only">Toggle {label}</span>
                 <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition-transform duration-300 ease-spring ${checked ? 'translate-x-5 scale-110' : 'translate-x-0.5 scale-90 opacity-70'}`} />
@@ -369,9 +576,9 @@ export function SegmentedTabs({ active, onChange, labels, tabs, icons }: { activ
                         key={tab}
                         type="button"
                         onClick={() => onChange(tab)}
-                        className={`flex-1 flex justify-center items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${isActive
-                                ? 'bg-[#75F16A] text-[#0a0a0a] shadow-[0_0_20px_rgba(117,241,106,0.3)]'
-                                : 'text-white/40 hover:text-white/80 hover:bg-white/[0.04]'
+                        className={`flex-1 flex justify-center items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-bold transition-all whitespace-nowrap ${isActive
+                                ? 'border-[#7AAA7A] bg-[#7AAA7A]/15 text-white shadow-[0_0_18px_rgba(122,170,122,0.16)]'
+                                : 'border-transparent text-white/40 hover:text-white/80 hover:bg-white/[0.04]'
                             }`}
                     >
                         {icons && icons[tab] && <span>{icons[tab]}</span>}
@@ -476,11 +683,15 @@ export function MultiSelectField({ label, options, selected, onChange, placehold
                         }
                     }}
                 >
-                    {(option) => (
+                    {(option) => {
+                        const roleTone = getRoleOptionTone(option);
+
+                        return (
                         <AutocompleteItem
                             key={option.id}
                             isDisabled={option.disabled || option.isSeparator}
                             textValue={`${option.name} ${option.categoryName || ''}`}
+                            style={roleTone?.itemStyle}
                             startContent={option.isSeparator ? null : <OptionIcon option={option} />}
                             endContent={
                                 option.isSeparator
@@ -491,19 +702,29 @@ export function MultiSelectField({ label, options, selected, onChange, placehold
                                         ? <CategoryHint name={option.categoryName} />
                                         : undefined
                             }
-                            selectedIcon={option.isSeparator ? undefined : ({ isSelected }) => <SelectionMarker isSelected={Boolean(isSelected)} />}
+                            selectedIcon={option.isSeparator || option.isAction ? undefined : ({ isSelected }) => <SelectionMarker isSelected={Boolean(isSelected)} />}
                             classNames={{
                                 base: option.isSeparator
                                     ? 'min-h-[30px] cursor-default rounded-none border-0 bg-transparent px-2 py-1 opacity-80'
-                                    : `min-h-[46px] items-center rounded-xl border px-3 py-2 data-[hover=true]:bg-white/[0.04] ${option.isCategory ? 'border-amber-300/20 bg-amber-300/[0.06]' : 'border-white/10 bg-white/[0.01]'} data-[selected=true]:border-[var(--color-primary-1)] data-[selected=true]:bg-[var(--color-primary-1)]/[0.08]`,
+                                    : option.isAction
+                                    ? option.actionVariant === 'edit'
+                                        ? 'min-h-[44px] items-center rounded-xl border border-amber-300/70 bg-amber-500/14 px-3 py-2 data-[hover=true]:bg-amber-500/22'
+                                        : 'min-h-[44px] items-center rounded-xl border border-sky-300/75 bg-sky-500/14 px-3 py-2 data-[hover=true]:bg-sky-500/22'
+                                    : `min-h-[46px] items-center rounded-xl border px-3 py-2 data-[hover=true]:bg-white/[0.04] ${
+                                        option.isCategory
+                                            ? 'border-amber-300/20 bg-amber-300/[0.06]'
+                                            : roleTone
+                                            ? '!border-[var(--role-item-border)] !bg-[var(--role-item-bg)] data-[hover=true]:!bg-[var(--role-item-bg-hover)] data-[selected=true]:!border-[var(--role-item-border)] data-[selected=true]:!bg-[var(--role-item-bg-hover)]'
+                                            : 'border-white/10 bg-white/[0.01] data-[selected=true]:border-[#7AAA7A] data-[selected=true]:bg-[#7AAA7A]/[0.08]'
+                                    }`,
                                 wrapper: option.isSeparator ? 'min-w-0 flex flex-1 items-center justify-center overflow-hidden' : 'min-w-0 flex flex-1 items-center justify-start overflow-hidden',
-                                title: option.isSeparator ? 'truncate text-[10px] font-bold uppercase tracking-[0.2em] text-white/25' : option.isCategory ? 'truncate text-sm font-bold tracking-wide text-amber-100' : 'truncate text-sm font-medium text-white/90',
-                                selectedIcon: option.isSeparator ? 'hidden' : 'order-[-1] mr-2 ml-0 flex h-6 w-6 shrink-0 items-center justify-center self-center'
+                                title: option.isSeparator ? 'truncate text-[10px] font-bold uppercase tracking-[0.2em] text-white/25' : option.isAction ? option.actionVariant === 'edit' ? 'truncate text-sm font-semibold tracking-wide text-amber-100' : 'truncate text-sm font-semibold tracking-wide text-sky-100' : option.isCategory ? 'truncate text-sm font-bold tracking-wide text-amber-100' : `truncate text-sm font-medium ${roleTone ? '' : 'text-white/90'}`,
+                                selectedIcon: option.isSeparator || option.isAction ? 'hidden' : 'order-[-1] mr-2 ml-0 flex h-6 w-6 shrink-0 items-center justify-center self-center'
                             }}
                         >
-                            {option.name}
+                            <span style={roleTone?.textStyle}>{option.name}</span>
                         </AutocompleteItem>
-                    )}
+                    )}}
                 </Autocomplete>
             </div>
         </div>

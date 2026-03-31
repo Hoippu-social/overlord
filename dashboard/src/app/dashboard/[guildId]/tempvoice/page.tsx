@@ -1,13 +1,12 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { use } from 'react';
 import {
     Spinner,
 } from '@nextui-org/react';
 import {
     ArrowsClockwise,
-    TextT,
     UsersThree,
     MicrophoneStage,
     SquaresFour,
@@ -20,6 +19,8 @@ import {
     ChatTeardropText
 } from '@phosphor-icons/react';
 import { useGuildLocale } from '@/lib/i18n';
+import { InteractiveSelect } from '@/components/moderation/ui';
+import { buildChannelSelectOptions } from '@/lib/channelSelectOptions';
 
 type Mode = 'create' | 'existing';
 
@@ -27,6 +28,9 @@ type ChannelOption = {
     id: string;
     name?: string;
     type?: number | string;
+    parentId?: string | null;
+    isCategory?: boolean;
+    categoryName?: string | null;
 };
 
 type TempVoiceConfig = {
@@ -194,6 +198,22 @@ export default function TempVoicePage({ params }: { params: Promise<{ guildId: s
     const [error, setError] = useState<string | null>(null);
     const [deleteConfirm, setDeleteConfirm] = useState('');
 
+    const categoryOptions = useMemo(() => buildChannelSelectOptions({
+        channels: channels.categories,
+        categories: channels.categories,
+        includeCategories: false,
+    }), [channels.categories]);
+    const voiceChannelOptions = useMemo(() => buildChannelSelectOptions({
+        channels: channels.voice,
+        categories: channels.categories,
+        includeCategories: true,
+    }), [channels.voice, channels.categories]);
+    const textChannelOptions = useMemo(() => buildChannelSelectOptions({
+        channels: channels.text,
+        categories: channels.categories,
+        includeCategories: true,
+    }), [channels.text, channels.categories]);
+
     useEffect(() => {
         setForm((prev) => ({
             ...prev,
@@ -204,7 +224,7 @@ export default function TempVoicePage({ params }: { params: Promise<{ guildId: s
         }));
     }, [defaults]);
 
-    const applyConfigToForm = (cfg: TempVoiceConfig | null) => {
+    const applyConfigToForm = useCallback((cfg: TempVoiceConfig | null) => {
         if (!cfg) return;
         setForm((prev) => ({
             ...prev,
@@ -214,9 +234,9 @@ export default function TempVoicePage({ params }: { params: Promise<{ guildId: s
             nameTemplate: cfg.nameTemplate || defaults.nameTemplate,
             userLimit: cfg.userLimit === null || cfg.userLimit === undefined ? '0' : String(cfg.userLimit),
         }));
-    };
+    }, [defaults.nameTemplate]);
 
-    const fetchData = async () => {
+    const fetchData = useCallback(async () => {
         if (!guildId) return;
         setLoading(true);
         setError(null);
@@ -241,11 +261,11 @@ export default function TempVoicePage({ params }: { params: Promise<{ guildId: s
         } finally {
             setLoading(false);
         }
-    };
+    }, [applyConfigToForm, guildId, text.errorLoad]);
 
     useEffect(() => {
         fetchData();
-    }, [guildId]);
+    }, [fetchData]);
 
     const handleSave = async () => {
         if (!guildId) return;
@@ -450,14 +470,13 @@ export default function TempVoicePage({ params }: { params: Promise<{ guildId: s
                                             className="w-full bg-transparent border-0 border-b border-[var(--border-subtle)] focus:border-[#3b82f6] text-white text-sm pb-1 outline-none transition-colors"
                                         />
                                     ) : (
-                                        <select
+                                        <InteractiveSelect
+                                            label={text.labelCategory}
                                             value={form.categoryId}
-                                            onChange={(e) => setForm({ ...form, categoryId: e.target.value })}
-                                            className="w-full bg-transparent border-0 border-b border-[var(--border-subtle)] focus:border-[#3b82f6] text-white text-sm pb-1 outline-none transition-colors appearance-none cursor-pointer"
-                                        >
-                                            <option value="" disabled className="bg-[#111]">{text.selectCategory}</option>
-                                            {channels.categories.map(c => <option key={c.id} value={c.id} className="bg-[#111]">{c.name || c.id}</option>)}
-                                        </select>
+                                            onChange={(value) => setForm({ ...form, categoryId: value })}
+                                            placeholder={text.selectCategory}
+                                            options={categoryOptions}
+                                        />
                                     )}
                                 </div>
                             </div>
@@ -477,14 +496,13 @@ export default function TempVoicePage({ params }: { params: Promise<{ guildId: s
                                             className="w-full bg-transparent border-0 border-b border-[var(--border-subtle)] focus:border-[var(--color-primary-1)] text-white text-sm pb-1 outline-none transition-colors"
                                         />
                                     ) : (
-                                        <select
+                                        <InteractiveSelect
+                                            label={text.labelHub}
                                             value={form.hubChannelId}
-                                            onChange={(e) => setForm({ ...form, hubChannelId: e.target.value })}
-                                            className="w-full bg-transparent border-0 border-b border-[var(--border-subtle)] focus:border-[var(--color-primary-1)] text-white text-sm pb-1 outline-none transition-colors appearance-none cursor-pointer"
-                                        >
-                                            <option value="" disabled className="bg-[#111]">{text.selectHub}</option>
-                                            {channels.voice.map(c => <option key={c.id} value={c.id} className="bg-[#111]">{c.name || c.id}</option>)}
-                                        </select>
+                                            onChange={(value) => setForm({ ...form, hubChannelId: value })}
+                                            placeholder={text.selectHub}
+                                            options={voiceChannelOptions}
+                                        />
                                     )}
                                 </div>
                             </div>
@@ -504,14 +522,13 @@ export default function TempVoicePage({ params }: { params: Promise<{ guildId: s
                                             className="w-full bg-transparent border-0 border-b border-[var(--border-subtle)] focus:border-[var(--color-primary-2)] text-white text-sm pb-1 outline-none transition-colors"
                                         />
                                     ) : (
-                                        <select
+                                        <InteractiveSelect
+                                            label={text.labelInterface}
                                             value={form.interfaceChannelId}
-                                            onChange={(e) => setForm({ ...form, interfaceChannelId: e.target.value })}
-                                            className="w-full bg-transparent border-0 border-b border-[var(--border-subtle)] focus:border-[var(--color-primary-2)] text-white text-sm pb-1 outline-none transition-colors appearance-none cursor-pointer"
-                                        >
-                                            <option value="" disabled className="bg-[#111]">{text.selectInterface}</option>
-                                            {channels.text.map(c => <option key={c.id} value={c.id} className="bg-[#111]">{c.name || c.id}</option>)}
-                                        </select>
+                                            onChange={(value) => setForm({ ...form, interfaceChannelId: value })}
+                                            placeholder={text.selectInterface}
+                                            options={textChannelOptions}
+                                        />
                                     )}
                                 </div>
                             </div>

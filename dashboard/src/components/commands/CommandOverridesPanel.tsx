@@ -3,6 +3,7 @@
 import React from 'react';
 import { CommandRule, CommandRuleMode, ConfigState } from '@/app/dashboard/[guildId]/moderation/types';
 import { updateAtIndex } from '@/app/dashboard/[guildId]/moderation/constants';
+import { parsePresetTitle } from '@/app/dashboard/[guildId]/moderation/presets';
 import { AnimatedCard, Badge, InteractiveSelect, MultiSelectField, SliderField } from '@/components/moderation/ui';
 import {
     COMMAND_CATALOG,
@@ -110,9 +111,11 @@ export function CommandOverridesPanel({
         const enabledBindings = config.roleBindings.filter((binding) => binding.enabled && binding.roleId);
         const markerOptions = enabledBindings.map((binding) => {
             const role = config.roles.find((item) => item.id === binding.roleId);
+            const parsedPreset = parsePresetTitle(binding.title);
+            const presetLabel = parsedPreset.name || 'Без пресета';
             return {
                 id: `marker:${binding.roleId}`,
-                name: `${binding.title} -> ${role?.name ?? binding.roleId} (${binding.accessLevel})`,
+                name: `${presetLabel} -> ${role?.name ?? binding.roleId} (${binding.accessLevel})`,
                 color: role?.color,
             };
         });
@@ -214,8 +217,8 @@ export function CommandOverridesPanel({
     };
 
     const moduleLabel = (moduleKey: CommandModuleKey) => {
-        const module = COMMAND_MODULES.find((item) => item.key === moduleKey);
-        return locale === 'ru' ? module?.label.ru ?? moduleKey : module?.label.en ?? moduleKey;
+        const moduleDef = COMMAND_MODULES.find((item) => item.key === moduleKey);
+        return locale === 'ru' ? moduleDef?.label.ru ?? moduleKey : moduleDef?.label.en ?? moduleKey;
     };
 
     return (
@@ -229,7 +232,7 @@ export function CommandOverridesPanel({
                         <button
                             type="button"
                             onClick={() => setActiveModule('all')}
-                            className={`rounded-2xl border px-4 py-2 text-sm font-bold transition-colors ${activeModule === 'all' ? 'border-[var(--color-primary-1)] bg-[var(--color-primary-1)]/15 text-[var(--color-primary-1)]' : 'border-white/10 bg-white/[0.03] text-white/60 hover:text-white/90'}`}
+                            className={`rounded-2xl border px-4 py-2 text-sm font-bold transition-colors ${activeModule === 'all' ? 'border-[#7AAA7A] bg-[#7AAA7A]/15 text-[#7AAA7A]' : 'border-white/10 bg-white/[0.03] text-white/60 hover:text-white/90'}`}
                         >
                             {tr('Все', 'All')}
                         </button>
@@ -238,7 +241,7 @@ export function CommandOverridesPanel({
                                 key={module.key}
                                 type="button"
                                 onClick={() => setActiveModule(module.key)}
-                                className={`rounded-2xl border px-4 py-2 text-sm font-bold transition-colors ${activeModule === module.key ? 'border-[var(--color-primary-1)] bg-[var(--color-primary-1)]/15 text-[var(--color-primary-1)]' : 'border-white/10 bg-white/[0.03] text-white/60 hover:text-white/90'}`}
+                                className={`rounded-2xl border px-4 py-2 text-sm font-bold transition-colors ${activeModule === module.key ? 'border-[#7AAA7A] bg-[#7AAA7A]/15 text-[#7AAA7A]' : 'border-white/10 bg-white/[0.03] text-white/60 hover:text-white/90'}`}
                             >
                                 {locale === 'ru' ? module.label.ru : module.label.en}
                             </button>
@@ -263,7 +266,7 @@ export function CommandOverridesPanel({
                     const sliderValue = typeof rule.requiredAccessLevel === 'number' ? rule.requiredAccessLevel : 0;
 
                     return (
-                        <div key={command.commandKey} className={`rounded-[26px] border bg-[linear-gradient(90deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01))] px-5 py-4 shadow-inner transition-all duration-300 ${isExpanded ? 'border-white/12 bg-black/30' : 'border-white/8 bg-black/18 hover:border-white/12 hover:bg-black/24'}`}>
+                        <div key={command.commandKey} className={`rounded-[26px] border bg-[linear-gradient(90deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01))] px-5 py-4 shadow-inner transition-all duration-300 ${rule.enabled ? 'border-[#7AAA7A] bg-black/30 shadow-[0_0_22px_rgba(122,170,122,0.12)]' : 'border-white/8 bg-black/18 hover:border-white/12 hover:bg-black/24'}`}>
                             <div className="flex items-center gap-4">
                                 <div className="flex w-[42px] shrink-0 justify-start pl-1">
                                     <button

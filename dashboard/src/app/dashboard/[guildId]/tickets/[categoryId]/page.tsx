@@ -12,6 +12,7 @@ import {
 } from "@phosphor-icons/react";
 import { useGuildLocale } from '@/lib/i18n';
 import Link from 'next/link';
+import { InteractiveSelect, MultiSelectField } from '@/components/moderation/ui';
 // import { toast } from 'sonner';
 
 // --- Interfaces ---
@@ -185,16 +186,15 @@ export default function TicketCategoryPage() {
 
     // Helper for Agent Roles (JSON string)
     const selectedAgentRoles = useMemo(() => {
-        if (!formData?.agentRoles) return new Set<string>();
+        if (!formData?.agentRoles) return [] as string[];
         try {
             const parsed = JSON.parse(formData.agentRoles);
-            return new Set<string>(Array.isArray(parsed) ? parsed : []);
-        } catch { return new Set<string>(); }
+            return Array.isArray(parsed) ? parsed.filter((item) => typeof item === 'string') : [];
+        } catch { return [] as string[]; }
     }, [formData?.agentRoles]);
 
-    const handleAgentRolesChange = (keys: any) => {
-        const arr = Array.from(keys) as string[];
-        updateField('agentRoles', JSON.stringify(arr));
+    const handleAgentRolesChange = (keys: string[]) => {
+        updateField('agentRoles', JSON.stringify(keys));
     };
 
     if (loading || !formData) {
@@ -267,36 +267,28 @@ export default function TicketCategoryPage() {
                                     variant="bordered"
                                 />
 
-                                <Select
+                                <InteractiveSelect
                                     label="Ticket Channel Category"
                                     placeholder="Where tickets will be created"
-                                    selectedKeys={formData.channelId ? [formData.channelId] : []}
-                                    onChange={(e) => updateField('channelId', e.target.value)}
-                                    variant="bordered"
-                                >
-                                    {channels.categories.map(c => (
-                                        <SelectItem key={c.id} value={c.id} textValue={c.name}>
-                                            {c.name}
-                                        </SelectItem>
-                                    ))}
-                                </Select>
+                                    value={formData.channelId || ''}
+                                    onChange={(value) => updateField('channelId', value)}
+                                    options={channels.categories.map((channel) => ({
+                                        ...channel,
+                                        name: channel.name || channel.id,
+                                        isCategory: true,
+                                    }))}
+                                />
 
-                                <Select
+                                <MultiSelectField
                                     label="Agent Roles"
                                     placeholder="Who can manage tickets"
-                                    selectionMode="multiple"
-                                    selectedKeys={selectedAgentRoles}
-                                    onSelectionChange={handleAgentRolesChange}
-                                    variant="bordered"
-                                >
-                                    {roles.map(r => (
-                                        <SelectItem key={r.id} value={r.id} textValue={r.name} startContent={
-                                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: `#${r.color.toString(16).padStart(6, '0')}` }} />
-                                        }>
-                                            {r.name} {r.id === guildId ? '(Everyone)' : ''}
-                                        </SelectItem>
-                                    ))}
-                                </Select>
+                                    selected={selectedAgentRoles}
+                                    onChange={handleAgentRolesChange}
+                                    options={roles.map((role) => ({
+                                        ...role,
+                                        name: `${role.name}${role.id === guildId ? ' (Everyone)' : ''}`,
+                                    }))}
+                                />
                             </CardBody>
                         </Card>
 

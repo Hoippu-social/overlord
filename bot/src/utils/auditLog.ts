@@ -1,6 +1,7 @@
 import { Client, EmbedBuilder } from 'discord.js';
 import logger from './logger';
 import { prisma, statsPrisma } from './database';
+import { getGuildLocale, LocaleCode, t } from './i18n';
 
 type AuditPayload = Record<string, unknown>;
 
@@ -58,6 +59,26 @@ const MODERATION_EXPIRED_EVENT_TITLES: Record<string, string> = {
     unmute: 'MODERATION | Мут истек и снят',
     untimeout: 'MODERATION | Тайм-аут истек и снят',
     unban: 'MODERATION | Временный бан истек и снят',
+};
+
+const MODERATION_EVENT_TITLE_KEYS: Record<string, string> = {
+    warn: 'audit.moderation.warn.title',
+    unwarn: 'audit.moderation.unwarn.title',
+    mute: 'audit.moderation.mute.title',
+    unmute: 'audit.moderation.unmute.title',
+    timeout: 'audit.moderation.timeout.title',
+    untimeout: 'audit.moderation.untimeout.title',
+    kick: 'audit.moderation.kick.title',
+    ban: 'audit.moderation.ban.title',
+    tempban: 'audit.moderation.tempban.title',
+    unban: 'audit.moderation.unban.title',
+};
+
+const MODERATION_EXPIRED_EVENT_TITLE_KEYS: Record<string, string> = {
+    unwarn: 'audit.moderation.unwarn.expired',
+    unmute: 'audit.moderation.unmute.expired',
+    untimeout: 'audit.moderation.untimeout.expired',
+    unban: 'audit.moderation.unban.expired',
 };
 
 const DUPLICATE_DISPATCH_WINDOW_MS = 4000;
@@ -205,6 +226,114 @@ function getModerationTitle(input: AuditInput, canonicalEvent: string, fallbackT
     return fallbackTitle;
 }
 
+function formatMinutesEn(totalMinutes: number) {
+    const safeMinutes = Math.max(1, Math.round(totalMinutes));
+    const days = Math.floor(safeMinutes / (24 * 60));
+    const hours = Math.floor((safeMinutes % (24 * 60)) / 60);
+    const minutes = safeMinutes % 60;
+    const parts: string[] = [];
+
+    if (days > 0) parts.push(`${days}d`);
+    if (hours > 0) parts.push(`${hours}h`);
+    if (minutes > 0 || parts.length === 0) parts.push(`${minutes}m`);
+    return parts.join(' ');
+}
+
+function formatMinutes(locale: LocaleCode, totalMinutes: number) {
+    return locale === 'ru' ? formatMinutesRu(totalMinutes) : formatMinutesEn(totalMinutes);
+}
+
+function getLocalizedModerationDuration(locale: LocaleCode, input: AuditInput, canonicalEvent: string) {
+    if (getPayloadBoolean(input, 'expired')) {
+        return t(locale, 'audit.moderation.expired');
+    }
+
+    const durationMinutes = getPayloadNumber(input, 'durationMinutes');
+    if (durationMinutes && durationMinutes > 0) {
+        return formatMinutes(locale, durationMinutes);
+    }
+
+    const until = getPayloadString(input, 'until');
+    if (until) {
+        const untilTimestamp = new Date(until).getTime();
+        if (!Number.isNaN(untilTimestamp)) {
+            const diffMinutes = Math.max(1, Math.round((untilTimestamp - Date.now()) / 60000));
+            return formatMinutes(locale, diffMinutes);
+        }
+    }
+
+    if (canonicalEvent.startsWith('un')) {
+        return t(locale, 'audit.moderation.cleared');
+    }
+
+    if (canonicalEvent === 'kick') {
+        return t(locale, 'audit.moderation.instant');
+    }
+
+    if (canonicalEvent === 'ban' || canonicalEvent === 'warn' || canonicalEvent === 'mute') {
+        return t(locale, 'audit.moderation.forever');
+    }
+
+    return t(locale, 'audit.moderation.notSpecified');
+}
+
+function getLocalizedModerationTitle(locale: LocaleCode, input: AuditInput, canonicalEvent: string, fallbackTitle: string) {
+    if (getPayloadBoolean(input, 'expired')) {
+        const expiredKey = MODERATION_EXPIRED_EVENT_TITLE_KEYS[canonicalEvent];
+        return expiredKey ? t(locale, expiredKey) : fallbackTitle;
+    }
+
+    const titleKey = MODERATION_EVENT_TITLE_KEYS[canonicalEvent];
+    return titleKey ? t(locale, titleKey) : fallbackTitle;
+}
+
+function buildModerationEmbedLocalized(
+    locale: LocaleCode,
+    input: AuditInput,
+    actor: { tag: string; displayAvatarURL: (options?: { size?: number }) => string } | null,
+    target: { id: string; displayAvatarURL: (options?: { size?: number }) => string } | null,
+    routeTemplate?: string | null
+) {
+    const moderationEvent = resolveModerationEvent(input);
+    if (!moderationEvent) return null;
+
+    const reason = getPayloadString(input, 'reason') || t(locale, 'audit.moderation.notSpecified');
+    const durationLabel = getLocalizedModerationDuration(locale, input, moderationEvent.canonicalEvent);
+    const descriptionLines = [
+        `**${getLocalizedModerationTitle(locale, input, moderationEvent.canonicalEvent, moderationEvent.title)}**`,
+        '',
+        `**${t(locale, 'audit.moderation.target')}:** ${input.targetId ? `<@${input.targetId}>` : t(locale, 'audit.moderation.notSpecified')}`,
+        `**${t(locale, 'audit.moderation.actor')}:** ${input.actorId ? `<@${input.actorId}>` : t(locale, 'audit.moderation.system')}`,
+    ];
+
+    if (routeTemplate) {
+        descriptionLines.push('', `> ${renderTemplate(routeTemplate, input)}`);
+    }
+
+    const embed = new EmbedBuilder()
+        .setColor(moderationEvent.color)
+        .setDescription(descriptionLines.join('\n'))
+        .addFields(
+            { name: '\u200b', value: `> **${t(locale, 'audit.moderation.reason')}**\n\`\`\`text\n${truncate(reason, 950) || t(locale, 'audit.moderation.notSpecified')}\n\`\`\``, inline: true },
+            { name: '\u200b', value: `> **${t(locale, 'audit.moderation.duration')}**\n\`\`\`text\n${durationLabel}\n\`\`\``, inline: true }
+        );
+
+    if (actor) {
+        embed.setAuthor({
+            name: actor.tag,
+            iconURL: actor.displayAvatarURL({ size: 128 }),
+        });
+    } else {
+        embed.setAuthor({ name: t(locale, 'audit.moderation.system') });
+    }
+
+    if (target) {
+        embed.setThumbnail(target.displayAvatarURL({ size: 256 }));
+    }
+
+    return embed;
+}
+
 function shouldSkipDuplicateDispatch(routeChannelId: string, input: AuditInput, canonicalEvent: string) {
     if (!DUPLICATE_PRONE_MODERATION_EVENTS.has(canonicalEvent)) {
         return false;
@@ -284,6 +413,7 @@ async function sendToRoute(client: Client, input: AuditInput) {
     if (!route || !route.enabled) return;
 
     try {
+        const locale = await getGuildLocale(input.guildId);
         const channel = await client.channels.fetch(route.channelId);
         if (!channel || !channel.isTextBased() || !('send' in channel)) return;
 
@@ -296,7 +426,7 @@ async function sendToRoute(client: Client, input: AuditInput) {
             return;
         }
 
-        const moderationEmbed = buildModerationEmbed(input, actor, target, route.template);
+        const moderationEmbed = buildModerationEmbedLocalized(locale, input, actor, target, route.template);
         if (moderationEmbed) {
             await (channel as any).send({ embeds: [moderationEmbed] });
             return;
@@ -409,6 +539,32 @@ async function sendToRoute(client: Client, input: AuditInput) {
     } catch (error) {
         logger.warn(`[AuditLog] Failed to route tag ${input.tag} for guild ${input.guildId}: ${error}`);
     }
+}
+
+export async function buildAuditPreview(client: Client, input: AuditInput) {
+    const locale = await getGuildLocale(input.guildId);
+    const actor = input.actorId ? await client.users.fetch(input.actorId).catch(() => null) : null;
+    const target = input.targetId ? await client.users.fetch(input.targetId).catch(() => null) : null;
+    const route = await prisma.auditTagRoute.findUnique({
+        where: {
+            guildId_tag: {
+                guildId: input.guildId,
+                tag: input.tag,
+            },
+        },
+        select: {
+            template: true,
+        },
+    }).catch(() => null);
+
+    const moderationEmbed = buildModerationEmbedLocalized(locale, input, actor, target, route?.template ?? null);
+    if (!moderationEmbed) {
+        return null;
+    }
+
+    return {
+        embeds: [moderationEmbed],
+    };
 }
 
 export async function logAuditEvent(client: Client, input: AuditInput) {

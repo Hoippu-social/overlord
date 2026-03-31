@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ArrowClockwise, ShieldCheck, WarningCircle } from '@phosphor-icons/react';
+import { ShieldCheck, WarningCircle } from '@phosphor-icons/react';
 
 import { useGuildLocale } from '@/lib/i18n';
 
@@ -10,13 +10,14 @@ import { AiIncidentState, AnalyticsState, AppealTicketState, CasesState, ConfigS
 import { emptyAnalytics, emptyAppeals, emptyCases, emptyConfig, emptyIncidents } from '@/app/dashboard/[guildId]/moderation/constants';
 import { buildConfigStateFromResponse, buildModerationSavePayload } from '@/app/dashboard/[guildId]/moderation/configState';
 
-type RoleBinding = {
-    roleId: string;
-    title: string;
-    accessLevel: number;
-    enabled: boolean;
-    sortOrder: number;
-};
+import { OverviewTab } from '@/components/moderation/tabs/OverviewTab';
+import { AccessControlTab } from '@/components/moderation/tabs/AccessControlTab';
+import { AutoModTab } from '@/components/moderation/tabs/AutoModTab';
+import { AiModerationTab } from '@/components/moderation/tabs/AiModerationTab';
+import { AppealsTab } from '@/components/moderation/tabs/AppealsTab';
+import { RetentionTab } from '@/components/moderation/tabs/RetentionTab';
+import { AnalyticsTab } from '@/components/moderation/tabs/AnalyticsTab';
+import { FloatingSaveBar } from '@/components/common/FloatingSaveBar';
 
 type CommandGrant = {
     roleId: string;
@@ -703,24 +704,15 @@ export default function ModerationPage({ params }: { params: Promise<{ guildId: 
                 {currentTab === 'analytics' ? <AnalyticsTab guildId={guildId} analyticsState={analyticsState} locale={locale} tr={tr} windowDays={analyticsWindowDays} setWindowDays={setAnalyticsWindowDays} /> : null}
             </div>
 
-            <div className={`fixed bottom-8 left-1/2 z-50 flex w-full max-w-lg -translate-x-1/2 justify-center px-4 transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${isDirty ? 'translate-y-0 scale-100 opacity-100' : 'pointer-events-none translate-y-24 scale-95 opacity-0'}`}>
-                <div className="flex w-full gap-2 rounded-full border border-[var(--border-subtle)] bg-[var(--surface-card)]/90 p-2 shadow-2xl backdrop-blur-2xl">
-                    <button
-                        className="flex h-12 flex-1 items-center justify-center gap-2 rounded-full bg-[var(--color-primary-1)] text-sm font-bold text-black transition-colors hover:bg-[var(--color-primary-2)]"
-                        onClick={handleSave}
-                        disabled={saving}
-                    >
-                        {saving ? text.saving : text.save}
-                    </button>
-                    <button
-                        className="flex h-12 w-12 min-w-12 items-center justify-center rounded-full bg-[var(--surface-hover)] text-[var(--text-secondary)] transition-colors hover:bg-[var(--border-divider)] hover:text-white"
-                        onClick={handleReset}
-                        title={text.reset}
-                    >
-                        <ArrowClockwise size={20} weight="bold" />
-                    </button>
-                </div>
-            </div>
+            <FloatingSaveBar
+                visible={isDirty}
+                saving={saving}
+                saveLabel={text.save}
+                savingLabel={text.saving}
+                resetLabel={text.reset}
+                onSave={handleSave}
+                onReset={handleReset}
+            />
         </div>
     );
 }

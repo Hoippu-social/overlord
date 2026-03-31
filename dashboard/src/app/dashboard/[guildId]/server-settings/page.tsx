@@ -1,8 +1,11 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
-import { Keyboard, CheckCircle, Prohibit, ShieldCheck, UserCircle, Translate, ArrowClockwise, Clock, X, FloppyDisk, Gear } from "@phosphor-icons/react";
+import React, { useCallback, useEffect, useState } from 'react';
+import { Keyboard, CheckCircle, Prohibit, ShieldCheck, UserCircle, Translate, Clock, Gear } from "@phosphor-icons/react";
 import { DEFAULT_LOCALE, LocaleCode, normalizeLocale, useGuildLocale } from "@/lib/i18n";
+import { MultiSelectField } from "@/components/moderation/ui";
+import { buildChannelSelectOptions } from "@/lib/channelSelectOptions";
+import { FloatingSaveBar } from "@/components/common/FloatingSaveBar";
 
 interface Role {
     id: string;
@@ -22,18 +25,6 @@ interface Channel {
 }
 
 const ADMIN_PERMISSION = BigInt(8);
-
-const hexToRgba = (hex: string, alpha: number) => {
-    if (!hex || hex === '#000000') return `rgba(63, 63, 70, ${alpha})`;
-    const cleanHex = hex.startsWith('#') ? hex.slice(1) : hex;
-    if (cleanHex.length !== 6) return `rgba(63, 63, 70, ${alpha})`;
-
-    const r = parseInt(cleanHex.substr(0, 2), 16);
-    const g = parseInt(cleanHex.substr(2, 2), 16);
-    const b = parseInt(cleanHex.substr(4, 2), 16);
-
-    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-};
 
 const isAdminRole = (role: Role) => {
     if (!role.permissions) return false;
@@ -212,6 +203,7 @@ export default function ServerSettingsPage({ params }: { params: Promise<{ guild
     const [syncPromptLocale, setSyncPromptLocale] = useState<LocaleCode | null>(null);
     const [roles, setRoles] = useState<Role[]>([]);
     const [textChannels, setTextChannels] = useState<Channel[]>([]);
+    const [channelCategories, setChannelCategories] = useState<Channel[]>([]);
     const [prefix, setPrefix] = useState('!');
     const [prefixCommandsEnabled, setPrefixCommandsEnabled] = useState(true);
     const [channelMode, setChannelMode] = useState<'whitelist' | 'blacklist'>('blacklist');
@@ -227,36 +219,21 @@ export default function ServerSettingsPage({ params }: { params: Promise<{ guild
     const [isDirty, setIsDirty] = useState(false);
     const [initialLoaded, setInitialLoaded] = useState(false);
 
-    // Dropdown state for Admins & Channels (since we removed NextUI Select)
-    const [isAdminsDropdownOpen, setIsAdminsDropdownOpen] = useState(false);
-    const [isChannelsDropdownOpen, setIsChannelsDropdownOpen] = useState(false);
-    const adminsDropdownRef = useRef<HTMLDivElement>(null);
-    const channelsDropdownRef = useRef<HTMLDivElement>(null);
-
-    // Close dropdowns on outside click
-    useEffect(() => {
-        const handleMouseDown = (e: MouseEvent) => {
-            if (adminsDropdownRef.current && !adminsDropdownRef.current.contains(e.target as Node)) {
-                setIsAdminsDropdownOpen(false);
-            }
-            if (channelsDropdownRef.current && !channelsDropdownRef.current.contains(e.target as Node)) {
-                setIsChannelsDropdownOpen(false);
-            }
-        };
-        document.addEventListener('mousedown', handleMouseDown);
-        return () => document.removeEventListener('mousedown', handleMouseDown);
-    }, []);
-
-
     const text = strings[locale];
-    const t = (key: keyof typeof strings.en, vars?: Record<string, string | number>) =>
-        formatText(text[key], vars);
+    const t = useCallback((key: keyof typeof strings.en, vars?: Record<string, string | number>) =>
+        formatText(text[key], vars), [text]);
 
-    const getDefaultAdminRoles = (items: Role[]) =>
+    const getDefaultAdminRoles = useCallback((items: Role[]) =>
         items
             .filter((role) => role.id !== guildId)
             .filter((role) => isAdminRole(role))
-            .map((role) => role.id);
+            .map((role) => role.id), [guildId]);
+
+    const commandChannelOptions = buildChannelSelectOptions({
+        channels: textChannels,
+        categories: channelCategories,
+        includeCategories: true,
+    });
 
     useEffect(() => {
         if (!guildId) return;
@@ -268,12 +245,12 @@ export default function ServerSettingsPage({ params }: { params: Promise<{ guild
             try {
                 const [rolesRes, channelsRes, settingsRes] = await Promise.all([
                     fetch(`/api/guilds/${guildId}/roles`),
-                    fetch(`/api/guilds/${guildId}/text-channels`),
+                    fetch(`/api/guilds/${guildId}/channel-tree`),
                     fetch(`/api/guilds/${guildId}/bot-settings`)
                 ]);
 
                 const rolesData = rolesRes.ok ? await rolesRes.json() : [];
-                const channelsData = channelsRes.ok ? await channelsRes.json() : [];
+                const channelsData = channelsRes.ok ? await channelsRes.json() : { text: [], categories: [] };
                 const settingsData = settingsRes.ok ? await settingsRes.json() : null;
 
                 if (!rolesRes.ok || !channelsRes.ok || !settingsRes.ok) {
@@ -283,10 +260,12 @@ export default function ServerSettingsPage({ params }: { params: Promise<{ guild
                 setSettingsWarning(settingsData?.warning || null);
 
                 const safeRoles = Array.isArray(rolesData) ? rolesData : [];
-                const safeChannels = Array.isArray(channelsData) ? channelsData : [];
+                const safeChannels = Array.isArray(channelsData?.text) ? channelsData.text : [];
+                const safeCategories = Array.isArray(channelsData?.categories) ? channelsData.categories : [];
 
                 setRoles(safeRoles);
                 setTextChannels(safeChannels);
+                setChannelCategories(safeCategories);
 
                 const config = settingsData?.config;
                 const guildPrefix = settingsData?.guild?.prefix ?? '!';
@@ -317,7 +296,7 @@ export default function ServerSettingsPage({ params }: { params: Promise<{ guild
         };
 
         loadSettings();
-    }, [guildId]);
+    }, [guildId, getDefaultAdminRoles, t]);
 
     useEffect(() => {
         if (initialLoaded) {
@@ -378,24 +357,6 @@ export default function ServerSettingsPage({ params }: { params: Promise<{ guild
         setRestoreNicknameOnRejoin(false);
         setSelectedLocale(DEFAULT_LOCALE);
         setSelectedTimezone('UTC');
-    };
-
-    const toggleAdminRole = (roleId: string) => {
-        setAdminRoles(prev => {
-            const next = new Set(prev);
-            if (next.has(roleId)) next.delete(roleId);
-            else next.add(roleId);
-            return next;
-        });
-    };
-
-    const toggleTextChannel = (channelId: string) => {
-        setSelectedTextChannels(prev => {
-            const next = new Set(prev);
-            if (next.has(channelId)) next.delete(channelId);
-            else next.add(channelId);
-            return next;
-        });
     };
 
     return (
@@ -526,64 +487,14 @@ export default function ServerSettingsPage({ params }: { params: Promise<{ guild
                             </div>
                         </div>
 
-                        <div className="px-6 pt-6 w-full space-y-4">
-                            <div
-                            ref={adminsDropdownRef}
-                            className="w-full min-h-[48px] border border-[var(--border-subtle)] rounded-xl bg-[var(--surface-hover)] p-2 cursor-pointer transition-colors hover:border-[#10b981]/50 relative"
-                            onClick={() => !settingsLoading && setIsAdminsDropdownOpen(!isAdminsDropdownOpen)}
-                        >
-                                <div className="flex flex-wrap gap-2">
-                                    {adminRoles.size === 0 && <span className="text-sm text-[var(--text-muted)] p-2">{text.selectAdminRolesPlaceholder}</span>}
-                                    {Array.from(adminRoles).map(roleId => {
-                                        const role = roles.find(r => r.id === roleId);
-                                        if (!role) return null;
-                                        const roleColor = role.color && role.color !== '#000000' ? role.color : '#3f3f46';
-                                        return (
-                                            <div
-                                                key={role.id}
-                                                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-bold whitespace-nowrap"
-                                                style={{ backgroundColor: hexToRgba(roleColor, 0.1), color: roleColor, borderColor: hexToRgba(roleColor, 0.3) }}
-                                            >
-                                                {role.icon && <span>{role.icon}</span>}
-                                                {role.name}
-                                                <X
-                                                    size={12}
-                                                    className="opacity-50 hover:opacity-100 cursor-pointer ml-1"
-                                                    onClick={(e) => { e.stopPropagation(); toggleAdminRole(role.id); }}
-                                                />
-                                            </div>
-                                        )
-                                    })}
-                                </div>
-                                {isAdminsDropdownOpen && (
-                                    <div className="absolute top-[calc(100%+8px)] left-0 w-full z-30 bg-[var(--surface-modal)] border border-[var(--border-subtle)] rounded-xl shadow-2xl max-h-[300px] overflow-y-auto custom-scrollbar p-2" onClick={(e) => e.stopPropagation()}>
-                                        {roles.map(role => {
-                                            const hasColor = role.color && role.color !== '#000000';
-                                            const textBorderColor = hasColor ? role.color : '#a1a1aa';
-                                            const bgColor = hasColor ? role.color : '#52525b';
-                                            const isSelected = adminRoles.has(role.id);
-                                            return (
-                                                <div
-                                                    key={role.id}
-                                                    onClick={() => toggleAdminRole(role.id)}
-                                                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-[var(--surface-hover)] cursor-pointer mb-1"
-                                                >
-                                                    <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${isSelected ? 'bg-[#10b981] border-[#10b981]' : 'border-[var(--border-subtle)] bg-[var(--surface-card)]'}`}>
-                                                        {isSelected && <CheckCircle size={12} weight="bold" className="text-white" />}
-                                                    </div>
-                                                    <div
-                                                        className="flex items-center gap-2 px-2 py-1 rounded-md border flex-1 truncate"
-                                                        style={{ borderColor: hexToRgba(bgColor, 0.2), backgroundColor: hexToRgba(bgColor, 0.05) }}
-                                                    >
-                                                        {role.icon && <span className="text-sm shrink-0">{role.icon}</span>}
-                                                        <span className="text-sm font-bold truncate" style={{ color: textBorderColor }}>{role.name}</span>
-                                                    </div>
-                                                </div>
-                                            )
-                                        })}
-                                    </div>
-                                )}
-                            </div>
+                        <div className={`px-6 pt-6 w-full space-y-4 ${settingsLoading ? 'opacity-50 pointer-events-none' : ''}`}>
+                            <MultiSelectField
+                                label={text.selectAdminRolesLabel}
+                                options={roles}
+                                selected={Array.from(adminRoles)}
+                                onChange={(keys) => setAdminRoles(new Set(keys))}
+                                placeholder={text.selectAdminRolesPlaceholder}
+                            />
                         </div>
                     </div>
                 </div>
@@ -656,105 +567,31 @@ export default function ServerSettingsPage({ params }: { params: Promise<{ guild
                             </div>
                         </div>
 
-                        <div className="px-6 pt-6 w-full space-y-4 relative flex-1">
-                            <div
-                                ref={channelsDropdownRef}
-                                className="w-full min-h-[48px] border border-[var(--border-subtle)] rounded-xl bg-[var(--surface-hover)] p-2 cursor-pointer transition-colors hover:border-rose-500/50 relative"
-                                onClick={() => !settingsLoading && setIsChannelsDropdownOpen(!isChannelsDropdownOpen)}
-                            >
-                                <div className="flex flex-wrap gap-2">
-                                    {selectedTextChannels.size === 0 && <span className="text-sm text-[var(--text-muted)] p-2">{text.selectTextChannelsPlaceholder}</span>}
-                                    {Array.from(selectedTextChannels).map(channelId => {
-                                        const channel = textChannels.find(c => c.id === channelId);
-                                        const displayName = channel ? channel.name : channelId;
-                                        return (
-                                            <div
-                                                key={channelId}
-                                                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-[var(--border-divider)] bg-[var(--surface-card)] text-xs font-bold whitespace-nowrap text-white"
-                                            >
-                                                <span className="text-[var(--text-muted)]">#</span> {displayName}
-                                                <X
-                                                    size={12}
-                                                    className="opacity-50 hover:opacity-100 cursor-pointer ml-1 text-rose-400"
-                                                    onClick={(e) => { e.stopPropagation(); toggleTextChannel(channelId); }}
-                                                />
-                                            </div>
-                                        )
-                                    })}
-                                </div>
-                                {isChannelsDropdownOpen && (
-                                    <div className="absolute top-[calc(100%+8px)] left-0 w-full z-30 bg-[var(--surface-modal)] border border-[var(--border-subtle)] rounded-xl shadow-2xl max-h-[300px] overflow-y-auto custom-scrollbar p-2" onClick={(e) => e.stopPropagation()}>
-                                        {textChannels.map(channel => {
-                                            const isSelected = selectedTextChannels.has(channel.id);
-                                            return (
-                                                <div
-                                                    key={channel.id}
-                                                    onClick={() => toggleTextChannel(channel.id)}
-                                                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-[var(--surface-hover)] cursor-pointer mb-1 w-full overflow-hidden"
-                                                >
-                                                    <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${isSelected ? 'bg-rose-500 border-rose-500' : 'border-[var(--border-subtle)] bg-[var(--surface-card)]'}`}>
-                                                        {isSelected && <CheckCircle size={12} weight="bold" className="text-white" />}
-                                                    </div>
-                                                    <div className="flex items-center gap-2 truncate">
-                                                        <span className="text-sm font-bold text-[var(--text-muted)]">#</span>
-                                                        <span className="text-sm font-bold text-white truncate">{channel.name || channel.id}</span>
-                                                    </div>
-                                                </div>
-                                            )
-                                        })}
-                                    </div>
-                                )}
-                            </div>
+                        <div className={`px-6 pt-6 w-full space-y-4 relative flex-1 ${settingsLoading ? 'opacity-50 pointer-events-none' : ''}`}>
+                            <MultiSelectField
+                                label={text.selectTextChannelsLabel}
+                                options={commandChannelOptions}
+                                selected={Array.from(selectedTextChannels)}
+                                onChange={(keys) => setSelectedTextChannels(new Set(keys))}
+                                placeholder={text.selectTextChannelsPlaceholder}
+                            />
                         </div>
                     </div>
                 </div>
 
             </div>
 
-            {/* Action Footer Desktop */}
-            <div className="sticky bottom-0 left-0 right-0 z-40 pt-4 pb-6 pointer-events-none justify-center hidden sm:flex">
-                <div className={`pointer-events-auto bg-[var(--surface-modal)]/90 backdrop-blur-xl border border-[var(--border-divider)] shadow-2xl rounded-2xl p-2 flex gap-3 w-fit transition-all duration-300 ${isDirty ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0 pointer-events-none'}`}>
-                    <button
-                        onClick={handleSaveSettings}
-                        disabled={!isDirty || settingsLoading || isSaving}
-                        className="h-10 px-6 rounded-xl font-bold text-sm text-white bg-[#3b82f6] hover:bg-[#2563eb] transition-colors flex items-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed border-none outline-none"
-                    >
-                        {isSaving ? (
-                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        ) : (
-                            <FloppyDisk size={16} weight="bold" />
-                        )}
-                        {text.saveSettings}
-                    </button>
-                    <button
-                        onClick={handleResetSettings}
-                        disabled={settingsLoading || isSaving}
-                        className="h-10 px-4 rounded-xl font-bold text-sm text-[var(--text-secondary)] bg-transparent hover:bg-[var(--surface-hover)] hover:text-white transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed border border-transparent"
-                    >
-                        <ArrowClockwise size={16} weight="bold" />
-                        <span className="sr-only">{text.resetDefaults}</span>
-                    </button>
-                </div>
-            </div>
-
-            {/* Mobile Sticky Footer */}
-            <div className={`sm:hidden fixed bottom-[72px] left-0 right-0 z-40 p-4 border-t border-[var(--border-divider)] bg-[var(--surface-modal)]/90 backdrop-blur-xl flex justify-between gap-3 transition-transform ${isDirty ? 'translate-y-0' : 'translate-y-[150%]'}`}>
-                <button
-                    onClick={handleResetSettings}
-                    disabled={settingsLoading || isSaving}
-                    className="h-12 flex-1 rounded-xl font-bold text-sm text-[var(--text-secondary)] bg-[var(--surface-hover)] border border-[var(--border-divider)] hover:text-white transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-                >
-                    <ArrowClockwise size={16} weight="bold" />
-                </button>
-                <button
-                    onClick={handleSaveSettings}
-                    disabled={!isDirty || settingsLoading || isSaving}
-                    className="h-12 w-2/3 rounded-xl font-bold text-sm text-white bg-[#3b82f6] hover:bg-[#2563eb] transition-colors flex items-center justify-center gap-2 shadow-sm disabled:opacity-50"
-                >
-                    {isSaving ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <FloppyDisk size={16} weight="bold" />}
-                    {text.saveSettings}
-                </button>
-            </div>
+            <FloatingSaveBar
+                visible={isDirty}
+                saving={isSaving}
+                saveLabel={text.saveSettings}
+                savingLabel={text.saving}
+                resetLabel={text.resetDefaults}
+                onSave={handleSaveSettings}
+                onReset={handleResetSettings}
+                disableSave={!isDirty || settingsLoading || isSaving}
+                disableReset={settingsLoading || isSaving}
+            />
 
 
             {/* Language Sync Prompt Modal */}

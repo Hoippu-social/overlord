@@ -16,16 +16,25 @@ const AI_CATEGORIES = [
 
 const BUILT_IN_RULES = [
     'flood',
-    'duplicate_messages',
-    'repeated_strings',
-    'mentions_spam',
+    'repeated_messages',
+    'banwords',
+    'zalgo',
+    'repeated_mentions',
     'links',
     'advertising',
     'emoji_spam',
-    'zalgo',
-    'command_only',
+    'emoji',
+    'command_channels',
+    'lines',
     'image_filter',
 ] as const;
+
+const LEGACY_BUILT_IN_RULES = new Set([
+    'duplicate_messages',
+    'repeated_strings',
+    'mentions_spam',
+    'command_only',
+]);
 
 const RETENTION_CATEGORIES = [
     'AI_DISMISSED_INCIDENTS',
@@ -122,6 +131,42 @@ const normalizeNullableString = (value: unknown) => {
     return trimmed.length ? trimmed : null;
 };
 
+const normalizeCommandRuleMode = (value: unknown) =>
+    value === 'WHITELIST' ? 'WHITELIST' : 'BLACKLIST';
+
+const asRecord = (value: unknown): Record<string, unknown> =>
+    value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
+
+const normalizeCommandRules = (value: unknown) => {
+    if (!Array.isArray(value)) {
+        return [];
+    }
+
+    return value
+        .map((rule: unknown) => {
+            const entry = asRecord(rule);
+            const commandKey = normalizeNullableString(entry.commandKey);
+            if (!commandKey) {
+                return null;
+            }
+
+            const requiredAccessLevel = entry.requiredAccessLevel;
+            return {
+                commandKey,
+                enabled: normalizeBoolean(entry.enabled, true),
+                roleMode: normalizeCommandRuleMode(entry.roleMode),
+                roleIds: normalizeStringArray(entry.roleIds),
+                channelMode: normalizeCommandRuleMode(entry.channelMode),
+                channelIds: normalizeStringArray(entry.channelIds),
+                requiredAccessLevel:
+                    requiredAccessLevel === null || requiredAccessLevel === undefined || requiredAccessLevel === ''
+                        ? null
+                        : normalizeInteger(requiredAccessLevel, 50, 0, 100),
+            };
+        })
+        .filter(Boolean);
+};
+
 const parseGuildPayload = (value: string | null) => {
     if (!value) return [];
 
@@ -133,7 +178,39 @@ const parseGuildPayload = (value: string | null) => {
     }
 };
 
-const textChannelTypes = new Set([0, 5, 11, 12, 'text', 'announcement', 'public_thread', 'private_thread', 'forum']);
+const textChannelTypes = new Set([0, 5, 11, 12, 15, 16, 'text', 'announcement', 'news', 'public_thread', 'private_thread', 'forum', 'media']);
+const voiceChannelTypes = new Set([2, 13, 'voice', 'GUILD_VOICE', 'stage_voice', 'GUILD_STAGE_VOICE', 'cast']);
+const categoryChannelTypes = new Set([4, 'category', 'GUILD_CATEGORY']);
+
+const sortRolesByServerOrder = (left: { position: number }, right: { position: number }) =>
+    right.position - left.position;
+
+const sortChannelsByServerOrder = (
+    left: { position: number; parentId: string | null; isCategory: boolean },
+    right: { position: number; parentId: string | null; isCategory: boolean },
+    categoryMap: Map<string, number>,
+) => {
+    const leftGroupPosition = left.isCategory
+        ? left.position
+        : left.parentId
+            ? (categoryMap.get(left.parentId) ?? left.position)
+            : left.position;
+    const rightGroupPosition = right.isCategory
+        ? right.position
+        : right.parentId
+            ? (categoryMap.get(right.parentId) ?? right.position)
+            : right.position;
+
+    if (leftGroupPosition !== rightGroupPosition) {
+        return leftGroupPosition - rightGroupPosition;
+    }
+
+    if (left.isCategory !== right.isCategory) {
+        return left.isCategory ? -1 : 1;
+    }
+
+    return left.position - right.position;
+};
 
 async function ensureModerationDefaults(guildId: string) {
     await prisma.guild.upsert({
@@ -186,6 +263,16 @@ async function ensureModerationDefaults(guildId: string) {
                 sortOrder: index,
             },
         });
+    }
+
+    const existingRuleConfigs = await prisma.automodRuleConfig.findMany({
+        where: { guildId },
+        select: { ruleKey: true },
+    });
+
+    const hasLegacyBuiltIns = existingRuleConfigs.some((rule) => LEGACY_BUILT_IN_RULES.has(rule.ruleKey));
+    if (hasLegacyBuiltIns) {
+        await prisma.automodRuleConfig.deleteMany({ where: { guildId } });
     }
 
     for (const ruleKey of BUILT_IN_RULES) {
@@ -269,8 +356,19 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
             position: Number(role.position ?? 0),
         }));
 
-        const channels = parseGuildPayload(guild?.channels ?? null)
-            .filter((channel) => textChannelTypes.has(channel.type))
+        const rawChannels = parseGuildPayload(guild?.channels ?? null);
+        const categoryEntries = rawChannels
+            .filter((channel) => categoryChannelTypes.has(channel?.type))
+            .map((channel) => ({
+                id: String(channel.id ?? ''),
+                name: String(channel.name ?? 'Category'),
+                position: Number(channel.position ?? 0),
+            }));
+        const categoryPositions = new Map(categoryEntries.map((channel) => [channel.id, channel.position]));
+        const categoryNames = new Map(categoryEntries.map((channel) => [channel.id, channel.name]));
+
+        const channels = rawChannels
+            .filter((channel) => textChannelTypes.has(channel.type) || voiceChannelTypes.has(channel.type) || categoryChannelTypes.has(channel.type))
             .map((channel) => ({
                 id: String(channel.id ?? ''),
                 name: String(channel.name ?? 'unknown-channel'),
@@ -294,10 +392,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
                 : null,
             roleBindings,
             commandGrants,
-            automodRules: automodRules.map((rule) => ({
-                ...rule,
-                config: parseJsonObject(rule.config),
-            })),
+            automodRules: BUILT_IN_RULES.map((ruleKey) => {
+                const existingRule = automodRules.find((rule) => rule.ruleKey === ruleKey);
+                return existingRule
+                    ? { ...existingRule, config: parseJsonObject(existingRule.config) }
+                    : { guildId, ruleKey, enabled: false, config: null };
+            }),
             customRules,
             sanctionSteps,
             aiConfig: aiConfig
@@ -426,7 +526,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
             await tx.retentionPolicy.deleteMany({ where: { guildId } });
             for (const category of RETENTION_CATEGORIES) {
-                const raw = retentionPolicies.find((entry: any) => entry?.category === category) ?? {};
+                const raw = asRecord(
+                    retentionPolicies.find(
+                        (entry: unknown) => asRecord(entry).category === category
+                    )
+                );
                 await tx.retentionPolicy.create({
                     data: {
                         guildId,
@@ -444,14 +548,17 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             await tx.moderationRoleBinding.deleteMany({ where: { guildId } });
             if (roleBindings.length) {
                 const normalizedBindings = roleBindings
-                    .map((binding: any, index: number) => ({
-                        guildId,
-                        roleId: normalizeNullableString(binding.roleId),
-                        title: normalizeNullableString(binding.title) ?? 'Moderator',
-                        accessLevel: normalizeInteger(binding.accessLevel, 50, 0, 100),
-                        enabled: normalizeBoolean(binding.enabled, true),
-                        sortOrder: normalizeInteger(binding.sortOrder, index, 0),
-                    }))
+                    .map((binding: unknown, index: number) => {
+                        const entry = asRecord(binding);
+                        return {
+                            guildId,
+                            roleId: normalizeNullableString(entry.roleId),
+                            title: typeof entry.title === 'string' ? entry.title.trim() : '',
+                            accessLevel: normalizeInteger(entry.accessLevel, 50, 0, 100),
+                            enabled: normalizeBoolean(entry.enabled, true),
+                            sortOrder: normalizeInteger(entry.sortOrder, index, 0),
+                        };
+                    })
                     .filter((binding: { roleId: string | null }) => Boolean(binding.roleId)) as Array<{
                         guildId: string;
                         roleId: string;
@@ -469,13 +576,16 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             await tx.moderationCommandGrant.deleteMany({ where: { guildId } });
             if (commandGrants.length) {
                 const normalizedGrants = commandGrants
-                    .map((grant: any) => ({
-                        guildId,
-                        roleId: normalizeNullableString(grant.roleId),
-                        scopeType: grant.scopeType === 'GROUP' ? 'GROUP' : 'COMMAND',
-                        scopeKey: normalizeNullableString(grant.scopeKey),
-                        effect: grant.effect === 'DENY' ? 'DENY' : 'ALLOW',
-                    }))
+                    .map((grant: unknown) => {
+                        const entry = asRecord(grant);
+                        return {
+                            guildId,
+                            roleId: normalizeNullableString(entry.roleId),
+                            scopeType: entry.scopeType === 'GROUP' ? 'GROUP' : 'COMMAND',
+                            scopeKey: normalizeNullableString(entry.scopeKey),
+                            effect: entry.effect === 'DENY' ? 'DENY' : 'ALLOW',
+                        };
+                    })
                     .filter((grant: { roleId: string | null; scopeKey: string | null }) => Boolean(grant.roleId) && Boolean(grant.scopeKey)) as Array<{
                         guildId: string;
                         roleId: string;
@@ -491,7 +601,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
             await tx.automodRuleConfig.deleteMany({ where: { guildId } });
             for (const ruleKey of BUILT_IN_RULES) {
-                const raw = automodRules.find((rule: any) => rule?.ruleKey === ruleKey) ?? {};
+                const raw = asRecord(
+                    automodRules.find((rule: unknown) => asRecord(rule).ruleKey === ruleKey)
+                );
                 await tx.automodRuleConfig.create({
                     data: {
                         guildId,
@@ -505,16 +617,19 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             await tx.automodCustomRule.deleteMany({ where: { guildId } });
             if (customRules.length) {
                 const normalizedCustomRules = customRules
-                    .map((rule: any) => ({
-                        guildId,
-                        name: normalizeNullableString(rule.name),
-                        ruleType: rule.ruleType === 'keyword-list' ? 'keyword-list' : 'regex',
-                        pattern: normalizeNullableString(rule.pattern),
-                        enabled: normalizeBoolean(rule.enabled, true),
-                        action: normalizeNullableString(rule.action) ?? 'DELETE',
-                        strikeWeight: normalizeInteger(rule.strikeWeight, 1, 0, 100),
-                        notes: normalizeNullableString(rule.notes),
-                    }))
+                    .map((rule: unknown) => {
+                        const entry = asRecord(rule);
+                        return {
+                            guildId,
+                            name: normalizeNullableString(entry.name),
+                            ruleType: entry.ruleType === 'keyword-list' ? 'keyword-list' : 'regex',
+                            pattern: normalizeNullableString(entry.pattern),
+                            enabled: normalizeBoolean(entry.enabled, true),
+                            action: normalizeNullableString(entry.action) ?? 'DELETE',
+                            strikeWeight: normalizeInteger(entry.strikeWeight, 1, 0, 100),
+                            notes: normalizeNullableString(entry.notes),
+                        };
+                    })
                     .filter((rule: { name: string | null; pattern: string | null }) => Boolean(rule.name) && Boolean(rule.pattern)) as Array<{
                         guildId: string;
                         name: string;
@@ -534,17 +649,20 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             await tx.automodSanctionStep.deleteMany({ where: { guildId } });
             if (sanctionSteps.length) {
                 const normalizedSteps = sanctionSteps
-                    .map((step: any, index: number) => ({
-                        guildId,
-                        triggerStrikeCount: normalizeInteger(step.triggerStrikeCount, index + 1, 1, 1000),
-                        actionType: normalizeNullableString(step.actionType) ?? 'TIMEOUT',
-                        durationMinutes:
-                            step.durationMinutes === null || step.durationMinutes === undefined
-                                ? null
-                                : normalizeInteger(step.durationMinutes, 60, 1, 1_000_000),
-                        enabled: normalizeBoolean(step.enabled, true),
-                        sortOrder: normalizeInteger(step.sortOrder, index, 0),
-                    }))
+                    .map((step: unknown, index: number) => {
+                        const entry = asRecord(step);
+                        return {
+                            guildId,
+                            triggerStrikeCount: normalizeInteger(entry.triggerStrikeCount, index + 1, 1, 1000),
+                            actionType: normalizeNullableString(entry.actionType) ?? 'TIMEOUT',
+                            durationMinutes:
+                                entry.durationMinutes === null || entry.durationMinutes === undefined
+                                    ? null
+                                    : normalizeInteger(entry.durationMinutes, 60, 1, 1_000_000),
+                            enabled: normalizeBoolean(entry.enabled, true),
+                            sortOrder: normalizeInteger(entry.sortOrder, index, 0),
+                        };
+                    })
                     .filter((step: { triggerStrikeCount: number; actionType: string }, index: number, array: Array<{ triggerStrikeCount: number; actionType: string }>) =>
                         array.findIndex(
                             (candidate) =>
@@ -560,7 +678,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
             await tx.aiModerationCategoryRule.deleteMany({ where: { guildId } });
             for (const [index, category] of AI_CATEGORIES.entries()) {
-                const raw = aiCategories.find((entry: any) => entry?.category === category) ?? {};
+                const raw = asRecord(
+                    aiCategories.find((entry: unknown) => asRecord(entry).category === category)
+                );
                 await tx.aiModerationCategoryRule.create({
                     data: {
                         guildId,

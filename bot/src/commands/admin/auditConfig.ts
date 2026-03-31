@@ -1,6 +1,7 @@
 import { ApplicationCommandType, ContextMenuCommandBuilder, ContextMenuCommandInteraction, GuildMember, PermissionFlagsBits } from 'discord.js';
 import { hasGuildPermissionAccess } from '../../services/ModerationService';
 import { buildAuditConfigUi } from '../../utils/auditConfigUi';
+import { getGuildLocale, t } from '../../utils/i18n';
 import { Command } from '../../utils/types';
 
 const command: Command<ContextMenuCommandInteraction> = {
@@ -11,8 +12,9 @@ const command: Command<ContextMenuCommandInteraction> = {
     accessGroup: 'admin',
     accessKey: 'audit_config',
     async execute(interaction: ContextMenuCommandInteraction) {
+        const locale = await getGuildLocale(interaction.guildId);
         if (!interaction.guildId) {
-            await interaction.reply({ content: 'Guild only.', ephemeral: true });
+            await interaction.reply({ content: t(locale, 'general.guildOnly'), ephemeral: true });
             return;
         }
 
@@ -21,12 +23,12 @@ const command: Command<ContextMenuCommandInteraction> = {
             : await interaction.guild?.members.fetch(interaction.user.id).catch(() => null);
 
         if (!member) {
-            await interaction.reply({ content: 'Unable to resolve your guild member state.', ephemeral: true });
+            await interaction.reply({ content: t(locale, 'general.memberResolveFailed'), ephemeral: true });
             return;
         }
 
         if (!hasGuildPermissionAccess(member, PermissionFlagsBits.ManageGuild)) {
-            await interaction.reply({ content: 'Missing Manage Server permission.', ephemeral: true });
+            await interaction.reply({ content: t(locale, 'general.manageServerRequired'), ephemeral: true });
             return;
         }
 

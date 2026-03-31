@@ -23,8 +23,8 @@ const akony = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Overlord — Dashboard",
-  description: "Overlord Bot Command Center",
+  title: "Overlord - Command Center",
+  description: "Premium Discord operations surface for moderation, analytics, tickets, and voice systems.",
   icons: { icon: "/logos/logo-color.svg" },
 };
 

@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useParams } from 'next/navigation';
 import {
     Spinner,
     Switch,
@@ -13,7 +13,6 @@ import {
 import {
     Ticket,
     Gear,
-    Warning,
     ChartBar,
     Scroll,
     CheckCircle,
@@ -33,6 +32,8 @@ import { useGuildLocale } from '@/lib/i18n';
 import CategoryModal, { CategoryData } from '@/components/tickets/CategoryModal';
 import { usePersistentPeriod } from '@/hooks/usePersistentPeriod';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { InteractiveSelect } from '@/components/moderation/ui';
+import { buildChannelSelectOptions } from '@/lib/channelSelectOptions';
 
 type TicketConfig = {
     enabled: boolean;
@@ -53,7 +54,7 @@ type TicketCategory = {
     mentionAgents: boolean;
     allowUserClose: boolean;
     enableRating: boolean;
-    messagePayload: string | any;
+    messagePayload: CategoryData['messagePayload'];
     buttonText: string;
     buttonEmoji: string | null;
     buttonStyle: string;
@@ -63,6 +64,35 @@ type ChannelOption = {
     id: string;
     name?: string;
     type?: number | string;
+    parentId?: string | null;
+    isCategory?: boolean;
+    categoryName?: string | null;
+};
+
+type CategoryPieEntry = {
+    name: string;
+    value: number;
+};
+
+type GlobalStats = {
+    open: number;
+    onHold: number;
+    closed: number;
+    total: number;
+    avgResolutionMins: number;
+    ratings: {
+        positive: number;
+        neutral: number;
+        negative: number;
+        total: number;
+    };
+    categoryPieData: CategoryPieEntry[];
+};
+
+type ActivityPoint = {
+    date: string;
+    created: number;
+    solved: number;
 };
 
 const MESSAGES = {
@@ -180,7 +210,6 @@ const StatCard = ({ title, value, icon, trend }: { title: string, value: string 
 
 export default function TicketsPage() {
     const { guildId } = useParams<{ guildId: string }>();
-    const router = useRouter();
     const { locale } = useGuildLocale(guildId);
     const t = MESSAGES[locale as keyof typeof MESSAGES] || MESSAGES.en;
 
@@ -191,19 +220,25 @@ export default function TicketsPage() {
     const [searchQuery, setSearchQuery] = useState('');
 
     // Stats State
-    const [globalStats, setGlobalStats] = useState<any>({ open: 0, onHold: 0, closed: 0, total: 0, avgResolutionMins: 0, ratings: { positive: 0, neutral: 0, negative: 0, total: 0 }, categoryPieData: [] });
-    const [activityData, setActivityData] = useState<any[]>([]);
+    const [globalStats, setGlobalStats] = useState<GlobalStats>({ open: 0, onHold: 0, closed: 0, total: 0, avgResolutionMins: 0, ratings: { positive: 0, neutral: 0, negative: 0, total: 0 }, categoryPieData: [] });
+    const [activityData, setActivityData] = useState<ActivityPoint[]>([]);
 
     const [period, setPeriod] = usePersistentPeriod('7d');
-    const [savingConfig, setSavingConfig] = useState(false);
+    const [, setSavingConfig] = useState(false);
 
     // Modal State
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingCategory, setEditingCategory] = useState<TicketCategory | null>(null);
     const [savingCategory, setSavingCategory] = useState(false);
 
+    const logChannelOptions = useMemo(() => buildChannelSelectOptions({
+        channels: channels.text,
+        categories: channels.categories,
+        includeCategories: true,
+    }), [channels]);
+
     // Fetch Data
-    const fetchData = async () => {
+    const fetchData = useCallback(async () => {
         setLoading(true);
         try {
             const res = await fetch(`/api/guilds/${guildId}/tickets?period=${period}`);
@@ -215,19 +250,19 @@ export default function TicketsPage() {
                     text: data.channels?.text || [],
                     categories: data.channels?.categories || []
                 });
-                if (data.globalStats) setGlobalStats(data.globalStats);
-                if (data.activityData) setActivityData(data.activityData);
+                if (data.globalStats) setGlobalStats(data.globalStats as GlobalStats);
+                if (Array.isArray(data.activityData)) setActivityData(data.activityData as ActivityPoint[]);
             }
         } catch (e) {
             console.error(e);
         } finally {
             setLoading(false);
         }
-    };
+    }, [guildId, period]);
 
     useEffect(() => {
         if (guildId) fetchData();
-    }, [guildId, period]);
+    }, [fetchData, guildId]);
 
     // Handlers
     const handleConfigUpdate = async (updates: Partial<TicketConfig>) => {
@@ -263,8 +298,6 @@ export default function TicketsPage() {
         setSavingCategory(true);
         try {
             const isEdit = !!editingCategory;
-            let url = `/api/guilds/${guildId}/tickets`;
-            let method = 'POST';
 
             if (isEdit) {
                 alert("Editing pending backend implementation. Only creation is currently supported.");
@@ -273,8 +306,8 @@ export default function TicketsPage() {
                 return;
             }
 
-            const res = await fetch(url, {
-                method,
+            const res = await fetch(`/api/guilds/${guildId}/tickets`, {
+                method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
             });
@@ -464,7 +497,7 @@ export default function TicketsPage() {
                                                             stroke="none"
                                                             cornerRadius={4}
                                                         >
-                                                            {globalStats.categoryPieData.map((entry: any, index: number) => (
+                                                            {globalStats.categoryPieData.map((entry, index: number) => (
                                                                 <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
                                                             ))}
                                                         </Pie>
@@ -489,7 +522,7 @@ export default function TicketsPage() {
 
                                             {/* Legend */}
                                             <div className="space-y-2 overflow-y-auto max-h-[140px] pr-2 custom-scrollbar">
-                                                {globalStats.categoryPieData.map((entry: any, index: number) => (
+                                                {globalStats.categoryPieData.map((entry, index: number) => (
                                                     <div key={index} className="flex items-center justify-between py-1 group">
                                                         <div className="flex items-center gap-2 truncate pr-2">
                                                             <div className="w-2 h-2 rounded-full shrink-0 shadow-sm" style={{ backgroundColor: PIE_COLORS[index % PIE_COLORS.length] }} />
@@ -669,15 +702,13 @@ export default function TicketsPage() {
                                     </div>
 
                                     <div className={`transition-opacity duration-300 ${!config?.enabled ? 'opacity-50 pointer-events-none' : ''}`}>
-                                        <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider block mb-2">{t.logChannelLabel}</label>
-                                        <select
+                                        <InteractiveSelect
+                                            label={t.logChannelLabel}
                                             value={config?.logChannelId || ''}
-                                            onChange={(e) => handleConfigUpdate({ logChannelId: e.target.value })}
-                                            className="w-full bg-[var(--surface-hover)] border border-[var(--border-divider)] focus:border-[#8f5eff] rounded-xl h-10 px-3 text-sm text-white outline-none transition-colors appearance-none cursor-pointer"
-                                        >
-                                            <option value="" disabled className="bg-[#111]">{t.logChannelPlaceholder}</option>
-                                            {channels.text.map(c => <option key={c.id} value={c.id} className="bg-[#111]">#{c.name || c.id}</option>)}
-                                        </select>
+                                            onChange={(value) => handleConfigUpdate({ logChannelId: value || null })}
+                                            placeholder={t.logChannelPlaceholder}
+                                            options={logChannelOptions}
+                                        />
                                     </div>
                                 </div>
                             </div>
@@ -722,7 +753,7 @@ export default function TicketsPage() {
             <CategoryModal
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
-                category={editingCategory as any}
+                category={editingCategory}
                 onSave={handleSaveCategory}
                 channels={channels.categories}
                 saving={savingCategory}

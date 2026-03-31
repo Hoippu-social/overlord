@@ -5,12 +5,12 @@ import {
     Collection,
     EmbedBuilder,
     GuildMember,
-    PermissionsBitField,
     StringSelectMenuBuilder,
     StringSelectMenuOptionBuilder,
 } from 'discord.js';
 import { createModeratorAccessEvaluator, type CommandAccessOptions } from '../services/ModerationService';
 import { LocaleCode, t } from './i18n';
+import { getCommandDefaultMemberPermissions } from './commandPermissions';
 import { Command } from './types';
 
 type LocalizedText = { en: string; ru: string };
@@ -161,11 +161,11 @@ const HELP_MODULES_BASE: HelpModuleBase[] = [
                 roles: 'Moderation staff',
             },
             {
-                name: 'warnings',
-                summary: { en: 'List active warnings.', ru: 'Показать активные предупреждения.' },
+                name: 'warns',
+                summary: { en: 'Show punishment history.', ru: 'Показать историю наказаний.' },
                 details: {
-                    en: 'Shows active warning cases for a user.',
-                    ru: 'Показывает активные предупреждения выбранного пользователя.',
+                    en: 'Shows full punishment history (warns, mutes, timeouts, kicks, bans) for you or for a specified user.',
+                    ru: 'Показывает полную историю наказаний (варны, муты, тайм-ауты, кики, баны) для вас или указанного пользователя.',
                 },
                 roles: 'Moderation staff',
             },
@@ -619,35 +619,6 @@ const filterHelpModules = (modules: HelpModule[], visibleCommandNames: Set<strin
         }))
         .filter((module) => module.commands.length > 0);
 
-const getDefaultMemberPermissions = (command: Command<any>) => {
-    const json = command.data.toJSON();
-    const rawValue = 'default_member_permissions' in json ? json.default_member_permissions : null;
-
-    if (rawValue === undefined || rawValue === null) return null;
-
-    const normalizedValue = rawValue;
-    if (normalizedValue === '0') return null;
-
-    try {
-        return new PermissionsBitField(BigInt(normalizedValue));
-    } catch {
-        return null;
-    }
-};
-
-const hasDiscordPermissionAccess = (command: Command<any>, member: GuildMember) => {
-    if (member.guild.ownerId === member.id) {
-        return true;
-    }
-
-    const requiredPermissions = getDefaultMemberPermissions(command);
-    if (!requiredPermissions) {
-        return true;
-    }
-
-    return member.permissions.has(requiredPermissions);
-};
-
 const toAccessOptions = (
     command: Command<any>,
     context: Pick<CommandAccessOptions, 'channelId' | 'parentChannelId'>,
@@ -655,6 +626,7 @@ const toAccessOptions = (
     accessGroup: command.accessGroup,
     accessKey: command.accessKey ?? command.data.name,
     requiredAccessLevel: command.requiredAccessLevel,
+    requiredDiscordPermissions: getCommandDefaultMemberPermissions(command),
     channelId: context.channelId,
     parentChannelId: context.parentChannelId,
 });
@@ -790,10 +762,6 @@ export async function buildGuildHelpView(
                 continue;
             }
 
-            if (!hasDiscordPermissionAccess(command, member)) {
-                continue;
-            }
-
             if (!evaluateAccess(toAccessOptions(command, context))) {
                 continue;
             }
@@ -826,10 +794,6 @@ export async function resolveGuildHelpCommand(
     const command = registry.get(normalizeCommandName(commandName));
     if (!command || command.hidden) {
         return { state: 'not_found' };
-    }
-
-    if (!hasDiscordPermissionAccess(command, member)) {
-        return { state: 'denied' };
     }
 
     const evaluateAccess = await createModeratorAccessEvaluator(member.guild.id, member);

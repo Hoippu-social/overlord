@@ -9,17 +9,19 @@ import {
     StringSelectMenuOptionBuilder,
 } from 'discord.js';
 import { prisma } from './database';
+import { getGuildLocale, t } from './i18n';
 
 export const AUDIT_TAGS = [
-    { value: 'moderation', label: 'Moderation', description: 'ban/kick/timeout/automod' },
-    { value: 'member', label: 'Member', description: 'join/leave/nick/boost' },
-    { value: 'message', label: 'Message', description: 'delete/edit/pin' },
-    { value: 'channel', label: 'Channel', description: 'create/update/delete' },
-    { value: 'role', label: 'Role', description: 'create/update/assign' },
-    { value: 'voice', label: 'Voice', description: 'join/leave/move' },
-    { value: 'invites', label: 'Invites', description: 'create/delete/use/leave' },
-    { value: 'security', label: 'Security', description: 'webhooks/integrations' },
-    { value: 'bot', label: 'Bot', description: 'config/restart/errors' },
+    { value: 'moderation', labelKey: 'admin.audit.tag.moderation', descriptionKey: 'admin.audit.desc.moderation' },
+    { value: 'member', labelKey: 'admin.audit.tag.member', descriptionKey: 'admin.audit.desc.member' },
+    { value: 'message', labelKey: 'admin.audit.tag.message', descriptionKey: 'admin.audit.desc.message' },
+    { value: 'channel', labelKey: 'admin.audit.tag.channel', descriptionKey: 'admin.audit.desc.channel' },
+    { value: 'role', labelKey: 'admin.audit.tag.role', descriptionKey: 'admin.audit.desc.role' },
+    { value: 'voice', labelKey: 'admin.audit.tag.voice', descriptionKey: 'admin.audit.desc.voice' },
+    { value: 'invites', labelKey: 'admin.audit.tag.invites', descriptionKey: 'admin.audit.desc.invites' },
+    { value: 'security', labelKey: 'admin.audit.tag.security', descriptionKey: 'admin.audit.desc.security' },
+    { value: 'bot', labelKey: 'admin.audit.tag.bot', descriptionKey: 'admin.audit.desc.bot' },
+    { value: 'ai_moderation', labelKey: 'admin.audit.tag.ai_moderation', descriptionKey: 'admin.audit.desc.ai_moderation' },
 ];
 
 export async function getAuditRoute(guildId: string, tag: string) {
@@ -55,59 +57,60 @@ export async function deleteAuditRoute(guildId: string, tag: string) {
 }
 
 export async function buildAuditConfigUi(guildId: string, userId: string, tag: string) {
+    const locale = await getGuildLocale(guildId);
     const route = await getAuditRoute(guildId, tag);
-    const channelValue = route?.channelId ? `<#${route.channelId}>` : 'not set';
-    const statusValue = route?.enabled ? 'enabled' : 'disabled';
+    const channelValue = route?.channelId ? `<#${route.channelId}>` : t(locale, 'admin.audit.notSet');
+    const statusValue = route?.enabled ? t(locale, 'admin.audit.enabled') : t(locale, 'admin.audit.disabled');
 
     const embed = new EmbedBuilder()
-        .setTitle('Audit routing')
-        .setDescription('Select a tag and map it to a channel. Use buttons to enable/disable or clear.')
+        .setTitle(t(locale, 'admin.audit.title'))
+        .setDescription(t(locale, 'admin.audit.description'))
         .addFields(
-            { name: 'Tag', value: `\`${tag}\``, inline: true },
-            { name: 'Status', value: statusValue, inline: true },
-            { name: 'Channel', value: channelValue, inline: false },
+            { name: t(locale, 'admin.audit.tag'), value: `\`${tag}\``, inline: true },
+            { name: t(locale, 'admin.audit.status'), value: statusValue, inline: true },
+            { name: t(locale, 'admin.audit.channel'), value: channelValue, inline: false },
         );
 
     const tagSelect = new StringSelectMenuBuilder()
         .setCustomId(`audit_tag_select:${userId}`)
-        .setPlaceholder('Select audit tag')
+        .setPlaceholder(t(locale, 'admin.audit.selectTag'))
         .addOptions(
             AUDIT_TAGS.map((entry) =>
                 new StringSelectMenuOptionBuilder()
-                    .setLabel(entry.label)
+                    .setLabel(t(locale, entry.labelKey))
                     .setValue(entry.value)
-                    .setDescription(entry.description)
+                    .setDescription(t(locale, entry.descriptionKey))
                     .setDefault(entry.value === tag),
             ),
         );
 
     const channelSelect = new ChannelSelectMenuBuilder()
         .setCustomId(`audit_channel_select:${tag}:${userId}`)
-        .setPlaceholder('Select target channel')
+        .setPlaceholder(t(locale, 'admin.audit.selectChannel'))
         .setMaxValues(1)
         .setChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement);
 
     const enableButton = new ButtonBuilder()
         .setCustomId(`audit_route_enable:${tag}:${userId}`)
-        .setLabel('Enable')
+        .setLabel(t(locale, 'admin.audit.button.enable'))
         .setStyle(ButtonStyle.Success)
         .setDisabled(route?.enabled ?? false);
 
     const disableButton = new ButtonBuilder()
         .setCustomId(`audit_route_disable:${tag}:${userId}`)
-        .setLabel('Disable')
+        .setLabel(t(locale, 'admin.audit.button.disable'))
         .setStyle(ButtonStyle.Secondary)
         .setDisabled(!route?.enabled);
 
     const clearButton = new ButtonBuilder()
         .setCustomId(`audit_route_clear:${tag}:${userId}`)
-        .setLabel('Clear')
+        .setLabel(t(locale, 'admin.audit.button.clear'))
         .setStyle(ButtonStyle.Danger)
         .setDisabled(!route);
 
     const closeButton = new ButtonBuilder()
         .setCustomId(`audit_route_close:${userId}`)
-        .setLabel('Close')
+        .setLabel(t(locale, 'admin.audit.button.close'))
         .setStyle(ButtonStyle.Secondary);
 
     return {

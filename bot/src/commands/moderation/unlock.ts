@@ -1,6 +1,9 @@
 import { ChannelType, PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
 import { unlockChannel } from '../../services/ModerationService';
 import { logAuditEvent } from '../../utils/auditLog';
+import { localizeDescription } from '../../utils/commandLocalizations';
+import { getInteractionLocale, t } from '../../utils/i18n';
+import { buildStaffEmbed } from '../../utils/staffEmbeds';
 import { Command } from '../../utils/types';
 
 function isGuildChannel(channel: unknown): channel is Parameters<typeof unlockChannel>[0]['channel'] {
@@ -8,25 +11,45 @@ function isGuildChannel(channel: unknown): channel is Parameters<typeof unlockCh
 }
 
 const command: Command = {
-    data: new SlashCommandBuilder()
-        .setName('unlock')
-        .setDescription('Unlock a text channel for @everyone')
-        .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels)
-        .setDMPermission(false)
-        .addChannelOption((option) =>
-            option
-                .setName('channel')
-                .setDescription('Channel to unlock, defaults to current')
-                .setRequired(false)
-                .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)
-        )
-        .addStringOption((option) => option.setName('reason').setDescription('Reason').setRequired(false).setMaxLength(500)),
+    data: localizeDescription(
+        new SlashCommandBuilder()
+            .setName('unlock')
+            .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels)
+            .setDMPermission(false)
+            .addChannelOption((option) =>
+                localizeDescription(option.setName('channel').setRequired(false).addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement), {
+                    en: 'Channel to unlock, defaults to current',
+                    ru: 'Канал для открытия, по умолчанию текущий',
+                })
+            )
+            .addStringOption((option) =>
+                localizeDescription(option.setName('reason').setRequired(false).setMaxLength(500), {
+                    en: 'Reason',
+                    ru: 'Причина',
+                })
+            ),
+        {
+            en: 'Unlock a text channel for @everyone',
+            ru: 'Открыть текстовый канал для @everyone',
+        }
+    ),
     accessGroup: 'moderation',
     accessKey: 'unlock',
     requiredAccessLevel: 50,
     async execute(interaction) {
+        const locale = await getInteractionLocale(interaction);
         if (!interaction.guild) {
-            await interaction.reply({ content: 'Guild only.', ephemeral: true });
+            await interaction.reply({
+                embeds: [
+                    buildStaffEmbed({
+                        actor: interaction.user,
+                        title: t(locale, 'staff.error.title'),
+                        color: 0xef4444,
+                        description: ['', t(locale, 'general.guildOnly')],
+                    }),
+                ],
+                ephemeral: true,
+            });
             return;
         }
 
@@ -34,7 +57,17 @@ const command: Command = {
         const reason = interaction.options.getString('reason');
 
         if (!isGuildChannel(selectedChannel)) {
-            await interaction.reply({ content: 'Select a guild text channel.', ephemeral: true });
+            await interaction.reply({
+                embeds: [
+                    buildStaffEmbed({
+                        actor: interaction.user,
+                        title: t(locale, 'staff.error.title'),
+                        color: 0xef4444,
+                        description: ['', t(locale, 'general.textChannelOnly')],
+                    }),
+                ],
+                ephemeral: true,
+            });
             return;
         }
 
@@ -58,7 +91,19 @@ const command: Command = {
         });
 
         await interaction.reply({
-            content: `Unlocked <#${selectedChannel.id}>. Case #${moderationCase.caseNumber}.`,
+            embeds: [
+                buildStaffEmbed({
+                    actor: interaction.user,
+                    title: t(locale, 'moderation.unlock.title'),
+                    color: 0x22c55e,
+                    description: [''],
+                    fields: [
+                        { label: t(locale, 'moderation.action.channel'), value: `<#${selectedChannel.id}>` },
+                        { label: t(locale, 'moderation.action.reason'), value: reason ?? t(locale, 'audit.moderation.notSpecified') },
+                        { label: t(locale, 'moderation.action.case'), value: `#${moderationCase.caseNumber}` },
+                    ],
+                }),
+            ],
             ephemeral: true,
         });
     },

@@ -13,6 +13,7 @@ import {
     User,
 } from 'discord.js';
 import { prisma } from '../utils/database';
+import { getInteractionLocale, t } from '../utils/i18n';
 
 const MAX_CLEAR_FETCH = 1000;
 
@@ -46,6 +47,27 @@ export const AI_CATEGORIES = [
     'self_harm_crisis',
     'doxxing_personal_data',
 ] as const;
+
+const AUTOMOD_BUILT_IN_RULES = [
+    'flood',
+    'zalgo',
+    'emoji',
+    'repeated_messages',
+    'repeated_mentions',
+    'lines',
+    'links',
+    'advertising',
+    'emoji_spam',
+    'command_channels',
+    'image_filter',
+] as const;
+
+const LEGACY_AUTOMOD_RULES = new Set([
+    'duplicate_messages',
+    'repeated_strings',
+    'mentions_spam',
+    'command_only',
+]);
 
 export type AiCategory = typeof AI_CATEGORIES[number];
 
@@ -89,6 +111,7 @@ export type CommandAccessOptions = {
     accessGroup?: string;
     accessKey?: string;
     requiredAccessLevel?: number;
+    requiredDiscordPermissions?: PermissionResolvable | null;
     channelId?: string | null;
     parentChannelId?: string | null;
 };
@@ -110,26 +133,25 @@ type ModeratorAccessContext = {
 
 const DEFAULT_COMMAND_ACCESS_LEVELS: Record<string, number> = {
     appeals: 70,
-    ban: 85,
-    case: 35,
-    cases: 35,
-    clear: 55,
-    kick: 65,
-    lock: 55,
-    mute: 55,
+    ban: 80,
+    case: 30,
+    cases: 30,
+    clear: 50,
+    kick: 70,
+    lock: 50,
+    mute: 50,
     note: 30,
-    slowmode: 55,
-    tempban: 80,
-    timeout: 60,
+    slowmode: 50,
+    timeout: 50,
     unban: 80,
-    unlock: 55,
-    unmute: 55,
-    untimeout: 60,
-    unwarn: 60,
-    voicekick: 45,
-    voicemove: 45,
-    warn: 45,
-    warnings: 35,
+    unlock: 50,
+    unmute: 50,
+    untimeout: 50,
+    unwarn: 70,
+    voicekick: 50,
+    voicemove: 50,
+    warns: 30,
+    warn: 50,
 };
 
 function getDefaultCommandRule(commandKey: string): CommandRuleConfig | null {
@@ -248,6 +270,28 @@ export async function ensureModerationConfig(guildId: string) {
                 enabled: ['hate_discrimination', 'threats_violence', 'scam_fraud', 'doxxing_personal_data'].includes(category),
                 threshold: 80,
                 sortOrder: index,
+            },
+        });
+    }
+
+    const existingRuleConfigs = await prisma.automodRuleConfig.findMany({
+        where: { guildId },
+        select: { ruleKey: true },
+    });
+
+    const hasLegacyBuiltIns = existingRuleConfigs.some((rule) => LEGACY_AUTOMOD_RULES.has(rule.ruleKey));
+    if (hasLegacyBuiltIns) {
+        await prisma.automodRuleConfig.deleteMany({ where: { guildId } });
+    }
+
+    for (const ruleKey of AUTOMOD_BUILT_IN_RULES) {
+        await prisma.automodRuleConfig.upsert({
+            where: { guildId_ruleKey: { guildId, ruleKey } },
+            update: {},
+            create: {
+                guildId,
+                ruleKey,
+                enabled: false,
             },
         });
     }
@@ -476,6 +520,56 @@ export async function listCasesForUser(guildId: string, targetUserId: string, ta
         orderBy: { caseNumber: 'desc' },
         take,
     });
+}
+
+const PUNISHMENT_ACTION_TYPES = ['WARN', 'MUTE', 'TIMEOUT', 'KICK', 'BAN', 'TEMPBAN'] as const;
+
+export async function getPunishmentHistory(guildId: string, targetUserId: string, take = 15) {
+    const safeTake = Math.min(Math.max(take, 1), 250);
+
+    const [groupedCounts, recentCases] = await Promise.all([
+        prisma.moderationCase.groupBy({
+            by: ['actionType'],
+            where: {
+                guildId,
+                targetUserId,
+                actionType: { in: [...PUNISHMENT_ACTION_TYPES] },
+            },
+            _count: {
+                _all: true,
+            },
+        }),
+        prisma.moderationCase.findMany({
+            where: {
+                guildId,
+                targetUserId,
+                actionType: { in: [...PUNISHMENT_ACTION_TYPES] },
+            },
+            orderBy: { caseNumber: 'desc' },
+            take: safeTake,
+        }),
+    ]);
+
+    const counts = {
+        warns: 0,
+        mutes: 0,
+        timeouts: 0,
+        kicks: 0,
+        bans: 0,
+    };
+
+    for (const item of groupedCounts) {
+        if (item.actionType === 'WARN') counts.warns += item._count._all;
+        if (item.actionType === 'MUTE') counts.mutes += item._count._all;
+        if (item.actionType === 'TIMEOUT') counts.timeouts += item._count._all;
+        if (item.actionType === 'KICK') counts.kicks += item._count._all;
+        if (item.actionType === 'BAN' || item.actionType === 'TEMPBAN') counts.bans += item._count._all;
+    }
+
+    return {
+        counts,
+        cases: recentCases.reverse(),
+    };
 }
 
 export async function timeoutMember(options: {
@@ -1013,6 +1107,13 @@ function evaluateModeratorAccess(context: ModeratorAccessContext, options: Comma
         return true;
     }
 
+    if (
+        options.requiredDiscordPermissions &&
+        hasGuildPermissionAccess(context.member, options.requiredDiscordPermissions)
+    ) {
+        return true;
+    }
+
     if (context.member.roles.cache.some((role) => context.adminRoleIds.has(role.id))) {
         return true;
     }
@@ -1073,6 +1174,10 @@ function evaluateModeratorAccess(context: ModeratorAccessContext, options: Comma
         return context.bindingLevel >= options.requiredAccessLevel;
     }
 
+    if (options.requiredDiscordPermissions) {
+        return false;
+    }
+
     return true;
 }
 
@@ -1087,9 +1192,10 @@ export async function ensureModeratorAccess(guildId: string, member: GuildMember
 }
 
 export async function replyWithCases(interaction: ChatInputCommandInteraction, guildId: string, targetUserId: string, take = 10) {
+    const locale = await getInteractionLocale(interaction);
     const cases = await listCasesForUser(guildId, targetUserId, take);
     if (!cases.length) {
-        await interaction.reply({ content: 'No moderation cases found for this user.', ephemeral: true });
+        await interaction.reply({ content: t(locale, 'staff.cases.empty'), ephemeral: true });
         return;
     }
 

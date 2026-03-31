@@ -2,33 +2,28 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ── Design tokens — strict dark ── */
 :root {
-    /* Backgrounds */
     --bg-base: #060606;
-    --surface-sidebar: #0B0B0B;
+    --surface-sidebar: #0b0b0b;
     --surface-card: #111111;
     --surface-hover: #18181b;
 
-    /* Brand */
-    --color-primary-1: #75F16A;
+    --color-primary: #75f16a;
+    --color-primary-1: #75f16a;
     --color-primary-2: #8f5eff;
-    --color-success: #10B981;
-    --color-destructive: #F43F5E;
-    --color-warning: #F59E0B;
+    --color-success: #10b981;
+    --color-destructive: #f43f5e;
+    --color-warning: #f59e0b;
 
-    /* Text */
     --text-primary: #ffffff;
     --text-secondary: rgba(255, 255, 255, 0.6);
     --text-muted: rgba(255, 255, 255, 0.3);
 
-    /* Borders */
     --border-divider: rgba(255, 255, 255, 0.04);
-    --border-subtle: #1A1A1A;
+    --border-subtle: #1a1a1a;
     --border-focus: rgba(117, 241, 106, 0.4);
 }
 
-/* ── Base ── */
 html {
     color-scheme: dark;
 }
@@ -38,7 +33,6 @@ body {
     color: var(--text-primary);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    /* Core font for everything but headers/accents */
     font-family: var(--font-futura), system-ui, -apple-system, sans-serif;
 }
 
@@ -50,24 +44,19 @@ h5,
 h6,
 .font-akony {
     font-family: var(--font-akony), system-ui, -apple-system, sans-serif;
-    /* Disable browser-synthesized bold — AKONY has no bold variant,
-       so faux-bold stretches pixels into mush at large resolutions on Windows */
     font-synthesis: none;
     -webkit-font-smoothing: antialiased;
     text-rendering: geometricPrecision;
 }
 
-/* ── Tabular numbers for data ── */
 .tabular {
     font-variant-numeric: tabular-nums;
 }
 
-/* ── Selection ── */
 ::selection {
     background: rgba(117, 241, 106, 0.15);
 }
 
-/* ── Scrollbar ── */
 ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
@@ -86,7 +75,6 @@ h6,
     background: var(--color-primary);
 }
 
-/* ── Animations ── */
 @keyframes fadeUp {
     from {
         opacity: 0;
@@ -110,7 +98,6 @@ h6,
 }
 
 @keyframes pulse-dot {
-
     0%,
     100% {
         opacity: 1;
@@ -143,7 +130,6 @@ h6,
     animation: pulse-dot 2s ease-in-out infinite;
 }
 
-/* ── Shimmer skeleton ── */
 .skeleton {
     background: linear-gradient(90deg, #1f1f1f 25%, #2a2a2a 50%, #1f1f1f 75%);
     background-size: 200% 100%;
@@ -151,7 +137,6 @@ h6,
     border-radius: 8px;
 }
 
-/* ── Glass panel ── */
 .glass {
     background: rgba(11, 11, 11, 0.7);
     backdrop-filter: blur(24px);
@@ -159,14 +144,141 @@ h6,
     border: 1px solid var(--border-divider);
 }
 
-/* ── Utilities ── */
 .no-scrollbar::-webkit-scrollbar {
     display: none;
 }
 
 .no-scrollbar {
     -ms-overflow-style: none;
-    /* IE and Edge */
     scrollbar-width: none;
-    /* Firefox */
+}
+
+.landing-shell {
+    --landing-bg: #06080b;
+    --landing-surface: rgba(12, 16, 20, 0.84);
+    --landing-surface-strong: #0d1116;
+    --landing-text: #f5f7fb;
+    --landing-muted: rgba(245, 247, 251, 0.72);
+    --landing-soft: rgba(245, 247, 251, 0.48);
+    --landing-line: rgba(255, 255, 255, 0.09);
+    --landing-line-strong: rgba(255, 255, 255, 0.16);
+    --landing-accent: var(--color-primary-1);
+    --landing-accent-strong: #d8ffd4;
+    --landing-accent-2: var(--color-primary-2);
+    background:
+        radial-gradient(circle at 14% 12%, rgba(117, 241, 106, 0.1), transparent 24%),
+        radial-gradient(circle at 82% 14%, rgba(143, 94, 255, 0.1), transparent 28%),
+        linear-gradient(180deg, #0a0c0f 0%, #06080b 52%, #050608 100%);
+}
+
+.landing-balance {
+    text-wrap: balance;
+}
+
+.landing-display-title {
+    max-inline-size: 100%;
+    text-wrap: balance;
+}
+
+.landing-kicker {
+    color: var(--landing-accent);
+    font-size: 0.72rem;
+    letter-spacing: 0.42em;
+    text-transform: uppercase;
+}
+
+.landing-panel {
+    border: 1px solid var(--landing-line);
+    background: linear-gradient(180deg, rgba(13, 16, 20, 0.94), rgba(9, 11, 14, 0.98));
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.32);
+}
+
+.landing-pill {
+    border: 1px solid var(--landing-line);
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.landing-button-primary,
+.landing-button-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    min-height: 3.5rem;
+    border-radius: 999px;
+    padding: 0 1.75rem;
+    font-size: 0.74rem;
+    font-weight: 700;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    transition:
+        transform 180ms ease,
+        border-color 180ms ease,
+        background-color 180ms ease,
+        color 180ms ease,
+        box-shadow 180ms ease;
+}
+
+.landing-button-primary {
+    border: 1px solid rgba(117, 241, 106, 0.22);
+    background: linear-gradient(135deg, #75f16a 0%, #9dff94 100%);
+    box-shadow: 0 14px 36px rgba(117, 241, 106, 0.18);
+    color: #07110a;
+}
+
+.landing-button-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 18px 42px rgba(117, 241, 106, 0.22);
+}
+
+.landing-button-secondary {
+    border: 1px solid var(--landing-line-strong);
+    background: rgba(255, 255, 255, 0.02);
+    color: var(--landing-text);
+}
+
+.landing-button-secondary:hover {
+    transform: translateY(-2px);
+    border-color: var(--landing-accent);
+    color: var(--landing-accent-strong);
+}
+
+.landing-inline-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    color: var(--landing-accent);
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.26em;
+    text-transform: uppercase;
+    transition: color 180ms ease, transform 180ms ease;
+}
+
+.landing-inline-link:hover {
+    color: var(--landing-accent-strong);
+    transform: translateX(2px);
+}
+
+.landing-auth-input {
+    width: 100%;
+    min-height: 3.5rem;
+    border-radius: 999px;
+    border: 1px solid var(--landing-line);
+    background: rgba(255, 255, 255, 0.02);
+    color: var(--landing-text);
+    padding: 0 1.25rem;
+    font-size: 0.98rem;
+    outline: none;
+    transition: border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
+}
+
+.landing-auth-input::placeholder {
+    color: var(--landing-soft);
+}
+
+.landing-auth-input:focus {
+    border-color: rgba(117, 241, 106, 0.4);
+    box-shadow: 0 0 0 4px rgba(117, 241, 106, 0.08);
+    background: rgba(255, 255, 255, 0.03);
 }

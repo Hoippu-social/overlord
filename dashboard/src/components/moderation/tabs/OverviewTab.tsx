@@ -305,13 +305,19 @@ export function OverviewTab({
                                         <button
                                             key={entry.id}
                                             onClick={() => setSelectedCaseId(entry.id)}
-                                            className={`group relative flex min-h-[104px] w-full items-start gap-4 overflow-hidden rounded-2xl px-5 py-4 text-left transition-all duration-300 ${
+                                            className={`group relative flex min-h-[104px] w-full items-start gap-4 overflow-hidden rounded-2xl border px-5 py-4 text-left transition-all duration-300 ${
                                                 isSelected
-                                                    ? 'border-l-4 border-[var(--color-primary-1)] bg-gradient-to-r from-[var(--color-primary-1)]/20 to-transparent'
-                                                    : 'border-l-4 border-transparent bg-white/[0.03] hover:bg-white/[0.06]'
+                                                    ? 'border-[#7AAA7A] bg-gradient-to-r from-[var(--color-primary-1)]/10 via-[var(--color-primary-1)]/4 to-transparent shadow-[0_0_32px_rgba(var(--color-primary-1-rgb),0.16)]'
+                                                    : 'border-white/5 bg-white/[0.03] hover:border-white/10 hover:bg-white/[0.06]'
                                             }`}
                                         >
-                                            <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-white/5 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
+                                            <div
+                                                className={`pointer-events-none absolute inset-0 transition-opacity ${
+                                                    isSelected
+                                                        ? 'bg-[radial-gradient(circle_at_left_center,rgba(var(--color-primary-1-rgb),0.14),transparent_58%)] opacity-100'
+                                                        : 'bg-gradient-to-r from-white/5 to-transparent opacity-0 group-hover:opacity-100'
+                                                }`}
+                                            />
 
                                             <div className="relative z-10 mt-1 shrink-0">
                                                 <div

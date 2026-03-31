@@ -11,7 +11,6 @@ import {
 import {
     FloppyDisk,
     TextT,
-    MapTrifold,
     ChatCircle,
     Gear,
     Users,
@@ -25,6 +24,7 @@ import {
 } from '@phosphor-icons/react';
 import DiscordMessagePreview, { MessagePayload } from './DiscordMessagePreview';
 import { Popover, PopoverTrigger, PopoverContent } from '@nextui-org/react';
+import { InteractiveSelect } from '@/components/moderation/ui';
 
 // Color picker helper
 const PRESET_COLORS = [
@@ -247,18 +247,17 @@ export default function CategoryModal({ isOpen, onClose, category, onSave, chann
                                                 />
                                             </div>
                                             <div className="space-y-2">
-                                                <label className="text-xs font-bold text-[var(--text-secondary)] pl-1">Discord Channel / Category ID</label>
-                                                <div className="relative">
-                                                    <MapTrifold className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" size={16} />
-                                                    <select
-                                                        value={formData.channelId || ''}
-                                                        onChange={(e) => setFormData(prev => ({ ...prev, channelId: e.target.value }))}
-                                                        className="w-full bg-[var(--surface-card)] border border-[var(--border-subtle)] focus:border-[#3b82f6] rounded-xl h-11 pl-10 pr-4 text-sm text-white outline-none transition-colors appearance-none cursor-pointer"
-                                                    >
-                                                        <option value="" disabled className="bg-[#111]">Select routing destination...</option>
-                                                        {channels.map(c => <option key={c.id} value={c.id} className="bg-[#111]">#{c.name || c.id}</option>)}
-                                                    </select>
-                                                </div>
+                                                <InteractiveSelect
+                                                    label="Discord Channel / Category ID"
+                                                    value={formData.channelId || ''}
+                                                    onChange={(value) => setFormData((prev) => ({ ...prev, channelId: value }))}
+                                                    placeholder="Select routing destination..."
+                                                    options={channels.map((channel) => ({
+                                                        ...channel,
+                                                        name: channel.name || channel.id,
+                                                        isCategory: true,
+                                                    }))}
+                                                />
                                             </div>
                                         </div>
                                     </div>

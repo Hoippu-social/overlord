@@ -1,49 +1,60 @@
-import { SlashCommandBuilder, GuildMember } from 'discord.js';
+import { GuildMember, SlashCommandBuilder } from 'discord.js';
+import { localizeDescription } from '../../utils/commandLocalizations';
+import { getInteractionLocale, t } from '../../utils/i18n';
 import { Command } from '../../utils/types';
 
 const command: Command = {
-    data: new SlashCommandBuilder()
-        .setName('loop')
-        .setDescription('Sets the loop mode')
-        .addStringOption(option =>
-            option.setName('mode')
-                .setDescription('Loop mode')
-                .setRequired(false)
-                .addChoices(
-                    { name: '❌ Выключить', value: 'off' },
-                    { name: '🔂 Повтор трека', value: 'track' },
-                    { name: '🔁 Повтор очереди', value: 'queue' }
+    data: localizeDescription(
+        new SlashCommandBuilder()
+            .setName('loop')
+            .addStringOption((option) =>
+                localizeDescription(
+                    option
+                        .setName('mode')
+                        .setRequired(false)
+                        .addChoices(
+                            { name: 'Off', value: 'off' },
+                            { name: 'Track', value: 'track' },
+                            { name: 'Queue', value: 'queue' }
+                        ),
+                    {
+                        en: 'Loop mode',
+                        ru: 'Режим повтора',
+                    }
                 )
-        ) as any,
+            ) as any,
+        {
+            en: 'Set the loop mode',
+            ru: 'Установить режим повтора',
+        }
+    ),
     accessGroup: 'music',
     accessKey: 'loop',
     execute: async (interaction) => {
+        const locale = await getInteractionLocale(interaction);
         const member = interaction.member as GuildMember;
         const voiceChannel = member.voice.channel;
 
         if (!voiceChannel) {
-            await interaction.reply({ content: '❌ Вы должны быть в голосовом канале!', ephemeral: true });
+            await interaction.reply({ content: t(locale, 'general.notVoice'), ephemeral: true });
             return;
         }
 
         const player = interaction.client.lavalink.getPlayer(interaction.guildId!);
 
         if (!player) {
-            await interaction.reply({ content: '❌ Плеер не активен!', ephemeral: true });
+            await interaction.reply({ content: t(locale, 'general.playerMissing'), ephemeral: true });
             return;
         }
 
         if (player.voiceChannelId !== voiceChannel.id) {
-            await interaction.reply({ content: '❌ Вы должны быть в том же канале, что и бот!', ephemeral: true });
+            await interaction.reply({ content: t(locale, 'general.notSameVoice'), ephemeral: true });
             return;
         }
 
         const mode = interaction.options.getString('mode');
-
-        // If no mode specified, cycle through modes
         let newMode: 'off' | 'track' | 'queue';
         if (!mode) {
-            // Cycle: off -> track -> queue -> off
             if (player.repeatMode === 'off') newMode = 'track';
             else if (player.repeatMode === 'track') newMode = 'queue';
             else newMode = 'off';
@@ -52,14 +63,10 @@ const command: Command = {
         }
 
         await player.setRepeatMode(newMode);
-
-        const modeMessages: Record<string, string> = {
-            'off': '❌ Повтор выключен',
-            'track': '🔂 Повтор текущего трека включен',
-            'queue': '🔁 Повтор очереди включен'
-        };
-
-        await interaction.reply(modeMessages[newMode]);
+        await interaction.reply({
+            content: t(locale, `music.loop.set.${newMode}` as never),
+            ephemeral: true,
+        });
     },
 };
 

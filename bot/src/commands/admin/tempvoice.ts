@@ -1,6 +1,7 @@
 import { ChannelType, ChatInputCommandInteraction, PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
 import { GuildMember } from 'discord.js';
 import { hasGuildPermissionAccess } from '../../services/ModerationService';
+import { localizeDescription } from '../../utils/commandLocalizations';
 import { prisma } from '../../utils/database';
 import { getGuildLocale, t, LocaleCode } from '../../utils/i18n';
 import logger from '../../utils/logger';
@@ -10,51 +11,67 @@ import { Command } from '../../utils/types';
 const DEFAULT_TEMPLATE = 'Room {user}';
 
 const command: Command = {
-    data: new SlashCommandBuilder()
-        .setName('tempvoice')
-        .setDescription('Manage temporary private voice rooms')
+    data: localizeDescription(new SlashCommandBuilder()
+        .setName('tempvoice'), {
+        en: 'Manage temporary private voice rooms',
+        ru: 'Управлять временными приватными голосовыми комнатами',
+    })
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels)
         .setDMPermission(false)
-        .addSubcommand(sub =>
-            sub
-                .setName('setup')
-                .setDescription('Enable temporary rooms for a lobby channel')
-                .addChannelOption(option =>
-                    option
-                        .setName('hub')
-                        .setDescription('Voice channel users join to get their room')
+        .addSubcommand((sub: any) =>
+            localizeDescription(sub
+                .setName('setup'), {
+                en: 'Enable temporary rooms for a lobby channel',
+                ru: 'Включить временные комнаты для лобби-канала',
+            })
+                .addChannelOption((option: any) =>
+                    localizeDescription(option
+                        .setName('hub'), {
+                        en: 'Voice channel users join to get their room',
+                        ru: 'Голосовой канал, в который заходят для создания комнаты',
+                    })
                         .setRequired(true)
                         .addChannelTypes(ChannelType.GuildVoice)
                 )
-                .addChannelOption(option =>
-                    option
-                        .setName('category')
-                        .setDescription('Category to place created rooms')
+                .addChannelOption((option: any) =>
+                    localizeDescription(option
+                        .setName('category'), {
+                        en: 'Category to place created rooms',
+                        ru: 'Категория для создаваемых комнат',
+                    })
                         .addChannelTypes(ChannelType.GuildCategory)
                 )
-                .addStringOption(option =>
-                    option
-                        .setName('name')
-                        .setDescription('Channel name template, use {user} for the owner name')
+                .addStringOption((option: any) =>
+                    localizeDescription(option
+                        .setName('name'), {
+                        en: 'Channel name template, use {user} for the owner name',
+                        ru: 'Шаблон имени канала, используйте {user} для имени владельца',
+                    })
                         .setMaxLength(90)
                 )
-                .addIntegerOption(option =>
-                    option
-                        .setName('limit')
-                        .setDescription('User limit for created rooms (optional)')
+                .addIntegerOption((option: any) =>
+                    localizeDescription(option
+                        .setName('limit'), {
+                        en: 'User limit for created rooms',
+                        ru: 'Лимит пользователей для создаваемых комнат',
+                    })
                         .setMinValue(1)
                         .setMaxValue(99)
                 )
         )
-        .addSubcommand(sub =>
-            sub
-                .setName('status')
-                .setDescription('Show current temp room configuration')
+        .addSubcommand((sub: any) =>
+            localizeDescription(sub
+                .setName('status'), {
+                en: 'Show current temp room configuration',
+                ru: 'Показать текущую конфигурацию временных комнат',
+            })
         )
-        .addSubcommand(sub =>
-            sub
-                .setName('disable')
-                .setDescription('Turn off temp rooms and clean up active ones')
+        .addSubcommand((sub: any) =>
+            localizeDescription(sub
+                .setName('disable'), {
+                en: 'Turn off temp rooms and clean up active ones',
+                ru: 'Выключить временные комнаты и удалить активные',
+            })
         ) as any,
     accessGroup: 'admin',
     accessKey: 'tempvoice',
@@ -71,7 +88,7 @@ const command: Command = {
             : await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
 
         if (!member) {
-            await interaction.reply({ content: 'Unable to resolve your guild member state.', ephemeral: true });
+            await interaction.reply({ content: t(locale, 'general.memberResolveFailed'), ephemeral: true });
             return;
         }
 

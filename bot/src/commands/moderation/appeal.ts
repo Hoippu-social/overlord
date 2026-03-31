@@ -1,35 +1,55 @@
 import { SlashCommandBuilder } from 'discord.js';
 import { createAppealTicket, listAppealTickets, safeEnsureAppealConfig } from '../../services/AppealService';
+import { localizeDescription } from '../../utils/commandLocalizations';
+import { getInteractionLocale, t } from '../../utils/i18n';
 import { Command } from '../../utils/types';
 
 const command: Command = {
-    data: new SlashCommandBuilder()
-        .setName('appeal')
-        .setDescription('Submit or view your moderation appeals')
-        .setDMPermission(false)
-        .addSubcommand((sub) =>
-            sub
-                .setName('submit')
-                .setDescription('Submit an appeal for one of your moderation cases')
-                .addIntegerOption((option) => option.setName('case_id').setDescription('Moderation case number').setRequired(true).setMinValue(1))
-                .addStringOption((option) => option.setName('message').setDescription('Why this case should be reviewed').setRequired(true).setMaxLength(1000))
-        )
-        .addSubcommand((sub) =>
-            sub
-                .setName('mine')
-                .setDescription('Show your recent appeal tickets')
-        ),
+    data: localizeDescription(
+        new SlashCommandBuilder()
+            .setName('appeal')
+            .setDMPermission(false)
+            .addSubcommand((sub: any) =>
+                localizeDescription(sub.setName('submit'), {
+                    en: 'Submit an appeal for one of your moderation cases',
+                    ru: 'Подать апелляцию на один из ваших кейсов',
+                })
+                    .addIntegerOption((option: any) =>
+                        localizeDescription(option.setName('case_id').setRequired(true).setMinValue(1), {
+                            en: 'Moderation case number',
+                            ru: 'Номер модераторского кейса',
+                        })
+                    )
+                    .addStringOption((option: any) =>
+                        localizeDescription(option.setName('message').setRequired(true).setMaxLength(1000), {
+                            en: 'Why this case should be reviewed',
+                            ru: 'Почему этот кейс должен быть пересмотрен',
+                        })
+                    )
+            )
+            .addSubcommand((sub: any) =>
+                localizeDescription(sub.setName('mine'), {
+                    en: 'Show your recent appeal tickets',
+                    ru: 'Показать ваши недавние тикеты апелляции',
+                })
+            ),
+        {
+            en: 'Submit or view your moderation appeals',
+            ru: 'Подать апелляцию или посмотреть свои апелляции',
+        }
+    ),
     accessGroup: 'moderation',
     accessKey: 'appeal',
     async execute(interaction) {
+        const locale = await getInteractionLocale(interaction);
         if (!interaction.guild) {
-            await interaction.reply({ content: 'Guild only.', ephemeral: true });
+            await interaction.reply({ content: t(locale, 'general.guildOnly'), ephemeral: true });
             return;
         }
 
         const config = await safeEnsureAppealConfig(interaction.guild.id);
         if (!config?.enabled) {
-            await interaction.reply({ content: 'Appeals are not enabled for this server.', ephemeral: true });
+            await interaction.reply({ content: t(locale, 'moderation.appeals.disabled'), ephemeral: true });
             return;
         }
 
@@ -41,13 +61,13 @@ const command: Command = {
             });
 
             if (!tickets.length) {
-                await interaction.reply({ content: 'You do not have any recent appeal tickets.', ephemeral: true });
+                await interaction.reply({ content: t(locale, 'moderation.appeal.none'), ephemeral: true });
                 return;
             }
 
             await interaction.reply({
                 content: tickets
-                    .map((ticket) => `#${ticket.id} - ${ticket.appealType} - case #${ticket.caseNumber} - ${ticket.status}`)
+                    .map((ticket) => `#${ticket.id} - ${ticket.appealType} - #${ticket.caseNumber} - ${ticket.status}`)
                     .join('\n')
                     .slice(0, 1900),
                 ephemeral: true,
@@ -65,12 +85,15 @@ const command: Command = {
             });
 
             await interaction.reply({
-                content: `Appeal ticket #${ticket.id} created for case #${ticket.caseNumber}.`,
+                content: t(locale, 'moderation.appeal.created', {
+                    ticketId: ticket.id,
+                    caseNumber: ticket.caseNumber,
+                }),
                 ephemeral: true,
             });
-        } catch (error) {
+        } catch {
             await interaction.reply({
-                content: error instanceof Error ? error.message : 'Failed to create appeal ticket.',
+                content: t(locale, 'moderation.appeal.failedCreate'),
                 ephemeral: true,
             });
         }

@@ -1,30 +1,48 @@
 import { PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
 import { createModerationCase } from '../../services/ModerationService';
-import { logAuditEvent } from '../../utils/auditLog';
+import { buildAuditPreview, logAuditEvent } from '../../utils/auditLog';
+import { localizeDescription } from '../../utils/commandLocalizations';
+import { getInteractionLocale, t } from '../../utils/i18n';
 import { formatDurationFromMinutes, parseDurationToMinutes } from '../../utils/moderationHelpers';
+import { buildStaffEmbed } from '../../utils/staffEmbeds';
 import { Command } from '../../utils/types';
 
 const command: Command = {
-    data: new SlashCommandBuilder()
-        .setName('warn')
-        .setDescription('Issue a warning to a member')
-        .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
-        .setDMPermission(false)
-        .addUserOption((option) =>
-            option.setName('user').setDescription('Member to warn').setRequired(true)
-        )
-        .addStringOption((option) =>
-            option.setName('duration').setDescription('Optional duration like 30m, 12h, 2d').setRequired(false)
-        )
-        .addStringOption((option) =>
-            option.setName('reason').setDescription('Reason for the warning').setRequired(true).setMaxLength(500)
-        ),
+    data: localizeDescription(
+        new SlashCommandBuilder()
+            .setName('warn')
+            .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
+            .setDMPermission(false)
+            .addUserOption((option) =>
+                localizeDescription(option.setName('user').setRequired(true), {
+                    en: 'Member to warn',
+                    ru: 'Участник для предупреждения',
+                })
+            )
+            .addStringOption((option) =>
+                localizeDescription(option.setName('reason').setRequired(true).setMaxLength(500), {
+                    en: 'Reason for the warning',
+                    ru: 'Причина предупреждения',
+                })
+            )
+            .addStringOption((option) =>
+                localizeDescription(option.setName('duration').setRequired(false), {
+                    en: 'Optional duration like 30m, 12h, 2d',
+                    ru: 'Необязательная длительность, например 30m, 12h, 2d',
+                })
+            ),
+        {
+            en: 'Issue a warning to a member',
+            ru: 'Выдать предупреждение участнику',
+        }
+    ),
     accessGroup: 'moderation',
     accessKey: 'warn',
-    requiredAccessLevel: 40,
+    requiredAccessLevel: 50,
     async execute(interaction) {
+        const locale = await getInteractionLocale(interaction);
         if (!interaction.guildId) {
-            await interaction.reply({ content: 'Guild only.', ephemeral: true });
+            await interaction.reply({ content: t(locale, 'general.guildOnly'), ephemeral: true });
             return;
         }
 
@@ -34,7 +52,7 @@ const command: Command = {
         const durationMinutes = duration ? (parseDurationToMinutes(duration) ?? undefined) : undefined;
 
         if (duration && (!durationMinutes || durationMinutes <= 0)) {
-            await interaction.reply({ content: 'Invalid duration.', ephemeral: true });
+            await interaction.reply({ content: t(locale, 'general.invalidDuration'), ephemeral: true });
             return;
         }
 
@@ -49,7 +67,7 @@ const command: Command = {
             metadata: durationMinutes ? { durationMinutes } : null,
         });
 
-        await logAuditEvent(interaction.client, {
+        const auditInput = {
             guildId: interaction.guildId,
             tag: 'moderation',
             actorId: interaction.user.id,
@@ -62,12 +80,35 @@ const command: Command = {
                 reason,
             },
             severity: 'WARN',
-        });
+        } as const;
+
+        await logAuditEvent(interaction.client, auditInput);
+        const preview = await buildAuditPreview(interaction.client, auditInput);
+
+        if (preview?.embeds?.length) {
+            await interaction.reply({ embeds: preview.embeds, ephemeral: true });
+            return;
+        }
 
         await interaction.reply({
-            content: durationMinutes
-                ? `Warned <@${target.id}> for ${formatDurationFromMinutes(durationMinutes)}. Case #${moderationCase.caseNumber}.`
-                : `Warned <@${target.id}>. Case #${moderationCase.caseNumber}.`,
+            embeds: [
+                buildStaffEmbed({
+                    actor: interaction.user,
+                    title: t(locale, 'audit.moderation.warn.title'),
+                    color: 0x60a5fa,
+                    thumbnailUrl: target.displayAvatarURL({ size: 256 }),
+                    description: [
+                        '',
+                        `**${t(locale, 'audit.moderation.target')}:** <@${target.id}>`,
+                        `**${t(locale, 'audit.moderation.actor')}:** <@${interaction.user.id}>`,
+                    ],
+                    fields: [
+                        { label: t(locale, 'audit.moderation.reason'), value: reason },
+                        { label: t(locale, 'audit.moderation.duration'), value: durationMinutes ? formatDurationFromMinutes(durationMinutes) : t(locale, 'audit.moderation.forever') },
+                        { label: t(locale, 'moderation.action.case'), value: `#${moderationCase.caseNumber}` },
+                    ],
+                }),
+            ],
             ephemeral: true,
         });
     },

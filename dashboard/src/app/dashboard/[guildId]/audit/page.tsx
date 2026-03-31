@@ -1,28 +1,21 @@
 'use client';
 
-import React, { useEffect, useMemo, useState, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import {
-    Card,
-    CardHeader,
-    CardBody,
     Chip,
-    ScrollShadow,
-    Divider,
     Select,
     SelectItem,
     Switch,
     Button,
-    Tooltip,
-    Autocomplete,
-    AutocompleteItem,
-    Avatar
 } from '@nextui-org/react';
 import {
-    Plus, Trash, Circle, Hash, Shield, EnvelopeSimple, MagnifyingGlass, WarningCircle, CheckCircle, Warning, UserPlus, IdentificationBadge, SpeakerHigh, UserMinus, ShieldCheck, Door, MonitorPlay, UsersThree, Info, Key, Clock, ShieldStar, Eye, UserCircle, Wrench, X, AppWindow, Users, ChatsCircle, Crown, ChatCircleText, Robot, CaretRight, Folder, Lock, Scroll
+    Plus, Trash, Circle, Hash, WarningCircle, CheckCircle, Warning, UserPlus, IdentificationBadge, SpeakerHigh, ShieldCheck, Info, Clock, UserCircle, Users, ChatCircleText, Robot, CaretRight, Lock
 } from "@phosphor-icons/react";
 import { useParams } from 'next/navigation';
 import { useGuildLocale, useGuildTimezone } from '@/lib/i18n';
 import { SectionBlock } from '@/components/SectionBlock';
+import { InteractiveSelect } from '@/components/moderation/ui';
+import { buildChannelSelectOptions } from '@/lib/channelSelectOptions';
 
 type AuditEvent = {
     id: number;
@@ -32,7 +25,7 @@ type AuditEvent = {
     targetId?: string | null;
     channelId?: string | null;
     messageId?: string | null;
-    payload?: any;
+    payload?: AuditPayload;
     severity?: string | null;
     createdAt: string;
 };
@@ -48,7 +41,14 @@ type Route = {
     updatedAt: string;
 };
 
-type Channel = { id: string; name?: string | null; type?: number | string | null };
+type Channel = {
+    id: string;
+    name?: string | null;
+    type?: number | string | null;
+    parentId?: string | null;
+    isCategory?: boolean;
+    categoryName?: string | null;
+};
 
 type EnrichedUser = {
     id: string;
@@ -56,6 +56,30 @@ type EnrichedUser = {
     username?: string;
     tag?: string;
     avatar: string | null;
+};
+
+type AttachmentItem = {
+    id?: string | null;
+    url?: string | null;
+    proxyUrl?: string | null;
+    name?: string | null;
+};
+
+type AuditPayload = {
+    [key: string]: unknown;
+    event?: string;
+    action?: string;
+    actorTag?: string;
+    targetTag?: string;
+    reason?: string;
+    until?: string;
+    fromChannelId?: string;
+    toChannelId?: string;
+    contentBefore?: string;
+    contentAfter?: string;
+    attachments?: AttachmentItem[];
+    attachmentsBefore?: AttachmentItem[];
+    attachmentsAfter?: AttachmentItem[];
 };
 
 const TAGS = [
@@ -70,7 +94,7 @@ const TAGS = [
     { value: 'bot', label: 'Bot', icon: Robot },
 ];
 
-const TAG_ICONS: Record<string, any> = TAGS.reduce((acc, tag) => ({ ...acc, [tag.value]: tag.icon }), {});
+const TAG_ICONS: Record<string, React.ElementType> = TAGS.reduce((acc, tag) => ({ ...acc, [tag.value]: tag.icon }), {});
 
 const strings = {
     en: {
@@ -133,7 +157,7 @@ const strings = {
     },
 } as const;
 
-const severityConfig: Record<string, { color: string; bgColor: string; icon: any }> = {
+const severityConfig: Record<string, { color: string; bgColor: string; icon: React.ElementType }> = {
     INFO: { color: 'text-blue-400', bgColor: 'bg-blue-400/10', icon: Info },
     WARN: { color: 'text-amber-400', bgColor: 'bg-amber-400/10', icon: WarningCircle },
     ERROR: { color: 'text-rose-400', bgColor: 'bg-rose-400/10', icon: Warning },
@@ -148,7 +172,7 @@ function ListItem({
     rightElement,
     onClick
 }: {
-    icon?: any;
+    icon?: React.ElementType;
     iconColor?: string;
     label: string | React.ReactNode;
     value?: string | React.ReactNode;
@@ -181,17 +205,17 @@ function ListItem({
     );
 }
 
-function renderAttachments(label: string, items?: any[]) {
+function renderAttachments(label: string, items?: AttachmentItem[]) {
     if (!items || !items.length) return null;
     return (
         <div className="text-xs text-[var(--text-muted)] mt-3 space-y-2 bg-[var(--surface-sidebar)] p-3 rounded-xl border border-[var(--border-divider)]">
             <div className="font-bold text-[var(--text-secondary)] uppercase tracking-widest text-[10px]">{label}</div>
             <div className="flex flex-wrap gap-2">
-                {items.map((att: any) => (
+                {items.map((att, index) => (
                     <a
-                        key={att.id || att.url}
+                        key={att.id ?? att.url ?? att.proxyUrl ?? `attachment-${index}`}
                         className="flex items-center gap-2 text-[var(--color-primary-1)] hover:text-white bg-[var(--color-primary-1)]/10 hover:bg-[var(--color-primary-1)]/20 px-3 py-1.5 rounded-lg max-w-full truncate transition-colors"
-                        href={att.url || att.proxyUrl}
+                        href={(att.url ?? att.proxyUrl) ?? undefined}
                         target="_blank"
                         rel="noreferrer"
                     >
@@ -213,6 +237,7 @@ export default function AuditPage() {
     const [events, setEvents] = useState<AuditEvent[]>([]);
     const [routes, setRoutes] = useState<Route[]>([]);
     const [channels, setChannels] = useState<Channel[]>([]);
+    const [channelCategories, setChannelCategories] = useState<Channel[]>([]);
     const [allChannels, setAllChannels] = useState<Channel[]>([]);
     const [enrichedUsers, setEnrichedUsers] = useState<Record<string, EnrichedUser>>({});
     const [enrichedChannels, setEnrichedChannels] = useState<Record<string, Channel>>({});
@@ -225,11 +250,29 @@ export default function AuditPage() {
     const [mounted, setMounted] = useState(false);
     const isDirty = useRef(false);
 
+    const routeChannelOptions = useMemo(
+        () =>
+            buildChannelSelectOptions({
+                channels,
+                categories: channelCategories,
+                includeCategories: true,
+            }).map((option) => ({
+                ...option,
+                name: option.name ?? option.id,
+                type: option.type ?? undefined,
+                position: option.position ?? undefined,
+                categoryName: option.categoryName ?? null,
+                parentId: option.parentId ?? null,
+            })),
+        [channels, channelCategories]
+    );
+
     useEffect(() => {
         setMounted(true);
     }, []);
 
-    const getChannelName = (id: string) => {
+    const getChannelName = (id?: string | null) => {
+        if (!id) return 'Unknown channel';
         return enrichedChannels[id]?.name || allChannels.find(c => c.id === id)?.name || id;
     };
 
@@ -243,13 +286,12 @@ export default function AuditPage() {
         });
     };
 
-    const loadData = async () => {
+    const loadData = useCallback(async () => {
         try {
-            const [evRes, routeRes, textChRes, voiceChRes] = await Promise.all([
+            const [evRes, routeRes, treeRes] = await Promise.all([
                 fetch(`/api/guilds/${guildId}/audit/events?limit=50`),
                 fetch(`/api/guilds/${guildId}/audit/routes`),
-                fetch(`/api/guilds/${guildId}/text-channels`),
-                fetch(`/api/guilds/${guildId}/channels`),
+                fetch(`/api/guilds/${guildId}/channel-tree`),
             ]);
 
             if (!evRes.ok || !routeRes.ok) {
@@ -258,10 +300,13 @@ export default function AuditPage() {
 
             const evData = await evRes.json();
             const routeData = await routeRes.json();
-            const textChannels: Channel[] = textChRes.ok ? (await textChRes.json()) : [];
-            const voiceChannels: Channel[] = voiceChRes.ok ? (await voiceChRes.json()) : [];
+            const treeData = treeRes.ok ? await treeRes.json() : { text: [], voice: [], categories: [] };
+            const textChannels: Channel[] = Array.isArray(treeData?.text) ? treeData.text : [];
+            const voiceChannels: Channel[] = Array.isArray(treeData?.voice) ? treeData.voice : [];
+            const categories: Channel[] = Array.isArray(treeData?.categories) ? treeData.categories : [];
 
             const merged = new Map<string, Channel>();
+            categories.forEach((channel) => merged.set(channel.id, channel));
             [...(Array.isArray(textChannels) ? textChannels : []),
             ...(Array.isArray(voiceChannels) ? voiceChannels : [])].forEach(c => merged.set(c.id, c));
             const allCh = Array.from(merged.values());
@@ -269,6 +314,7 @@ export default function AuditPage() {
             setEvents(evData.events || []);
             setRoutes(routeData.routes || []);
             setChannels(Array.isArray(textChannels) ? textChannels : []);
+            setChannelCategories(categories);
             setAllChannels(allCh);
 
             const eventsData: AuditEvent[] = evData.events || [];
@@ -297,16 +343,16 @@ export default function AuditPage() {
                 } catch { /* enrich is best-effort */ }
             }
 
-        } catch (err: any) {
-            setError(err.message || 'Failed to load audit data');
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : 'Failed to load audit data');
         }
-    };
+    }, [guildId]);
 
     useEffect(() => {
         loadData();
         const id = setInterval(loadData, 5000);
         return () => clearInterval(id);
-    }, [guildId]);
+    }, [loadData]);
 
     const currentRoutesMap = useMemo(() => {
         const map = new Map<string, Route>();
@@ -442,43 +488,16 @@ export default function AuditPage() {
                                 ))}
                             </Select>
 
-                            <Autocomplete
+                            <InteractiveSelect
                                 label={text.selectChannel}
-                                variant="bordered"
-                                allowsCustomValue={false}
-                                defaultItems={channels}
-                                selectedKey={selectedChannelId}
-                                onSelectionChange={(key) => {
+                                value={selectedChannelId || ''}
+                                onChange={(value) => {
                                     isDirty.current = true;
-                                    setSelectedChannelId(key as string || null);
+                                    setSelectedChannelId(value || null);
                                 }}
-                                classNames={{
-                                    base: "w-full",
-                                    listboxWrapper: "bg-[var(--surface-hover)] rounded-xl",
-                                    popoverContent: "bg-[var(--surface-card)] border border-[var(--border-subtle)] rounded-2xl shadow-2xl",
-                                }}
-                                inputProps={{
-                                    classNames: {
-                                        inputWrapper: "bg-[var(--surface-hover)] border border-[var(--border-subtle)] min-h-[64px] rounded-2xl data-[hover=true]:bg-[var(--surface-hover)] data-[hover=true]:border-[var(--border-focus)] transition-all px-4",
-                                        label: "hidden",
-                                        input: "text-lg font-medium text-[var(--text-primary)] placeholder:text-[var(--text-muted)]",
-                                    }
-                                }}
-                                listboxProps={{
-                                    itemClasses: {
-                                        base: "rounded-xl data-[hover=true]:bg-[var(--surface-hover)] text-[var(--text-secondary)] data-[hover=true]:text-[var(--text-primary)] p-3",
-                                    }
-                                }}
-                            >
-                                {(ch) => (
-                                    <AutocompleteItem key={ch.id} textValue={ch.name || ch.id}>
-                                        <div className="flex items-center gap-2">
-                                            <Hash size={18} className="text-default-400" />
-                                            <span className="text-base font-bold">{ch.name || ch.id}</span>
-                                        </div>
-                                    </AutocompleteItem>
-                                )}
-                            </Autocomplete>
+                                options={routeChannelOptions}
+                                placeholder={text.selectChannel}
+                            />
 
                             <div className="flex items-center justify-between p-4 bg-[var(--surface-hover)] rounded-2xl border border-[var(--border-divider)]">
                                 <span className="font-bold text-[var(--text-muted)] uppercase text-xs tracking-wider ml-1">{text.status}</span>
@@ -514,7 +533,6 @@ export default function AuditPage() {
                             <div className="p-2 space-y-1">
                                 {routes.map((r) => {
                                     const tagInfo = TAGS.find(t => t.value === r.tag);
-                                    const ch = channels.find(c => c.id === r.channelId);
                                     return (
                                         <ListItem
                                             key={r.id}
@@ -624,7 +642,10 @@ export default function AuditPage() {
                                                         {ev.actorId === ev.targetId && ev.actorId && (
                                                             <div className="bg-[var(--surface-hover)] p-3 rounded-2xl border border-[var(--border-divider)] flex items-center gap-3">
                                                                 <div className="w-8 h-8 rounded-lg overflow-hidden bg-[var(--surface-card)] flex items-center justify-center text-[var(--text-muted)] shrink-0">
-                                                                    {enrichedUsers[ev.actorId]?.avatar ? <img src={enrichedUsers[ev.actorId].avatar || undefined} className="w-full h-full object-cover" alt="" /> : <UserCircle size={16} />}
+                                                                    {enrichedUsers[ev.actorId]?.avatar ? (
+                                                                        // eslint-disable-next-line @next/next/no-img-element
+                                                                        <img src={enrichedUsers[ev.actorId].avatar || undefined} className="w-full h-full object-cover" alt="" />
+                                                                    ) : <UserCircle size={16} />}
                                                                 </div>
                                                                 <div className="min-w-0">
                                                                     <div className="text-[10px] uppercase font-bold text-[var(--text-muted)] tracking-wider mb-0.5">{text.user}</div>
@@ -637,7 +658,10 @@ export default function AuditPage() {
                                                         {ev.actorId !== ev.targetId && ev.actorId && (
                                                             <div className="bg-[var(--surface-hover)] p-3 rounded-2xl border border-[var(--border-divider)] flex items-center gap-3">
                                                                 <div className="w-8 h-8 rounded-lg overflow-hidden bg-[var(--surface-card)] flex items-center justify-center text-[var(--text-muted)] shrink-0">
-                                                                    {enrichedUsers[ev.actorId]?.avatar ? <img src={enrichedUsers[ev.actorId].avatar || undefined} className="w-full h-full object-cover" alt="" /> : <UserCircle size={16} />}
+                                                                    {enrichedUsers[ev.actorId]?.avatar ? (
+                                                                        // eslint-disable-next-line @next/next/no-img-element
+                                                                        <img src={enrichedUsers[ev.actorId].avatar || undefined} className="w-full h-full object-cover" alt="" />
+                                                                    ) : <UserCircle size={16} />}
                                                                 </div>
                                                                 <div className="min-w-0">
                                                                     <div className="text-[10px] uppercase font-bold text-[var(--text-muted)] tracking-wider mb-0.5">
@@ -652,7 +676,10 @@ export default function AuditPage() {
                                                         {ev.actorId !== ev.targetId && ev.targetId && (
                                                             <div className="bg-[var(--surface-hover)] p-3 rounded-2xl border border-[var(--border-divider)] flex items-center gap-3">
                                                                 <div className="w-8 h-8 rounded-lg overflow-hidden bg-[var(--surface-card)] flex items-center justify-center text-[var(--text-muted)] shrink-0">
-                                                                    {enrichedUsers[ev.targetId]?.avatar ? <img src={enrichedUsers[ev.targetId].avatar || undefined} className="w-full h-full object-cover" alt="" /> : <UserCircle size={16} />}
+                                                                    {enrichedUsers[ev.targetId]?.avatar ? (
+                                                                        // eslint-disable-next-line @next/next/no-img-element
+                                                                        <img src={enrichedUsers[ev.targetId].avatar || undefined} className="w-full h-full object-cover" alt="" />
+                                                                    ) : <UserCircle size={16} />}
                                                                 </div>
                                                                 <div className="min-w-0">
                                                                     <div className="text-[10px] uppercase font-bold text-[var(--text-muted)] tracking-wider mb-0.5">

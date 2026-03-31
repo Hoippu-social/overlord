@@ -75,7 +75,7 @@ export const COMMAND_CATALOG: readonly CommandCatalogEntry[] = [
         hidden: false,
         label: { en: 'Ban', ru: 'Бан' },
         description: { en: 'Ban a member from the server.', ru: 'Блокировка участника на сервере.' },
-        defaultRequiredAccessLevel: 85,
+        defaultRequiredAccessLevel: 80,
     },
     {
         commandKey: 'case',
@@ -84,7 +84,7 @@ export const COMMAND_CATALOG: readonly CommandCatalogEntry[] = [
         hidden: false,
         label: { en: 'Case', ru: 'Кейс' },
         description: { en: 'Inspect a specific moderation case.', ru: 'Просмотр конкретного модерационного кейса.' },
-        defaultRequiredAccessLevel: 35,
+        defaultRequiredAccessLevel: 30,
     },
     {
         commandKey: 'cases',
@@ -93,7 +93,7 @@ export const COMMAND_CATALOG: readonly CommandCatalogEntry[] = [
         hidden: false,
         label: { en: 'Cases', ru: 'Кейсы' },
         description: { en: 'Browse moderation case history.', ru: 'Просмотр истории модерационных кейсов.' },
-        defaultRequiredAccessLevel: 35,
+        defaultRequiredAccessLevel: 30,
     },
     {
         commandKey: 'clear',
@@ -102,7 +102,7 @@ export const COMMAND_CATALOG: readonly CommandCatalogEntry[] = [
         hidden: false,
         label: { en: 'Clear', ru: 'Очистка' },
         description: { en: 'Bulk delete messages in a channel.', ru: 'Массовое удаление сообщений в канале.' },
-        defaultRequiredAccessLevel: 55,
+        defaultRequiredAccessLevel: 50,
     },
     {
         commandKey: 'kick',
@@ -111,7 +111,7 @@ export const COMMAND_CATALOG: readonly CommandCatalogEntry[] = [
         hidden: false,
         label: { en: 'Kick', ru: 'Кик' },
         description: { en: 'Kick a member from the server.', ru: 'Исключение участника с сервера.' },
-        defaultRequiredAccessLevel: 65,
+        defaultRequiredAccessLevel: 70,
     },
     {
         commandKey: 'lock',
@@ -120,7 +120,7 @@ export const COMMAND_CATALOG: readonly CommandCatalogEntry[] = [
         hidden: false,
         label: { en: 'Lock', ru: 'Лок' },
         description: { en: 'Lock a channel from sending messages.', ru: 'Закрытие канала для отправки сообщений.' },
-        defaultRequiredAccessLevel: 55,
+        defaultRequiredAccessLevel: 50,
     },
     {
         commandKey: 'mute',
@@ -129,7 +129,7 @@ export const COMMAND_CATALOG: readonly CommandCatalogEntry[] = [
         hidden: false,
         label: { en: 'Mute', ru: 'Мьют' },
         description: { en: 'Apply the configured mute role.', ru: 'Выдача настроенной роли мута.' },
-        defaultRequiredAccessLevel: 55,
+        defaultRequiredAccessLevel: 50,
     },
     {
         commandKey: 'note',
@@ -147,16 +147,7 @@ export const COMMAND_CATALOG: readonly CommandCatalogEntry[] = [
         hidden: false,
         label: { en: 'Slowmode', ru: 'Медленный режим' },
         description: { en: 'Configure channel slowmode.', ru: 'Настройка медленного режима канала.' },
-        defaultRequiredAccessLevel: 55,
-    },
-    {
-        commandKey: 'tempban',
-        moduleKey: 'moderation',
-        kind: 'slash',
-        hidden: false,
-        label: { en: 'Tempban', ru: 'Временный бан' },
-        description: { en: 'Temporarily ban a user.', ru: 'Временная блокировка пользователя.' },
-        defaultRequiredAccessLevel: 80,
+        defaultRequiredAccessLevel: 50,
     },
     {
         commandKey: 'timeout',
@@ -165,7 +156,7 @@ export const COMMAND_CATALOG: readonly CommandCatalogEntry[] = [
         hidden: false,
         label: { en: 'Timeout', ru: 'Таймаут' },
         description: { en: 'Temporarily timeout a member.', ru: 'Временное ограничение участника.' },
-        defaultRequiredAccessLevel: 60,
+        defaultRequiredAccessLevel: 50,
     },
     {
         commandKey: 'unban',
@@ -183,7 +174,7 @@ export const COMMAND_CATALOG: readonly CommandCatalogEntry[] = [
         hidden: false,
         label: { en: 'Unlock', ru: 'Разлок' },
         description: { en: 'Re-open a locked channel.', ru: 'Повторное открытие закрытого канала.' },
-        defaultRequiredAccessLevel: 55,
+        defaultRequiredAccessLevel: 50,
     },
     {
         commandKey: 'unmute',
@@ -192,7 +183,7 @@ export const COMMAND_CATALOG: readonly CommandCatalogEntry[] = [
         hidden: false,
         label: { en: 'Unmute', ru: 'Размьют' },
         description: { en: 'Remove the configured mute role.', ru: 'Снятие настроенной роли мута.' },
-        defaultRequiredAccessLevel: 55,
+        defaultRequiredAccessLevel: 50,
     },
     {
         commandKey: 'untimeout',
@@ -201,7 +192,7 @@ export const COMMAND_CATALOG: readonly CommandCatalogEntry[] = [
         hidden: false,
         label: { en: 'Untimeout', ru: 'Снять таймаут' },
         description: { en: 'Remove an active timeout.', ru: 'Снятие активного таймаута.' },
-        defaultRequiredAccessLevel: 60,
+        defaultRequiredAccessLevel: 50,
     },
     {
         commandKey: 'unwarn',
@@ -210,7 +201,7 @@ export const COMMAND_CATALOG: readonly CommandCatalogEntry[] = [
         hidden: false,
         label: { en: 'Unwarn', ru: 'Снять предупреждение' },
         description: { en: 'Clear a warning case.', ru: 'Снятие предупреждения по кейсу.' },
-        defaultRequiredAccessLevel: 60,
+        defaultRequiredAccessLevel: 70,
     },
     {
         commandKey: 'voicekick',
@@ -219,7 +210,7 @@ export const COMMAND_CATALOG: readonly CommandCatalogEntry[] = [
         hidden: false,
         label: { en: 'Voice Kick', ru: 'Кик из голосового' },
         description: { en: 'Disconnect a member from voice.', ru: 'Отключение участника из голосового канала.' },
-        defaultRequiredAccessLevel: 45,
+        defaultRequiredAccessLevel: 50,
     },
     {
         commandKey: 'voicemove',
@@ -228,7 +219,7 @@ export const COMMAND_CATALOG: readonly CommandCatalogEntry[] = [
         hidden: false,
         label: { en: 'Voice Move', ru: 'Перемещение в голосовом' },
         description: { en: 'Move a member between voice channels.', ru: 'Перемещение участника между голосовыми каналами.' },
-        defaultRequiredAccessLevel: 45,
+        defaultRequiredAccessLevel: 50,
     },
     {
         commandKey: 'warn',
@@ -237,16 +228,19 @@ export const COMMAND_CATALOG: readonly CommandCatalogEntry[] = [
         hidden: false,
         label: { en: 'Warn', ru: 'Предупреждение' },
         description: { en: 'Issue a warning to a member.', ru: 'Выдача предупреждения участнику.' },
-        defaultRequiredAccessLevel: 45,
+        defaultRequiredAccessLevel: 50,
     },
     {
-        commandKey: 'warnings',
+        commandKey: 'warns',
         moduleKey: 'moderation',
         kind: 'slash',
         hidden: false,
-        label: { en: 'Warnings', ru: 'Предупреждения' },
-        description: { en: 'List active warnings for a member.', ru: 'Просмотр активных предупреждений участника.' },
-        defaultRequiredAccessLevel: 35,
+        label: { en: 'Warnings', ru: 'История наказаний' },
+        description: {
+            en: 'Show punishment history (warns, mutes, timeouts, kicks, bans) for yourself or a specified user.',
+            ru: 'Показать историю наказаний (варны, муты, тайм-ауты, кики, баны) для себя или указанного пользователя.',
+        },
+        defaultRequiredAccessLevel: 30,
     },
     {
         commandKey: 'loop',
