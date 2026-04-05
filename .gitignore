@@ -28,3 +28,9 @@ sync_status*.json
 api_response*.json
 test_db.js
 check_db.js
+
+# Local temp and test artifacts
+tmp/
+dashboard/tmp/
+dashboard/test-results/
+
