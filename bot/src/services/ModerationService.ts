@@ -1069,10 +1069,14 @@ async function buildModeratorAccessContext(guildId: string, member: GuildMember)
         };
     }
 
-    const [botSettings, bindings, grants] = await Promise.all([
+    const [botSettings, moderationConfig, bindings, grants] = await Promise.all([
         prisma.botSettings.findUnique({
             where: { guildId },
             select: { adminRoles: true },
+        }),
+        prisma.moderationConfig.findUnique({
+            where: { guildId },
+            select: { commandRules: true },
         }),
         prisma.moderationRoleBinding.findMany({
             where: { guildId, enabled: true },

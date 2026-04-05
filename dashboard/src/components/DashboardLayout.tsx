@@ -3,6 +3,7 @@
 import React from 'react';
 import { Sidebar } from './Sidebar';
 import { TopNav } from './TopNav';
+import { GuildAccessGuard } from '@/components/common/GuildAccessGuard';
 
 interface DashboardLayoutProps {
     children: React.ReactNode;
@@ -14,6 +15,8 @@ interface DashboardLayoutProps {
 export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, guildId, guildName, guildIcon }) => {
     return (
         <div className="flex h-screen w-screen bg-[var(--bg-base)] text-[var(--text-primary)] overflow-hidden font-sans">
+            <GuildAccessGuard guildId={guildId} />
+
             {/* Left Sidebar (Fixed 280px) */}
             <Sidebar guildId={guildId} guildName={guildName} guildIcon={guildIcon} />
 

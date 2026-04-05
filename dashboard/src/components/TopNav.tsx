@@ -1,10 +1,11 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { Bell, MagnifyingGlass, Question } from '@phosphor-icons/react';
 import { useGuildLocale } from '@/lib/i18n';
 import { Avatar, Button } from '@nextui-org/react';
+import { useSession } from 'next-auth/react';
 
 interface TopNavProps {
     guildId: string;
@@ -43,6 +44,62 @@ export const TopNav: React.FC<TopNavProps> = ({ guildId }) => {
     const { locale } = useGuildLocale(guildId);
     const text = strings[locale];
     const pathname = usePathname();
+    const { data: session } = useSession();
+    const sessionUserId = (session?.user as { id?: string } | undefined)?.id || 'viewer';
+    const [stableProfile, setStableProfile] = useState<{ image?: string; name: string }>({ name: 'User' });
+
+    useEffect(() => {
+        if (typeof window === 'undefined') {
+            return;
+        }
+
+        const storageKey = `dashboard-profile:${sessionUserId}`;
+        try {
+            const raw = window.localStorage.getItem(storageKey);
+            if (!raw) {
+                setStableProfile({ name: 'User' });
+                return;
+            }
+
+            const cached = JSON.parse(raw) as { image?: string; name?: string };
+            setStableProfile({
+                name: cached.name?.trim() || 'User',
+                image: cached.image?.trim() || undefined,
+            });
+        } catch {
+            // Ignore malformed local profile cache.
+        }
+    }, [sessionUserId]);
+
+    useEffect(() => {
+        const nextName = session?.user?.name?.trim();
+        const nextImage = session?.user?.image?.trim();
+
+        if (!nextName && !nextImage) {
+            return;
+        }
+
+        setStableProfile((current) => {
+            const updated = {
+                name: nextName || current.name,
+                image: nextImage || current.image,
+            };
+
+            if (typeof window !== 'undefined') {
+                try {
+                    window.localStorage.setItem(`dashboard-profile:${sessionUserId}`, JSON.stringify(updated));
+                } catch {
+                    // Ignore quota or privacy-mode failures.
+                }
+            }
+
+            return updated;
+        });
+    }, [session?.user?.image, session?.user?.name, sessionUserId]);
+
+    const userImage = stableProfile.image;
+    const userName = stableProfile.name;
+    const avatarKey = `${sessionUserId}:${userImage || userName}`;
 
     let pageTitle: string = text.dashboard;
     if (pathname.includes('/stats')) pageTitle = text.stats;
@@ -55,12 +112,14 @@ export const TopNav: React.FC<TopNavProps> = ({ guildId }) => {
     if (pathname.includes('/audit')) pageTitle = text.audit;
 
     return (
-        <header className="relative z-10 mt-16 flex h-24 w-full flex-shrink-0 items-center justify-between px-4 md:mt-0 md:px-8">
-            <div>
-                <h1 className="text-3xl font-akony tracking-tight text-[var(--text-primary)] drop-shadow-sm">{pageTitle}</h1>
+        <header className="relative z-10 mt-16 flex min-h-[5.5rem] w-full flex-shrink-0 items-center justify-between gap-4 px-4 py-3 md:mt-0 md:h-24 md:px-8 md:py-0">
+            <div className="min-w-0 flex-1">
+                <h1 className="max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-[clamp(1.55rem,7.2vw,2.35rem)] font-akony leading-none tracking-tight text-[var(--text-primary)] drop-shadow-sm md:text-3xl">
+                    {pageTitle}
+                </h1>
             </div>
 
-            <div className="flex items-center gap-3 md:gap-4">
+            <div className="flex flex-shrink-0 items-center gap-3 md:gap-4">
                 <div className="hidden h-11 w-72 items-center rounded-full border border-[var(--border-divider)] bg-[var(--surface-card)] px-4 shadow-inner transition-colors focus-within:border-[var(--color-primary-1)]/50 lg:flex">
                     <MagnifyingGlass size={18} className="text-[var(--text-muted)]" />
                     <input
@@ -85,7 +144,14 @@ export const TopNav: React.FC<TopNavProps> = ({ guildId }) => {
 
                 <div className="group flex cursor-pointer items-center gap-3 pl-1 md:pl-2">
                     <div className="h-11 w-11 rounded-full bg-gradient-to-tr from-[var(--color-primary-1)] to-[var(--color-primary-1)]/30 p-[2px] shadow-lg shadow-[var(--color-primary-1)]/10 transition-transform hover:scale-105">
-                        <Avatar src="https://i.pravatar.cc/150?u=a042581f4e29026024d" className="h-full w-full rounded-full border-2 border-[var(--bg-base)] bg-[var(--bg-base)]" />
+                        <Avatar
+                            key={avatarKey}
+                            src={userImage}
+                            name={userName}
+                            showFallback
+                            className="h-full w-full rounded-full border-2 border-[var(--bg-base)] bg-[var(--bg-base)]"
+                            imgProps={{ referrerPolicy: 'no-referrer' }}
+                        />
                     </div>
                 </div>
             </div>

@@ -1,6 +1,5 @@
 import React from 'react';
 import { StatsNav } from '@/components/StatsNav';
-import { SyncProgressBar } from '@/components/stats/SyncProgressBar';
 
 export default async function StatsLayout({
     children,
@@ -13,10 +12,7 @@ export default async function StatsLayout({
 
     return (
         <div className="relative min-h-screen">
-            {/* Sync Progress Bar handles auto-sync logic internally */}
-            <SyncProgressBar guildId={guildId} />
-
-            <div className="px-6 pt-6 pb-4">
+            <div className="px-3 pt-4 pb-4 sm:px-6 sm:pt-6">
                 <StatsNav guildId={guildId} />
             </div>
 

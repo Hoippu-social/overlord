@@ -35,7 +35,13 @@ const config: Config = {
                 content2: "var(--surface-hover)",
             },
             fontFamily: {
-                sans: ["Outfit", "sans-serif"],
+                sans: [
+                    "var(--font-futura)",
+                    "\"Segoe UI Variable Text\"",
+                    "\"Segoe UI\"",
+                    "system-ui",
+                    "sans-serif",
+                ],
             },
             borderRadius: {
                 lg: "24px",

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getAuthToken } from '@/lib/auth';
-import { canAccessGuild } from '@/lib/discordAccess';
+import { syncGuildCommandVisibility } from '@/lib/discordCommandPermissions';
+import { authorizeGuildApiRequest, isGuildApiAuthFailure } from '@/lib/guildApiAuth';
 
 const AI_CATEGORIES = [
     'toxicity',
@@ -91,6 +91,18 @@ const parseJsonObject = (value: unknown) => {
     }
 };
 
+const parseJsonValue = (value: unknown) => {
+    if (typeof value !== 'string') {
+        return null;
+    }
+
+    try {
+        return JSON.parse(value);
+    } catch {
+        return null;
+    }
+};
+
 const normalizeStringArray = (value: unknown) => {
     if (!Array.isArray(value)) {
         return [];
@@ -134,6 +146,9 @@ const normalizeNullableString = (value: unknown) => {
 const normalizeCommandRuleMode = (value: unknown) =>
     value === 'WHITELIST' ? 'WHITELIST' : 'BLACKLIST';
 
+const normalizeDiscordChannelMode = (value: unknown): 'whitelist' | 'blacklist' =>
+    typeof value === 'string' && value.toLowerCase() === 'whitelist' ? 'whitelist' : 'blacklist';
+
 const asRecord = (value: unknown): Record<string, unknown> =>
     value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
 
@@ -164,7 +179,15 @@ const normalizeCommandRules = (value: unknown) => {
                         : normalizeInteger(requiredAccessLevel, 50, 0, 100),
             };
         })
-        .filter(Boolean);
+        .filter((rule): rule is {
+            commandKey: string;
+            enabled: boolean;
+            roleMode: 'WHITELIST' | 'BLACKLIST';
+            roleIds: string[];
+            channelMode: 'WHITELIST' | 'BLACKLIST';
+            channelIds: string[];
+            requiredAccessLevel: number | null;
+        } => Boolean(rule));
 };
 
 const parseGuildPayload = (value: string | null) => {
@@ -181,36 +204,6 @@ const parseGuildPayload = (value: string | null) => {
 const textChannelTypes = new Set([0, 5, 11, 12, 15, 16, 'text', 'announcement', 'news', 'public_thread', 'private_thread', 'forum', 'media']);
 const voiceChannelTypes = new Set([2, 13, 'voice', 'GUILD_VOICE', 'stage_voice', 'GUILD_STAGE_VOICE', 'cast']);
 const categoryChannelTypes = new Set([4, 'category', 'GUILD_CATEGORY']);
-
-const sortRolesByServerOrder = (left: { position: number }, right: { position: number }) =>
-    right.position - left.position;
-
-const sortChannelsByServerOrder = (
-    left: { position: number; parentId: string | null; isCategory: boolean },
-    right: { position: number; parentId: string | null; isCategory: boolean },
-    categoryMap: Map<string, number>,
-) => {
-    const leftGroupPosition = left.isCategory
-        ? left.position
-        : left.parentId
-            ? (categoryMap.get(left.parentId) ?? left.position)
-            : left.position;
-    const rightGroupPosition = right.isCategory
-        ? right.position
-        : right.parentId
-            ? (categoryMap.get(right.parentId) ?? right.position)
-            : right.position;
-
-    if (leftGroupPosition !== rightGroupPosition) {
-        return leftGroupPosition - rightGroupPosition;
-    }
-
-    if (left.isCategory !== right.isCategory) {
-        return left.isCategory ? -1 : 1;
-    }
-
-    return left.position - right.position;
-};
 
 async function ensureModerationDefaults(guildId: string) {
     await prisma.guild.upsert({
@@ -284,28 +277,12 @@ async function ensureModerationDefaults(guildId: string) {
     }
 }
 
-async function authorize(request: NextRequest, guildId: string) {
-    const token = await getAuthToken(request);
-    const accessToken = typeof token?.accessToken === 'string' ? token.accessToken : null;
-    if (!accessToken) {
-        return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
-    }
-
-    const allowedGuilds = Array.isArray(token?.allowedGuilds) ? token.allowedGuilds : null;
-    const hasAccess = allowedGuilds ? allowedGuilds.includes(guildId) : await canAccessGuild(accessToken, guildId);
-    if (!hasAccess) {
-        return { error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
-    }
-
-    return { error: null };
-}
-
 export async function GET(request: NextRequest, { params }: { params: Promise<{ guildId: string }> }) {
     try {
         const { guildId } = await params;
-        const auth = await authorize(request, guildId);
-        if (auth.error) {
-            return auth.error;
+        const auth = await authorizeGuildApiRequest(request, guildId);
+        if (isGuildApiAuthFailure(auth)) {
+            return auth.response;
         }
 
         await ensureModerationDefaults(guildId);
@@ -357,16 +334,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         }));
 
         const rawChannels = parseGuildPayload(guild?.channels ?? null);
-        const categoryEntries = rawChannels
-            .filter((channel) => categoryChannelTypes.has(channel?.type))
-            .map((channel) => ({
-                id: String(channel.id ?? ''),
-                name: String(channel.name ?? 'Category'),
-                position: Number(channel.position ?? 0),
-            }));
-        const categoryPositions = new Map(categoryEntries.map((channel) => [channel.id, channel.position]));
-        const categoryNames = new Map(categoryEntries.map((channel) => [channel.id, channel.name]));
-
         const channels = rawChannels
             .filter((channel) => textChannelTypes.has(channel.type) || voiceChannelTypes.has(channel.type) || categoryChannelTypes.has(channel.type))
             .map((channel) => ({
@@ -388,8 +355,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
                     ignoredRoles: parseJsonArray(config.ignoredRoles),
                     ignoredUsers: parseJsonArray(config.ignoredUsers),
                     commandOnlyChannels: parseJsonArray(config.commandOnlyChannels),
+                    commandRules: parseJsonValue(config.commandRules),
                 }
                 : null,
+            commandRules: parseJsonValue(config?.commandRules) ?? [],
             roleBindings,
             commandGrants,
             automodRules: BUILT_IN_RULES.map((ruleKey) => {
@@ -437,10 +406,11 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ guildId: string }> }) {
     try {
         const { guildId } = await params;
-        const auth = await authorize(request, guildId);
-        if (auth.error) {
-            return auth.error;
+        const auth = await authorizeGuildApiRequest(request, guildId, { live: true });
+        if (isGuildApiAuthFailure(auth)) {
+            return auth.response;
         }
+        const accessToken = auth.accessToken;
 
         await ensureModerationDefaults(guildId);
 
@@ -455,6 +425,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         const aiCategories = Array.isArray(body?.aiCategories) ? body.aiCategories : [];
         const appealConfig = body?.appealConfig ?? {};
         const retentionPolicies = Array.isArray(body?.retentionPolicies) ? body.retentionPolicies : [];
+        const syncDiscordCommandPermissions = body?.syncDiscordCommandPermissions === true;
+        const payloadGuildChannels = Array.isArray(body?.guildChannels) ? JSON.stringify(body.guildChannels) : null;
+        const normalizedCommandRules = normalizeCommandRules(body?.commandRules);
 
         await prisma.$transaction(async (tx) => {
             await tx.moderationConfig.upsert({
@@ -465,6 +438,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
                     ignoredRoles: JSON.stringify(normalizeStringArray(moderationConfig.ignoredRoles)),
                     ignoredUsers: JSON.stringify(normalizeStringArray(moderationConfig.ignoredUsers)),
                     commandOnlyChannels: JSON.stringify(normalizeStringArray(moderationConfig.commandOnlyChannels)),
+                    commandRules: JSON.stringify(normalizedCommandRules),
                 },
                 create: {
                     guildId,
@@ -473,6 +447,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
                     ignoredRoles: JSON.stringify(normalizeStringArray(moderationConfig.ignoredRoles)),
                     ignoredUsers: JSON.stringify(normalizeStringArray(moderationConfig.ignoredUsers)),
                     commandOnlyChannels: JSON.stringify(normalizeStringArray(moderationConfig.commandOnlyChannels)),
+                    commandRules: JSON.stringify(normalizedCommandRules),
                 },
             });
 
@@ -693,9 +668,38 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             }
         });
 
-        return NextResponse.json({ ok: true });
+        let syncWarning: string | null = null;
+        if (syncDiscordCommandPermissions && accessToken === 'admin') {
+            syncWarning = 'discord_oauth_required';
+        } else if (syncDiscordCommandPermissions && accessToken) {
+            const [botSettings, guild] = await Promise.all([
+                prisma.botSettings.findUnique({
+                    where: { guildId },
+                    select: {
+                        commandChannelMode: true,
+                        allowedTextChannels: true,
+                    },
+                }),
+                prisma.guild.findUnique({
+                    where: { id: guildId },
+                    select: { channels: true },
+                }),
+            ]);
+
+            await syncGuildCommandVisibility({
+                guildId,
+                accessToken,
+                mode: normalizeDiscordChannelMode(botSettings?.commandChannelMode),
+                selectedChannelIds: parseJsonArray(botSettings?.allowedTextChannels),
+                commandRules: normalizedCommandRules,
+                guildChannelsJson: payloadGuildChannels ?? guild?.channels ?? null,
+            });
+        }
+
+        return NextResponse.json({ ok: true, syncWarning });
     } catch (error) {
         console.error('Failed to save moderation config:', error);
-        return NextResponse.json({ error: 'Failed to save moderation config.' }, { status: 500 });
+        const message = error instanceof Error && error.message ? error.message : 'Failed to save moderation config.';
+        return NextResponse.json({ error: message }, { status: 500 });
     }
 }

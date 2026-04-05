@@ -25,7 +25,6 @@ type BotSettingsState = {
     timezone: string | null;
 };
 
-const TEXT_CHANNEL_TYPES = new Set([0, 5, 11, 12, 15, 16, 'text', 'announcement', 'news', 'public_thread', 'private_thread', 'forum', 'media', 'GUILD_TEXT', 'GUILD_NEWS', 'GUILD_FORUM', 'GUILD_MEDIA']);
 const CATEGORY_CHANNEL_TYPES = new Set([4, 'category', 'GUILD_CATEGORY']);
 
 const createDefaultBotSettings = (): BotSettingsState => ({
@@ -94,6 +93,7 @@ const STRINGS = {
         loading: 'Loading command settings...',
         failed: 'Failed to load command settings.',
         saved: 'Command settings saved successfully.',
+        savedWithSyncWarning: 'Settings saved, but hiding commands in Discord requires Discord OAuth login.',
         saveFailed: 'Failed to save command settings.',
         save: 'Save Changes',
         saving: 'Saving...',
@@ -103,6 +103,7 @@ const STRINGS = {
         loading: 'Загрузка настроек команд...',
         failed: 'Не удалось загрузить настройки команд.',
         saved: 'Настройки команд успешно сохранены.',
+        savedWithSyncWarning: 'Настройки сохранены, но скрытие команд в Discord требует входа через Discord OAuth.',
         saveFailed: 'Не удалось сохранить настройки команд.',
         save: 'Сохранить изменения',
         saving: 'Сохранение...',
@@ -126,10 +127,10 @@ export default function CommandsPage({ params }: { params: Promise<{ guildId: st
 
     const commandChannelOptions = useMemo(() => {
         const categories = config.channels.filter((channel) => CATEGORY_CHANNEL_TYPES.has(channel.type ?? ''));
-        const textChannels = config.channels.filter((channel) => TEXT_CHANNEL_TYPES.has(channel.type ?? ''));
+        const channels = config.channels.filter((channel) => !CATEGORY_CHANNEL_TYPES.has(channel.type ?? ''));
 
         return buildChannelSelectOptions({
-            channels: textChannels,
+            channels,
             categories,
             includeCategories: true,
         });
@@ -191,13 +192,20 @@ export default function CommandsPage({ params }: { params: Promise<{ guildId: st
         setNotice(null);
 
         try {
+            const moderationPayload: Record<string, unknown> = {
+                ...buildModerationSavePayload(config),
+                guildChannels: config.channels,
+                syncDiscordCommandPermissions: false,
+            };
             const botSettingsPayload: Record<string, unknown> = {
                 prefixCommandsEnabled: botSettings.prefixCommandsEnabled,
                 commandChannelMode: botSettings.commandChannelMode,
                 allowedTextChannels: botSettings.allowedTextChannels,
+                guildChannels: config.channels,
                 adminRoles: botSettings.adminRoles,
                 restoreRolesOnRejoin: botSettings.restoreRolesOnRejoin,
                 restoreNicknameOnRejoin: botSettings.restoreNicknameOnRejoin,
+                syncDiscordCommandPermissions: true,
             };
 
             if (botSettings.locale) {
@@ -208,29 +216,47 @@ export default function CommandsPage({ params }: { params: Promise<{ guildId: st
                 botSettingsPayload.timezone = botSettings.timezone;
             }
 
-            const [moderationResponse, botSettingsResponse] = await Promise.all([
-                fetch(`/api/guilds/${guildId}/moderation/config`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(buildModerationSavePayload(config)),
-                }),
-                fetch(`/api/guilds/${guildId}/bot-settings`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(botSettingsPayload),
-                }),
-            ]);
+            const moderationResponse = await fetch(`/api/guilds/${guildId}/moderation/config`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(moderationPayload),
+            });
 
-            if (!moderationResponse.ok || !botSettingsResponse.ok) {
-                throw new Error(text.saveFailed);
+            if (!moderationResponse.ok) {
+                const moderationError = await moderationResponse.json().catch(() => null);
+                const message =
+                    (moderationError && typeof moderationError.error === 'string' && moderationError.error) ||
+                    text.saveFailed;
+                throw new Error(message);
             }
 
-            setNotice(text.saved);
+            const botSettingsResponse = await fetch(`/api/guilds/${guildId}/bot-settings`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(botSettingsPayload),
+            });
+
+            if (!botSettingsResponse.ok) {
+                const botSettingsError = botSettingsResponse.ok
+                    ? null
+                    : await botSettingsResponse.json().catch(() => null);
+                const message =
+                    (botSettingsError && typeof botSettingsError.error === 'string' && botSettingsError.error) ||
+                    text.saveFailed;
+                throw new Error(message);
+            }
+
+            const botSettingsResult = await botSettingsResponse.json().catch(() => null);
+            const syncWarning = botSettingsResult && typeof botSettingsResult.syncWarning === 'string'
+                ? botSettingsResult.syncWarning
+                : null;
+
+            setNotice(syncWarning === 'discord_oauth_required' ? text.savedWithSyncWarning : text.saved);
             setTimeout(() => setNotice(null), 4000);
             await loadData();
         } catch (saveError) {
             console.error(saveError);
-            setError(text.saveFailed);
+            setError(saveError instanceof Error && saveError.message ? saveError.message : text.saveFailed);
         } finally {
             setSaving(false);
         }

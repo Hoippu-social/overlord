@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useCallback, use } from 'react';
+import React, { useEffect, useState, useCallback, use, useRef } from 'react';
 import Link from 'next/link';
 import {
     Pulse, ShieldCheck, Ticket, Users, Database,
@@ -8,8 +8,8 @@ import {
     CaretDown, CaretUp, Pause
 } from '@phosphor-icons/react';
 import { useGuildLocale } from '@/lib/i18n';
-import { Spinner } from '@nextui-org/react';
 import { DashboardAudioPlayer } from '@/components/music/DashboardAudioPlayer';
+import { fetchWithTimeout, withTimeout } from '@/lib/requestTimeout';
 
 /* ─── Types ─────────────────────────────────────────────────────── */
 interface GuildSummary {
@@ -46,6 +46,9 @@ interface AuditEvent {
     payload?: string | null;
     createdAt: string;
 }
+
+const PAGE_DATA_TIMEOUT_MS = 6000;
+const ENRICH_TIMEOUT_MS = 3500;
 
 /* ─── Strings ────────────────────────────────────────────────────── */
 const strings = {
@@ -243,6 +246,29 @@ function SectionHeader({ title, icon: Icon }: { title: string, icon: any }) {
 }
 
 /* ─── Main Component ──────────────────────────────────────────────── */
+async function readJson<T>(
+    url: string,
+    init: RequestInit | undefined,
+    timeoutMs: number,
+    label: string
+): Promise<T | null> {
+    try {
+        const response = await fetchWithTimeout(url, { cache: 'no-store', ...(init || {}) }, timeoutMs, label);
+        if (!response.ok) {
+            return null;
+        }
+
+        return await withTimeout(
+            async () => await response.json() as T,
+            timeoutMs,
+            `${label} body`
+        );
+    } catch (error) {
+        console.error(`[HubPage] ${label} failed:`, error);
+        return null;
+    }
+}
+
 export default function HubPage({ params }: { params: Promise<{ guildId: string }> }) {
     const { guildId } = use(params);
     const { locale } = useGuildLocale(guildId);
@@ -253,71 +279,120 @@ export default function HubPage({ params }: { params: Promise<{ guildId: string 
     const [events, setEvents] = useState<AuditEvent[]>([]);
     const [enrichedUsers, setEnrichedUsers] = useState<Record<string, any>>({});
     const [allChannels, setAllChannels] = useState<Record<string, any>>({});
-    const [loading, setLoading] = useState(true);
+    const fetchInFlightRef = useRef(false);
+    const isMountedRef = useRef(true);
 
-    const fetchAll = useCallback(async () => {
-        try {
-            const [guildRes, sysRes, auditRes] = await Promise.all([
-                fetch(`/api/guilds/${guildId}`).then(r => r.ok ? r.json() : null),
-                fetch('/api/system').then(r => r.ok ? r.json() : null),
-                fetch(`/api/guilds/${guildId}/audit/events?limit=20`).then(r => r.ok ? r.json() : null),
-            ]);
-            if (guildRes) setGuild(guildRes);
-            if (sysRes) setSys(sysRes);
+    useEffect(() => {
+        isMountedRef.current = true;
 
-            if (auditRes?.events) {
-                const fetchedEvents = auditRes.events as AuditEvent[];
-                setEvents(fetchedEvents);
+        return () => {
+            isMountedRef.current = false;
+        };
+    }, []);
 
-                // Fetch enrich explicitly for rare events we need to display
-                const RARE_TAGS = ['ban', 'kick', 'mute', 'unmute', 'warn', 'security', 'channels', 'role'];
-                const serverEventsToDisplay = fetchedEvents
-                    .filter(ev => RARE_TAGS.includes(ev.tag))
-                    .slice(0, 3);
+    const enrichEvents = useCallback(async (fetchedEvents: AuditEvent[]) => {
+        const rareTags = ['ban', 'kick', 'mute', 'unmute', 'warn', 'security', 'channels', 'role'];
+        const serverEventsToDisplay = fetchedEvents
+            .filter((event) => rareTags.includes(event.tag))
+            .slice(0, 3);
 
-                const botEventsToDisplay = fetchedEvents
-                    .filter(ev => ev.tag === 'bot_event' || ev.tag === 'dashboard_event')
-                    .slice(0, 4);
+        const botEventsToDisplay = fetchedEvents
+            .filter((event) => event.tag === 'bot_event' || event.tag === 'dashboard_event')
+            .slice(0, 4);
 
-                const evsToEnrich = [...serverEventsToDisplay, ...botEventsToDisplay];
-                const userIds = [...new Set(evsToEnrich.flatMap(ev => [ev.actorId, ev.targetId].filter(Boolean) as string[]))];
-                const channelIds = [...new Set(evsToEnrich.flatMap(ev => [ev.channelId].filter(Boolean) as string[]))];
+        const eventsToEnrich = [...serverEventsToDisplay, ...botEventsToDisplay];
+        const userIds = [...new Set(eventsToEnrich.flatMap((event) => [event.actorId, event.targetId].filter(Boolean) as string[]))];
+        const channelIds = [...new Set(eventsToEnrich.flatMap((event) => [event.channelId].filter(Boolean) as string[]))];
 
-                if (userIds.length > 0 || channelIds.length > 0) {
-                    try {
-                        const enrichRes = await fetch(`/api/guilds/${guildId}/enrich`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ userIds, channelIds }),
-                        });
-                        if (enrichRes.ok) {
-                            const data = await enrichRes.json();
-                            if (data.users) setEnrichedUsers(prev => ({ ...prev, ...data.users }));
-                            if (data.channels) setAllChannels(prev => ({ ...prev, ...data.channels }));
-                        }
-                    } catch { }
-                }
-            }
-        } catch {
-            // silent
-        } finally {
-            setLoading(false);
+        if (userIds.length === 0 && channelIds.length === 0) {
+            return;
+        }
+
+        const data = await readJson<{ channels?: Record<string, any>; users?: Record<string, any> }>(
+            `/api/guilds/${guildId}/enrich`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userIds, channelIds }),
+            },
+            ENRICH_TIMEOUT_MS,
+            `Guild enrich (${guildId})`
+        );
+
+        if (!data || !isMountedRef.current) {
+            return;
+        }
+
+        if (data.users) {
+            setEnrichedUsers((current) => ({ ...current, ...data.users }));
+        }
+        if (data.channels) {
+            setAllChannels((current) => ({ ...current, ...data.channels }));
         }
     }, [guildId]);
 
+    const fetchAll = useCallback(async () => {
+        if (fetchInFlightRef.current) {
+            return;
+        }
+
+        fetchInFlightRef.current = true;
+
+        try {
+            const guildPromise = readJson<GuildSummary>(
+                `/api/guilds/${guildId}`,
+                undefined,
+                PAGE_DATA_TIMEOUT_MS,
+                `Guild summary (${guildId})`
+            );
+            const systemPromise = readJson<SystemStats>(
+                '/api/system',
+                undefined,
+                PAGE_DATA_TIMEOUT_MS,
+                'System summary'
+            );
+            const auditPromise = readJson<{ events?: AuditEvent[] }>(
+                `/api/guilds/${guildId}/audit/events?limit=20`,
+                undefined,
+                PAGE_DATA_TIMEOUT_MS,
+                `Audit events (${guildId})`
+            );
+
+            void guildPromise.then((guildData) => {
+                if (guildData && isMountedRef.current) {
+                    setGuild(guildData);
+                }
+            });
+
+            void systemPromise.then((systemData) => {
+                if (systemData && isMountedRef.current) {
+                    setSys(systemData);
+                }
+            });
+
+            void auditPromise.then((auditData) => {
+                if (!auditData || !Array.isArray(auditData.events) || !isMountedRef.current) {
+                    return;
+                }
+
+                const fetchedEvents = auditData.events;
+                setEvents(fetchedEvents);
+                void enrichEvents(fetchedEvents);
+            });
+
+            await Promise.allSettled([guildPromise, systemPromise, auditPromise]);
+        } finally {
+            fetchInFlightRef.current = false;
+        }
+    }, [enrichEvents, guildId]);
+
     useEffect(() => {
-        fetchAll();
-        const interval = setInterval(fetchAll, 3000);
+        void fetchAll();
+        const interval = setInterval(() => {
+            void fetchAll();
+        }, 3000);
         return () => clearInterval(interval);
     }, [fetchAll]);
-
-    if (loading) {
-        return (
-            <div className="flex items-center justify-center h-[60vh]">
-                <Spinner color="primary" />
-            </div>
-        );
-    }
 
     const botStatusColor = sys?.botStatus === 'ONLINE' ? 'good' : sys?.botStatus === 'PARTIAL' ? 'warn' : 'bad';
     const pingStatus = sys && sys.ping !== null ? (sys.ping < 100 ? 'good' : sys.ping < 250 ? 'warn' : 'bad') : 'neutral';

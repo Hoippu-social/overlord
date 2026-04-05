@@ -1,0 +1,31 @@
+{
+  "ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/146.0.0.0 Safari/537.36 Edg/146.0.0.0",
+  "platform": "Win32",
+  "cssSupportsWebkit": true,
+  "cssSupportsMoz": false,
+  "devicePixelRatio": 1,
+  "body": {
+    "webkitFontSmoothing": "antialiased",
+    "mozOsxFontSmoothing": "",
+    "textRendering": "auto",
+    "fontFamily": "Outfit, sans-serif"
+  },
+  "heading": {
+    "text": "OVERLORD",
+    "className": "font-akony text-[0.88rem] tracking-[0.26em] text-[var(--landing-text)] sm:text-[1rem]",
+    "webkitFontSmoothing": "antialiased",
+    "mozOsxFontSmoothing": "",
+    "textRendering": "geometricprecision",
+    "fontFamily": "akony, \"akony Fallback\", system-ui, -apple-system, sans-serif"
+  },
+  "paragraph": {
+    "text": "Discord operating system",
+    "fontFamily": "Outfit, sans-serif"
+  },
+  "clip": {
+    "x": 105,
+    "y": 16,
+    "width": 245,
+    "height": 56
+  }
+}

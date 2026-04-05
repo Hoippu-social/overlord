@@ -2,6 +2,7 @@ import { Client, EmbedBuilder } from 'discord.js';
 import logger from './logger';
 import { prisma, statsPrisma } from './database';
 import { getGuildLocale, LocaleCode, t } from './i18n';
+import { parseAuditRouteChannelIds } from './auditRouteChannels';
 
 type AuditPayload = Record<string, unknown>;
 
@@ -411,24 +412,30 @@ async function sendToRoute(client: Client, input: AuditInput) {
     });
 
     if (!route || !route.enabled) return;
+    const routeChannelIds = parseAuditRouteChannelIds(route.channelId);
+    if (!routeChannelIds.length) return;
 
     try {
         const locale = await getGuildLocale(input.guildId);
-        const channel = await client.channels.fetch(route.channelId);
-        if (!channel || !channel.isTextBased() || !('send' in channel)) return;
-
-        // Fetch users for premium data
         const actor = input.actorId ? await client.users.fetch(input.actorId).catch(() => null) : null;
         const target = input.targetId ? await client.users.fetch(input.targetId).catch(() => null) : null;
 
         const moderationEvent = resolveModerationEvent(input);
-        if (moderationEvent && shouldSkipDuplicateDispatch(route.channelId, input, moderationEvent.canonicalEvent)) {
-            return;
-        }
-
         const moderationEmbed = buildModerationEmbedLocalized(locale, input, actor, target, route.template);
         if (moderationEmbed) {
-            await (channel as any).send({ embeds: [moderationEmbed] });
+            for (const routeChannelId of routeChannelIds) {
+                try {
+                    const channel = await client.channels.fetch(routeChannelId).catch(() => null);
+                    if (!channel || !channel.isTextBased() || !('send' in channel)) continue;
+                    if (moderationEvent && shouldSkipDuplicateDispatch(routeChannelId, input, moderationEvent.canonicalEvent)) {
+                        continue;
+                    }
+
+                    await (channel as any).send({ embeds: [EmbedBuilder.from(moderationEmbed)] });
+                } catch (channelError) {
+                    logger.warn(`[AuditLog] Failed to route tag ${input.tag} to channel ${routeChannelId} for guild ${input.guildId}: ${channelError}`);
+                }
+            }
             return;
         }
 
@@ -535,7 +542,15 @@ async function sendToRoute(client: Client, input: AuditInput) {
         embed.setDescription(description);
         embed.setFooter({ text: `Audit Log • ${input.tag.toUpperCase()}` });
 
-        await (channel as any).send({ embeds: [embed] });
+        for (const routeChannelId of routeChannelIds) {
+            try {
+                const channel = await client.channels.fetch(routeChannelId).catch(() => null);
+                if (!channel || !channel.isTextBased() || !('send' in channel)) continue;
+                await (channel as any).send({ embeds: [EmbedBuilder.from(embed)] });
+            } catch (channelError) {
+                logger.warn(`[AuditLog] Failed to route tag ${input.tag} to channel ${routeChannelId} for guild ${input.guildId}: ${channelError}`);
+            }
+        }
     } catch (error) {
         logger.warn(`[AuditLog] Failed to route tag ${input.tag} for guild ${input.guildId}: ${error}`);
     }

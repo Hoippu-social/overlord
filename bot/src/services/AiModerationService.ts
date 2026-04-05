@@ -19,6 +19,7 @@ import {
     parseJsonObject,
     timeoutMember,
 } from './ModerationService';
+import { parseAuditRouteChannelIds } from '../utils/auditRouteChannels';
 
 type AiCategory = (typeof AI_CATEGORIES)[number];
 
@@ -209,9 +210,8 @@ async function sendAiAlert(message: Message, assessment: AiAssessment, triggered
     });
 
     if (!route || !route.enabled) return;
-
-    const channel = await message.client.channels.fetch(route.channelId).catch(() => null);
-    if (!channel || !channel.isTextBased() || !('send' in channel)) return;
+    const routeChannelIds = parseAuditRouteChannelIds(route.channelId);
+    if (!routeChannelIds.length) return;
 
     const categories = triggered
         .map((entry) => `${entry.category} (${entry.score})`)
@@ -232,10 +232,15 @@ async function sendAiAlert(message: Message, assessment: AiAssessment, triggered
         .setFooter({ text: `${provider}/${model}` })
         .setTimestamp();
 
-    await (channel as { send: (payload: unknown) => Promise<unknown> }).send({
-        embeds: [embed],
-        components: [buildAiActionRow(locale, message.id)],
-    });
+    for (const routeChannelId of routeChannelIds) {
+        const channel = await message.client.channels.fetch(routeChannelId).catch(() => null);
+        if (!channel || !channel.isTextBased() || !('send' in channel)) continue;
+
+        await (channel as { send: (payload: unknown) => Promise<unknown> }).send({
+            embeds: [EmbedBuilder.from(embed)],
+            components: [buildAiActionRow(locale, message.id)],
+        });
+    }
 }
 
 export function isAiModerationButton(customId: string) {

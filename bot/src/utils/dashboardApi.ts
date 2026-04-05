@@ -3,6 +3,7 @@ import { Client } from 'discord.js';
 import logger from './logger';
 import { prisma, statsPrisma } from './database';
 import { reviewAppealTicket } from '../services/AppealService';
+import { parseAuditRouteChannelIds, serializeAuditRouteChannelIds } from './auditRouteChannels';
 
 const PORT = Number.parseInt(process.env.DASHBOARD_API_PORT || '3002', 10);
 const API_KEY = process.env.DASHBOARD_API_KEY || '';
@@ -322,50 +323,115 @@ export function startDashboardApi(client: Client): http.Server {
                         where: { guildId },
                         orderBy: { tag: 'asc' },
                     });
+                    const normalizedRoutes = routes.map((route) => ({
+                        ...route,
+                        channelIds: parseAuditRouteChannelIds(route.channelId),
+                    }));
                     res.writeHead(200, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ ok: true, routes }));
+                    res.end(JSON.stringify({ ok: true, routes: normalizedRoutes }));
                     return;
                 }
 
                 if (req.method === 'POST') {
                     const raw = await readBody(req);
                     const body = raw ? JSON.parse(raw) : {};
-                    const tag = typeof body.tag === 'string' ? body.tag : '';
-                    const channelId = typeof body.channelId === 'string' ? body.channelId : '';
-                    const enabled = typeof body.enabled === 'boolean' ? body.enabled : true;
+                    const tags = Array.from(
+                        new Set(
+                            [
+                                ...(typeof body.tag === 'string' ? [body.tag] : []),
+                                ...(Array.isArray(body.tags) ? body.tags : []),
+                            ]
+                                .filter((tag): tag is string => typeof tag === 'string')
+                                .map((tag) => tag.trim())
+                                .filter(Boolean)
+                        )
+                    );
+                    const channelIds = Array.from(
+                        new Set(
+                            [
+                                ...(typeof body.channelId === 'string' ? [body.channelId] : []),
+                                ...(Array.isArray(body.channelIds) ? body.channelIds : []),
+                            ]
+                                .filter((channelId): channelId is string => typeof channelId === 'string')
+                                .map((channelId) => channelId.trim())
+                                .filter(Boolean)
+                        )
+                    );
+                    const enabled = typeof body.enabled === 'boolean' ? body.enabled : undefined;
+                    const hasTemplate = Object.prototype.hasOwnProperty.call(body, 'template');
                     const template = typeof body.template === 'string' ? body.template : null;
+                    const hasMentions = Object.prototype.hasOwnProperty.call(body, 'mentions');
                     const mentions = body.mentions ? JSON.stringify(body.mentions) : null;
 
-                    if (!tag || !channelId) {
+                    if (tags.length === 0 || channelIds.length === 0) {
                         res.writeHead(400);
-                        res.end('tag and channelId are required');
+                        res.end('tags and channelIds are required');
                         return;
                     }
 
-                    const route = await prisma.auditTagRoute.upsert({
-                        where: { guildId_tag: { guildId, tag } },
-                        update: { channelId, enabled, template, mentions },
-                        create: { guildId, tag, channelId, enabled, template, mentions },
-                    });
+                    const serializedChannelIds = serializeAuditRouteChannelIds(channelIds);
+                    const routes = await prisma.$transaction(
+                        tags.map((tag) =>
+                            prisma.auditTagRoute.upsert({
+                                where: { guildId_tag: { guildId, tag } },
+                                update: {
+                                    channelId: serializedChannelIds,
+                                    ...(typeof enabled === 'boolean' ? { enabled } : {}),
+                                    ...(hasTemplate ? { template } : {}),
+                                    ...(hasMentions ? { mentions } : {}),
+                                },
+                                create: {
+                                    guildId,
+                                    tag,
+                                    channelId: serializedChannelIds,
+                                    enabled: enabled ?? true,
+                                    template: hasTemplate ? template : null,
+                                    mentions: hasMentions ? mentions : null,
+                                },
+                            })
+                        )
+                    );
+                    const normalizedRoutes = routes.map((route) => ({
+                        ...route,
+                        channelIds: parseAuditRouteChannelIds(route.channelId),
+                    }));
                     res.writeHead(200, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ ok: true, route }));
+                    res.end(JSON.stringify({
+                        ok: true,
+                        route: normalizedRoutes[0] ?? null,
+                        routes: normalizedRoutes,
+                    }));
                     return;
                 }
 
                 if (req.method === 'DELETE') {
                     const raw = await readBody(req);
                     const body = raw ? JSON.parse(raw) : {};
-                    const tag = typeof body.tag === 'string' ? body.tag : url.searchParams.get('tag') || '';
-                    if (!tag) {
+                    const tags = Array.from(
+                        new Set(
+                            [
+                                ...(url.searchParams.get('tag') ? [url.searchParams.get('tag')] : []),
+                                ...(typeof body.tag === 'string' ? [body.tag] : []),
+                                ...(Array.isArray(body.tags) ? body.tags : []),
+                            ]
+                                .filter((tag): tag is string => typeof tag === 'string')
+                                .map((tag) => tag.trim())
+                                .filter(Boolean)
+                        )
+                    );
+                    if (tags.length === 0) {
                         res.writeHead(400);
-                        res.end('tag is required');
+                        res.end('tag or tags are required');
                         return;
                     }
-                    await prisma.auditTagRoute.delete({
-                        where: { guildId_tag: { guildId, tag } },
+                    const result = await prisma.auditTagRoute.deleteMany({
+                        where: {
+                            guildId,
+                            tag: { in: tags },
+                        },
                     });
                     res.writeHead(200, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ ok: true }));
+                    res.end(JSON.stringify({ ok: true, count: result.count }));
                     return;
                 }
 

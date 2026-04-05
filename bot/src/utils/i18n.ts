@@ -809,6 +809,14 @@ Object.assign(translations.ru, {
     'ai.review.value': '{decision} от <@{userId}>',
 });
 
+Object.assign(translations.en, {
+    'general.commandChannelRestricted': 'Commands are not allowed in this channel.',
+});
+
+Object.assign(translations.ru, {
+    'general.commandChannelRestricted': 'Команды запрещены в этом канале.',
+});
+
 type TranslationKey = keyof typeof translations.en;
 
 const localeCache = new Map<string, { locale: LocaleCode; expires: number }>();

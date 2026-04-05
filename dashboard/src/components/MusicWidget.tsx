@@ -505,7 +505,7 @@ export const MusicWidget = ({ className = "", nowPlaying, guildId }: { className
                         classNames={{
                             tabList: "w-full border-b border-divider p-0 gap-0",
                             cursor: "w-full bg-primary",
-                            tab: "h-12 px-0",
+                            tab: "h-10 px-0",
                             tabContent: "group-data-[selected=true]:text-primary font-semibold"
                         }}
                     >

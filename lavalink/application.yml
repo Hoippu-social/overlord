@@ -59,8 +59,8 @@ logging:
 
   logback:
     rollingpolicy:
-      max-file-size: 1GB
-      max-history: 30
+      max-file-size: 50MB
+      max-history: 7
 
 plugins:
   youtube:

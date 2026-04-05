@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthToken } from '@/lib/auth';
 import { canAccessGuild } from '@/lib/discordAccess';
+import { fetchWithTimeout } from '@/lib/requestTimeout';
 
 const BOT_API_PORT = process.env.DASHBOARD_API_PORT || '3002';
 const BOT_API_URL = process.env.DASHBOARD_API_URL || `http://127.0.0.1:${BOT_API_PORT}`;
@@ -41,15 +42,23 @@ export async function GET(
     const headers: Record<string, string> = {};
     if (BOT_API_KEY) headers['x-dashboard-key'] = BOT_API_KEY;
 
-    const res = await fetch(url.toString(), { headers });
+    try {
+        const res = await fetchWithTimeout(url.toString(), { headers }, 5000, `Audit events (${guildId})`);
 
-    if (!res.ok) {
+        if (!res.ok) {
+            return NextResponse.json(
+                { ok: false, error: `Bot API error ${res.status}` },
+                { status: res.status }
+            );
+        }
+
+        const data = await res.json();
+        return NextResponse.json(data);
+    } catch (error) {
+        console.error(`[Audit events] Failed for guild ${guildId}:`, error);
         return NextResponse.json(
-            { ok: false, error: `Bot API error ${res.status}` },
-            { status: res.status }
+            { ok: false, error: 'Audit service unavailable' },
+            { status: 504 }
         );
     }
-
-    const data = await res.json();
-    return NextResponse.json(data);
 }

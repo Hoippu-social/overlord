@@ -1,34 +1,51 @@
 'use client';
 
 import React, { Suspense, useState } from 'react';
-import Link from 'next/link';
 import { usePathname, useSearchParams, useRouter } from 'next/navigation';
 import {
-    SquaresFour, ChatsTeardrop, MicrophoneStage, UsersThree,
-    Hash, UserCircle, Gear, GameController, Graph, ArrowsClockwise,
+    ArrowsClockwise,
 } from '@phosphor-icons/react';
 import { Button, Select, SelectItem } from '@nextui-org/react';
 import { useGuildLocale } from '@/lib/i18n';
-import { useSession } from 'next-auth/react';
-import { BOT_OWNER_ID } from '@/lib/constants';
+import { SegmentedTabs } from '@/components/common/SegmentedTabs';
 import { HistoricalSyncModal } from '@/components/stats/HistoricalSyncModal';
 
 const strings = {
     en: {
-        overview: 'Overview', messages: 'Messages', voice: 'Voice',
-        members: 'Members', channels: 'Channels', users: 'Users',
-        activities: 'Activities', settings: 'Settings', contacts: 'Contacts',
-        day1: '24h', day3: '3d', day7: '7d', day14: '14d',
-        day30: '30d', month3: '90d', month6: '180d', year1: '365d',
-        minutes: 'min', hours: 'h',
+        overview: 'Overview',
+        messages: 'Messages',
+        voice: 'Voice',
+        members: 'Members',
+        channels: 'Channels',
+        users: 'Users',
+        activities: 'Activities',
+        contacts: 'Contacts',
+        day1: '24h',
+        day3: '3d',
+        day7: '7d',
+        day14: '14d',
+        day30: '30d',
+        month3: '90d',
+        month6: '180d',
+        year1: '365d',
     },
     ru: {
-        overview: 'Обзор', messages: 'Сообщения', voice: 'Голос',
-        members: 'Участники', channels: 'Каналы', users: 'Пользователь',
-        activities: 'Активности', settings: 'Настройки', contacts: 'Связи',
-        day1: '24ч', day3: '3д', day7: '7д', day14: '14д',
-        day30: '30д', month3: '90д', month6: '180д', year1: '365д',
-        minutes: 'мин', hours: 'ч',
+        overview: 'Обзор',
+        messages: 'Сообщения',
+        voice: 'Голос',
+        members: 'Участники',
+        channels: 'Каналы',
+        users: 'Пользователи',
+        activities: 'Активности',
+        contacts: 'Связи',
+        day1: '24ч',
+        day3: '3д',
+        day7: '7д',
+        day14: '14д',
+        day30: '30д',
+        month3: '90д',
+        month6: '180д',
+        year1: '365д',
     },
 } as const;
 
@@ -39,23 +56,35 @@ function StatsNavContent({ guildId }: { guildId: string }) {
     const { locale } = useGuildLocale(guildId);
     const t = strings[locale];
     const [syncing, setSyncing] = useState(false);
+    const [syncModalOpen, setSyncModalOpen] = useState(false);
 
     const period = searchParams.get('period') || '7d';
 
-    const { data: session } = useSession();
-    const isOwner = (session?.user as any)?.id === BOT_OWNER_ID || (session?.user as any)?.role === 'admin';
+    const tabs = ['overview', 'messages', 'voice', 'members', 'channels', 'users', 'activities', 'contacts'] as const;
 
-    const items = [
-        { key: 'overview', label: t.overview, icon: SquaresFour, href: `/dashboard/${guildId}/stats` },
-        { key: 'messages', label: t.messages, icon: ChatsTeardrop, href: `/dashboard/${guildId}/stats/messages` },
-        { key: 'voice', label: t.voice, icon: MicrophoneStage, href: `/dashboard/${guildId}/stats/voice` },
-        { key: 'members', label: t.members, icon: UsersThree, href: `/dashboard/${guildId}/stats/members` },
-        { key: 'channels', label: t.channels, icon: Hash, href: `/dashboard/${guildId}/stats/channels` },
-        { key: 'users', label: t.users, icon: UserCircle, href: `/dashboard/${guildId}/stats/users` },
-        { key: 'activity', label: t.activities, icon: GameController, href: `/dashboard/${guildId}/stats/activities` },
-        { key: 'contacts', label: t.contacts, icon: Graph, href: `/dashboard/${guildId}/stats/contacts` },
-        ...(isOwner ? [{ key: 'settings', label: t.settings, icon: Gear, href: `/dashboard/${guildId}/stats/settings` }] : []),
-    ];
+    const labels = {
+        overview: t.overview,
+        messages: t.messages,
+        voice: t.voice,
+        members: t.members,
+        channels: t.channels,
+        users: t.users,
+        activities: t.activities,
+        contacts: t.contacts,
+    } satisfies Record<(typeof tabs)[number], string>;
+
+    const hrefs = {
+        overview: `/dashboard/${guildId}/stats`,
+        messages: `/dashboard/${guildId}/stats/messages`,
+        voice: `/dashboard/${guildId}/stats/voice`,
+        members: `/dashboard/${guildId}/stats/members`,
+        channels: `/dashboard/${guildId}/stats/channels`,
+        users: `/dashboard/${guildId}/stats/users`,
+        activities: `/dashboard/${guildId}/stats/activities`,
+        contacts: `/dashboard/${guildId}/stats/contacts`,
+    } satisfies Record<(typeof tabs)[number], string>;
+
+    const activeTab = tabs.find((tab) => pathname === hrefs[tab]) || 'overview';
 
     const setParam = (key: string, value: string) => {
         const params = new URLSearchParams(searchParams.toString());
@@ -63,10 +92,14 @@ function StatsNavContent({ guildId }: { guildId: string }) {
         router.push(`${pathname}?${params.toString()}`, { scroll: false });
     };
 
-    const [syncModalOpen, setSyncModalOpen] = useState(false);
-
     const handleSync = () => {
+        setSyncing(true);
         setSyncModalOpen(true);
+    };
+
+    const handleTabChange = (tab: string) => {
+        const key = tab as (typeof tabs)[number];
+        router.push(`${hrefs[key]}?period=${period}`, { scroll: false });
     };
 
     const selectedDays = (() => {
@@ -77,53 +110,37 @@ function StatsNavContent({ guildId }: { guildId: string }) {
     })();
 
     return (
-        <div className="flex items-start gap-3">
-            {/* Nav tabs pill — takes all available space */}
-            <div className="flex items-center gap-1 flex-wrap bg-[#111111] border border-white/[0.04] rounded-2xl p-1.5 shadow-sm shadow-black/20 flex-1 min-w-0">
-                {items.map(item => {
-                    const active = pathname === item.href;
-                    const href = `${item.href}?period=${period}`;
-                    return (
-                        <Link
-                            key={item.key}
-                            href={href}
-                            className={`
-                                flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all whitespace-nowrap
-                                ${active
-                                    ? 'bg-[#75F16A] text-[#0a0a0a] shadow-[0_0_20px_rgba(117,241,106,0.3)]'
-                                    : 'text-white/40 hover:text-white/80 hover:bg-white/[0.04]'}
-                            `}
-                        >
-                            <item.icon size={16} weight={active ? 'fill' : 'regular'} />
-                            <span>{item.label}</span>
-                        </Link>
-                    );
-                })}
-            </div>
+        <div className="flex min-w-0 flex-col gap-3 xl:flex-row xl:items-start">
+            <SegmentedTabs
+                active={activeTab}
+                onChange={handleTabChange}
+                labels={labels}
+                tabs={tabs}
+                className="flex-1"
+            />
 
-            {/* Right column: period pill, then voice toggle below (stacked) */}
-            <div className="flex flex-col items-end gap-2 flex-shrink-0">
-                {/* Period selector pill */}
-                <div className="flex items-center gap-2 bg-[#111111] border border-white/[0.04] rounded-full p-1.5 shadow-sm shadow-black/20">
+            <div className="flex w-full flex-shrink-0 flex-col items-stretch gap-2 sm:w-auto xl:items-end">
+                <div className="flex w-full items-center gap-2 rounded-2xl border border-divider bg-surface p-1.5 shadow-sm shadow-black/20 sm:w-auto sm:rounded-full">
                     <Button
                         isIconOnly
                         variant="light"
                         isLoading={syncing}
                         onPress={handleSync}
-                        className="text-white/40 hover:text-[#75F16A] hover:bg-[#75F16A]/10 w-9 h-9 rounded-full transition-all"
+                        aria-label="Sync"
+                        className="h-10 w-10 rounded-full text-white/40 transition-all hover:bg-white/[0.04] hover:text-[var(--color-primary-1)]"
                         title="Sync"
                     >
                         {!syncing && <ArrowsClockwise size={18} />}
                     </Button>
-                    <div className="w-px h-5 bg-white/[0.06]" />
+                    <div className="h-5 w-px bg-white/[0.06]" />
                     <Select
                         selectedKeys={[period]}
                         onChange={(e) => setParam('period', e.target.value)}
-                        className="w-28"
+                        className="min-w-0 flex-1 sm:w-28 sm:flex-none"
                         classNames={{
-                            trigger: "bg-transparent shadow-none hover:bg-white/[0.04] border-0 h-9 min-h-9 rounded-full transition-colors px-3",
-                            value: "text-sm text-white/80 font-bold",
-                            popoverContent: "bg-[#111111] border border-white/[0.08] rounded-2xl shadow-2xl",
+                            trigger: 'h-10 min-h-10 rounded-full border-0 bg-transparent px-3 shadow-none transition-colors hover:bg-white/[0.04]',
+                            value: 'text-sm font-bold text-white/80',
+                            popoverContent: 'rounded-2xl border border-divider bg-surface shadow-2xl',
                         }}
                         disallowEmptySelection
                         aria-label="Period"
@@ -138,12 +155,15 @@ function StatsNavContent({ guildId }: { guildId: string }) {
                         <SelectItem key="365d">{t.year1}</SelectItem>
                     </Select>
                 </div>
-
-
             </div>
+
             <HistoricalSyncModal
                 isOpen={syncModalOpen}
-                onClose={() => { setSyncModalOpen(false); router.refresh(); }}
+                onClose={() => {
+                    setSyncModalOpen(false);
+                    setSyncing(false);
+                    router.refresh();
+                }}
                 guildId={guildId}
                 selectedDays={selectedDays}
             />
@@ -153,7 +173,7 @@ function StatsNavContent({ guildId }: { guildId: string }) {
 
 export function StatsNav({ guildId }: { guildId: string }) {
     return (
-        <Suspense fallback={<div className="h-[46px] rounded-xl skeleton" />}>
+        <Suspense fallback={<div className="h-[110px] rounded-2xl skeleton sm:h-[46px]" />}>
             <StatsNavContent guildId={guildId} />
         </Suspense>
     );

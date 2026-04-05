@@ -26,6 +26,8 @@
 
 html {
     color-scheme: dark;
+    text-size-adjust: 100%;
+    font-kerning: normal;
 }
 
 body {
@@ -33,7 +35,16 @@ body {
     color: var(--text-primary);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    font-family: var(--font-futura), system-ui, -apple-system, sans-serif;
+    font-family:
+        var(--font-futura),
+        "Segoe UI Variable Text",
+        "Segoe UI",
+        system-ui,
+        -apple-system,
+        sans-serif;
+    font-synthesis: none;
+    font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
+    text-rendering: optimizeLegibility;
 }
 
 h1,
@@ -46,7 +57,15 @@ h6,
     font-family: var(--font-akony), system-ui, -apple-system, sans-serif;
     font-synthesis: none;
     -webkit-font-smoothing: antialiased;
-    text-rendering: geometricPrecision;
+    font-kerning: normal;
+    text-rendering: optimizeLegibility;
+}
+
+button,
+input,
+textarea,
+select {
+    font: inherit;
 }
 
 .tabular {

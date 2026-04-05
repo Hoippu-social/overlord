@@ -2,12 +2,14 @@
 
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import Link from 'next/link';
-import { signOut } from 'next-auth/react';
+import { signOut, useSession } from 'next-auth/react';
 import { motion } from 'framer-motion';
-import { CaretRight, MagnifyingGlass, SignOut } from '@phosphor-icons/react';
+import { CaretRight, Crown, MagnifyingGlass, SignOut } from '@phosphor-icons/react';
 import { Image, Spinner } from '@nextui-org/react';
 import { FastAverageColor } from 'fast-average-color';
 import { getStoredLocale } from '@/lib/i18n';
+import { BOT_OWNER_ID } from '@/lib/constants';
+import { fetchWithTimeout } from '@/lib/requestTimeout';
 
 interface Guild {
     id: string;
@@ -27,8 +29,9 @@ const strings = {
         noServers: 'No servers found. Make sure the bot is online and the sync has completed.',
         noMatches: 'No servers match the current query.',
         searchPlaceholder: 'Search servers',
-        serverWord: 'servers',
         cardEyebrow: 'Command Center',
+        masterModeOn: 'Master Mode On',
+        masterModeOff: 'Master Mode Off',
     },
     ru: {
         loadingServers: 'Загрузка рабочих пространств...',
@@ -38,11 +41,12 @@ const strings = {
         logout: 'Выйти',
         manageSettings: 'Открыть центр управления',
         unknownServer: 'Неизвестный сервер',
-        noServers: 'Серверы не найдены. Убедитесь, что бот запущен и синхронизация завершена.',
+        noServers: 'Упс! Кажется, у тебя ещё нет серверов. Добавь бота на свой первый и наслаждайся контролем',
         noMatches: 'По этому запросу серверы не найдены.',
         searchPlaceholder: 'Найти сервер',
-        serverWord: 'серверов',
         cardEyebrow: 'Command Center',
+        masterModeOn: 'Мастер-режим вкл',
+        masterModeOff: 'Мастер-режим выкл',
     },
 } as const;
 
@@ -195,7 +199,7 @@ function ServerTile({
                             <span>{text.cardEyebrow}</span>
                         </div>
 
-                            <div className="mt-7 flex-1">
+                        <div className="mt-7 flex-1">
                             <div
                                 className="inline-flex rounded-[30px] border p-3 transition-transform duration-500 group-hover:scale-[1.03] group-focus-visible:scale-[1.03]"
                                 style={{
@@ -233,9 +237,7 @@ function ServerTile({
                             >
                                 {text.manageSettings}
                             </span>
-                            <span
-                                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.02] text-white/40 transition-all duration-300 group-hover:border-[color:var(--guild-accent-line)] group-hover:text-[color:var(--guild-accent)] group-focus-visible:border-[color:var(--guild-accent-line)] group-focus-visible:text-[color:var(--guild-accent)]"
-                            >
+                            <span className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.02] text-white/40 transition-all duration-300 group-hover:border-[color:var(--guild-accent-line)] group-hover:text-[color:var(--guild-accent)] group-focus-visible:border-[color:var(--guild-accent-line)] group-focus-visible:text-[color:var(--guild-accent)]">
                                 <CaretRight size={16} weight="bold" />
                             </span>
                         </div>
@@ -281,33 +283,43 @@ function LoadingState({ text }: { text: (typeof strings)[Locale] }) {
 }
 
 export default function Dashboard() {
+    const { data: session } = useSession();
     const [guilds, setGuilds] = useState<Guild[]>([]);
     const [loading, setLoading] = useState(true);
     const [mounted, setMounted] = useState(false);
     const [query, setQuery] = useState('');
+    const [masterModeEnabled, setMasterModeEnabled] = useState(false);
+    const [masterModeLoading, setMasterModeLoading] = useState(false);
     const [locale] = useState<Locale>(getStoredLocale() as Locale);
     const text = strings[locale] ?? strings.en;
     const deferredQuery = useDeferredValue(query);
+    const isMasterEligible = (session?.user as { id?: string } | undefined)?.id === BOT_OWNER_ID;
+
+    const loadGuilds = useCallback(async () => {
+        const response = await fetchWithTimeout('/api/guilds', { cache: 'no-store' }, 8000, 'Dashboard guild list');
+
+        if (response.status === 401 || response.status === 403) {
+            await fetch('/api/logout', { method: 'POST' });
+            await signOut({ callbackUrl: '/login' });
+            return;
+        }
+
+        const data = await response.json();
+        if (Array.isArray(data)) {
+            setGuilds(data);
+        }
+    }, []);
 
     useEffect(() => {
         setMounted(true);
 
         let active = true;
 
-        const loadGuilds = async () => {
+        const init = async () => {
             try {
-                const response = await fetch('/api/guilds');
-
-                if (response.status === 401 || response.status === 403) {
-                    await fetch('/api/logout', { method: 'POST' });
-                    await signOut({ callbackUrl: '/login' });
-                    return;
-                }
-
-                const data = await response.json();
-                if (active && Array.isArray(data)) {
-                    setGuilds(data);
-                }
+                await loadGuilds();
+            } catch (error) {
+                console.error('Failed to load guild chooser data:', error);
             } finally {
                 if (active) {
                     setLoading(false);
@@ -315,12 +327,43 @@ export default function Dashboard() {
             }
         };
 
-        void loadGuilds();
+        void init();
 
         return () => {
             active = false;
         };
-    }, []);
+    }, [loadGuilds]);
+
+    useEffect(() => {
+        if (!mounted || !isMasterEligible) {
+            setMasterModeEnabled(false);
+            return;
+        }
+
+        let active = true;
+
+        const loadMasterMode = async () => {
+            try {
+                const response = await fetch('/api/auth/master-mode', { cache: 'no-store' });
+                if (!response.ok) {
+                    return;
+                }
+
+                const data = await response.json();
+                if (active && typeof data.enabled === 'boolean') {
+                    setMasterModeEnabled(data.enabled);
+                }
+            } catch {
+                // Ignore temporary state read failures on the chooser page.
+            }
+        };
+
+        void loadMasterMode();
+
+        return () => {
+            active = false;
+        };
+    }, [isMasterEligible, mounted]);
 
     const filteredGuilds = useMemo(() => {
         const normalized = deferredQuery.trim().toLocaleLowerCase();
@@ -334,6 +377,33 @@ export default function Dashboard() {
     const handleLogout = async () => {
         await fetch('/api/logout', { method: 'POST' });
         await signOut({ callbackUrl: '/login' });
+    };
+
+    const handleMasterModeToggle = async () => {
+        if (!isMasterEligible || masterModeLoading) {
+            return;
+        }
+
+        setMasterModeLoading(true);
+        try {
+            const nextEnabled = !masterModeEnabled;
+            const response = await fetch('/api/auth/master-mode', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ enabled: nextEnabled }),
+            });
+
+            if (!response.ok) {
+                return;
+            }
+
+            setMasterModeEnabled(nextEnabled);
+            setLoading(true);
+            await loadGuilds();
+        } finally {
+            setLoading(false);
+            setMasterModeLoading(false);
+        }
     };
 
     if (loading || !mounted) {
@@ -361,6 +431,22 @@ export default function Dashboard() {
                         </div>
 
                         <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+                            {isMasterEligible ? (
+                                <button
+                                    type="button"
+                                    onClick={handleMasterModeToggle}
+                                    disabled={masterModeLoading}
+                                    className={`inline-flex min-h-[3.25rem] items-center justify-center gap-2 rounded-full border px-5 text-[0.74rem] font-bold uppercase tracking-[0.24em] transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-70 ${
+                                        masterModeEnabled
+                                            ? 'border-[rgba(117,241,106,0.34)] bg-[rgba(117,241,106,0.12)] text-[rgb(165,255,158)] hover:bg-[rgba(117,241,106,0.16)]'
+                                            : 'border-white/[0.1] bg-white/[0.03] text-white/76 hover:border-white/[0.18] hover:bg-white/[0.05] hover:text-white'
+                                    }`}
+                                >
+                                    <Crown size={16} weight={masterModeEnabled ? 'fill' : 'regular'} />
+                                    {masterModeEnabled ? text.masterModeOn : text.masterModeOff}
+                                </button>
+                            ) : null}
+
                             <button
                                 type="button"
                                 onClick={handleLogout}

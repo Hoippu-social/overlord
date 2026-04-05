@@ -10,6 +10,7 @@ import {
 } from 'discord.js';
 import { prisma } from './database';
 import { getGuildLocale, t } from './i18n';
+import { parseAuditRouteChannelIds } from './auditRouteChannels';
 
 export const AUDIT_TAGS = [
     { value: 'moderation', labelKey: 'admin.audit.tag.moderation', descriptionKey: 'admin.audit.desc.moderation' },
@@ -59,7 +60,10 @@ export async function deleteAuditRoute(guildId: string, tag: string) {
 export async function buildAuditConfigUi(guildId: string, userId: string, tag: string) {
     const locale = await getGuildLocale(guildId);
     const route = await getAuditRoute(guildId, tag);
-    const channelValue = route?.channelId ? `<#${route.channelId}>` : t(locale, 'admin.audit.notSet');
+    const channelIds = parseAuditRouteChannelIds(route?.channelId);
+    const channelValue = channelIds.length
+        ? channelIds.map((channelId) => `<#${channelId}>`).join(', ')
+        : t(locale, 'admin.audit.notSet');
     const statusValue = route?.enabled ? t(locale, 'admin.audit.enabled') : t(locale, 'admin.audit.disabled');
 
     const embed = new EmbedBuilder()

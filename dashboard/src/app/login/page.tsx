@@ -3,20 +3,25 @@
 import { ArrowLeft, ArrowUpRight } from "@phosphor-icons/react";
 import Image from "next/image";
 import Link from "next/link";
+import { signIn, signOut } from "next-auth/react";
 import { useState } from "react";
 import { Footer } from "@/components/landing/Footer";
 
+type LoginMode = "discord" | "password" | null;
+
 export default function LoginPage() {
-  const [loading, setLoading] = useState(false);
+  const [loadingMode, setLoadingMode] = useState<LoginMode>(null);
   const [password, setPassword] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
 
   const handlePasswordLogin = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setLoading(true);
+    setLoadingMode("password");
     setErrorMessage("");
 
     try {
+      await signOut({ redirect: false });
+
       const response = await fetch("/api/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -32,7 +37,20 @@ export default function LoginPage() {
     } catch {
       setErrorMessage("Не удалось выполнить вход.");
     } finally {
-      setLoading(false);
+      setLoadingMode(null);
+    }
+  };
+
+  const handleDiscordLogin = async () => {
+    setLoadingMode("discord");
+    setErrorMessage("");
+
+    try {
+      await fetch("/api/logout", { method: "POST" });
+      await signIn("discord", { callbackUrl: "/dashboard" });
+    } catch {
+      setErrorMessage("Не удалось начать вход через Discord.");
+      setLoadingMode(null);
     }
   };
 
@@ -67,14 +85,15 @@ export default function LoginPage() {
                 Вход в Command Center.
               </h1>
               <p className="mt-7 max-w-[30rem] text-base leading-[1.9] text-[var(--landing-muted)] sm:text-lg">
-                Один пароль. Один вход. Без лишних экранов и отвлекающего chrome. После авторизации панель сразу переводит в рабочую зону.
+                Для локальной работы доступны два режима: быстрый вход по паролю и полноценный вход через Discord OAuth.
+                OAuth нужен для функций, где Discord должен принять действие от вашего имени, например для скрытия slash-команд по каналам.
               </p>
 
               <div className="mt-10 border-t border-[var(--landing-line)]">
                 {[
-                  "Прямой доступ к dashboard",
-                  "Та же продуктовая палитра и ритм",
-                  "Мобильный сценарий без лишних шагов",
+                  "Discord OAuth для sync прав и скрытия команд",
+                  "Локальный парольный вход как быстрый fallback",
+                  "Переключение между режимами без внешних туннелей",
                 ].map((item, index) => (
                   <div key={item} className="grid gap-2 border-b border-[var(--landing-line)] py-4 sm:grid-cols-[56px_minmax(0,1fr)] sm:gap-4">
                     <div className="tabular text-[0.9rem] font-semibold uppercase tracking-[0.18em] text-[var(--landing-accent)]">
@@ -90,41 +109,60 @@ export default function LoginPage() {
               <div className="border-b border-[var(--landing-line)] pb-5">
                 <p className="text-[0.72rem] uppercase tracking-[0.34em] text-[var(--landing-accent)]">Secure Entry</p>
                 <h2 className="mt-4 text-[1.3rem] font-semibold uppercase tracking-[0.16em] text-[var(--landing-text)] sm:text-[1.55rem]">
-                  Администратор
+                  Авторизация
                 </h2>
                 <p className="mt-3 text-sm leading-[1.8] text-[var(--landing-muted)] sm:text-[0.98rem]">
-                  Используйте пароль администратора, чтобы открыть внутреннюю панель без промежуточных экранов.
+                  Через Discord вы получите пользовательский OAuth token для операций интеграции с API Discord.
+                  Локальный пароль остаётся для быстрых внутренних входов.
                 </p>
               </div>
 
-              <form onSubmit={handlePasswordLogin} className="mt-6 space-y-5">
-                <div className="space-y-3">
-                  <label htmlFor="password" className="block text-[0.68rem] font-semibold uppercase tracking-[0.26em] text-[var(--landing-soft)]">
-                    Пароль
-                  </label>
-                  <input
-                    id="password"
-                    type="password"
-                    className="landing-auth-input"
-                    placeholder="Введите пароль"
-                    value={password}
-                    onChange={(event) => setPassword(event.target.value)}
-                    disabled={loading}
-                    autoComplete="current-password"
-                  />
-                </div>
-
-                {errorMessage ? (
-                  <div className="rounded-[1.25rem] border border-[rgba(244,63,94,0.22)] bg-[rgba(244,63,94,0.08)] px-4 py-3 text-sm leading-[1.7] text-[rgb(255,196,207)]">
-                    {errorMessage}
-                  </div>
-                ) : null}
-
-                <button type="submit" disabled={loading} className="landing-button-primary w-full disabled:cursor-not-allowed disabled:opacity-70">
-                  {loading ? "Проверка..." : "Войти"}
+              <div className="mt-6 space-y-4">
+                <button
+                  type="button"
+                  onClick={handleDiscordLogin}
+                  disabled={loadingMode !== null}
+                  className="landing-button-primary w-full justify-center disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {loadingMode === "discord" ? "Переход в Discord..." : "Войти через Discord"}
                   <ArrowUpRight size={16} weight="bold" />
                 </button>
-              </form>
+              </div>
+
+              <div className="mt-6 border-t border-[var(--landing-line)] pt-6">
+                <form onSubmit={handlePasswordLogin} className="space-y-5">
+                  <div className="space-y-3">
+                    <label htmlFor="password" className="block text-[0.68rem] font-semibold uppercase tracking-[0.26em] text-[var(--landing-soft)]">
+                      Локальный пароль
+                    </label>
+                    <input
+                      id="password"
+                      type="password"
+                      className="landing-auth-input"
+                      placeholder="Введите пароль"
+                      value={password}
+                      onChange={(event) => setPassword(event.target.value)}
+                      disabled={loadingMode !== null}
+                      autoComplete="current-password"
+                    />
+                  </div>
+
+                  {errorMessage ? (
+                    <div className="rounded-[1.25rem] border border-[rgba(244,63,94,0.22)] bg-[rgba(244,63,94,0.08)] px-4 py-3 text-sm leading-[1.7] text-[rgb(255,196,207)]">
+                      {errorMessage}
+                    </div>
+                  ) : null}
+
+                  <button
+                    type="submit"
+                    disabled={loadingMode !== null}
+                    className="landing-button-secondary w-full justify-center disabled:cursor-not-allowed disabled:opacity-70"
+                  >
+                    {loadingMode === "password" ? "Проверка..." : "Войти по паролю"}
+                    <ArrowUpRight size={16} weight="bold" />
+                  </button>
+                </form>
+              </div>
             </section>
           </div>
         </main>

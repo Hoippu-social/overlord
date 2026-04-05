@@ -1,6 +1,7 @@
 import { Events, GuildMember, Interaction } from 'discord.js';
 import logger from '../utils/logger';
 import { getCommandDefaultMemberPermissions } from '../utils/commandPermissions';
+import { isCommandAllowedInChannel } from '../utils/commandChannelAccess';
 import {
     buildGuildHelpView,
     buildHelpModuleEmbed,
@@ -65,8 +66,23 @@ export default {
                 return;
             }
 
+            const locale = await getInteractionLocale(interaction);
+            const parentChannelId = interaction.channel && 'parentId' in interaction.channel ? interaction.channel.parentId : null;
+
+            if (interaction.guildId) {
+                const allowedInChannel = await isCommandAllowedInChannel({
+                    guildId: interaction.guildId,
+                    channelId: interaction.channelId,
+                    parentChannelId,
+                });
+
+                if (!allowedInChannel) {
+                    await interaction.reply({ content: t(locale, 'general.commandChannelRestricted'), ephemeral: true });
+                    return;
+                }
+            }
+
             if ((command.accessGroup || command.accessKey || command.requiredAccessLevel !== undefined) && interaction.guildId && interaction.guild) {
-                const locale = await getInteractionLocale(interaction);
                 const { ensureModeratorAccess } = await import('../services/ModerationService');
                 const member = interaction.member instanceof GuildMember
                     ? interaction.member
@@ -83,7 +99,7 @@ export default {
                     requiredAccessLevel: command.requiredAccessLevel,
                     requiredDiscordPermissions: getCommandDefaultMemberPermissions(command),
                     channelId: interaction.channelId,
-                    parentChannelId: interaction.channel && 'parentId' in interaction.channel ? interaction.channel.parentId : null,
+                    parentChannelId,
                 });
 
                 if (!allowed) {
@@ -94,7 +110,6 @@ export default {
 
             const musicCommands = ['play', 'skip', 'stop', 'pause', 'resume', 'queue', 'volume', 'loop', 'shuffle', 'nowplaying'];
             if (musicCommands.includes(interaction.commandName) && interaction.guildId) {
-                const locale = await getInteractionLocale(interaction);
                 const { prisma } = await import('../utils/database');
                 const musicConfig = await prisma.musicConfig.findUnique({ where: { guildId: interaction.guildId } });
 
@@ -135,7 +150,6 @@ export default {
                 await command.execute(interaction);
             } catch (error) {
                 logger.error(`Error executing ${interaction.commandName}:`, error);
-                const locale = await getInteractionLocale(interaction);
                 const replyOpts = { content: t(locale, 'general.commandError'), ephemeral: true };
                 if (interaction.replied || interaction.deferred) await interaction.followUp(replyOpts);
                 else await interaction.reply(replyOpts);

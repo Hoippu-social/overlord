@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import dotenv from 'dotenv';
 import path from 'path';
-import { getAuthToken } from '@/lib/auth';
-import { canAccessGuild } from '@/lib/discordAccess';
+import { authorizeGuildApiRequest, isGuildApiAuthFailure } from '@/lib/guildApiAuth';
 
 const DISCORD_API = 'https://discord.com/api/v10';
 
@@ -168,16 +167,10 @@ async function deleteRooms(token: string, guildId: string) {
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ guildId: string }> }) {
     try {
-        const token = await getAuthToken(request);
-        const accessToken = typeof token?.accessToken === 'string' ? token.accessToken : null;
-        if (!accessToken) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-        }
         const { guildId } = await params;
-        const allowedGuilds = Array.isArray(token?.allowedGuilds) ? token.allowedGuilds : null;
-        const hasAccess = allowedGuilds ? allowedGuilds.includes(guildId) : await canAccessGuild(accessToken, guildId);
-        if (!hasAccess) {
-            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        const auth = await authorizeGuildApiRequest(request, guildId);
+        if (isGuildApiAuthFailure(auth)) {
+            return auth.response;
         }
 
         const config = await prisma.tempVoiceConfig.findUnique({ where: { guildId } });
@@ -194,16 +187,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ guildId: string }> }) {
     try {
-        const token = await getAuthToken(request);
-        const accessToken = typeof token?.accessToken === 'string' ? token.accessToken : null;
-        if (!accessToken) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-        }
         const { guildId } = await params;
-        const allowedGuilds = Array.isArray(token?.allowedGuilds) ? token.allowedGuilds : null;
-        const hasAccess = allowedGuilds ? allowedGuilds.includes(guildId) : await canAccessGuild(accessToken, guildId);
-        if (!hasAccess) {
-            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        const auth = await authorizeGuildApiRequest(request, guildId, { live: true });
+        if (isGuildApiAuthFailure(auth)) {
+            return auth.response;
         }
         const body = await request.json();
         const mode: 'create' | 'existing' = body.mode === 'existing' ? 'existing' : 'create';
@@ -309,16 +296,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ guildId: string }> }) {
     try {
-        const token = await getAuthToken(request);
-        const accessToken = typeof token?.accessToken === 'string' ? token.accessToken : null;
-        if (!accessToken) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-        }
         const { guildId } = await params;
-        const allowedGuilds = Array.isArray(token?.allowedGuilds) ? token.allowedGuilds : null;
-        const hasAccess = allowedGuilds ? allowedGuilds.includes(guildId) : await canAccessGuild(accessToken, guildId);
-        if (!hasAccess) {
-            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        const auth = await authorizeGuildApiRequest(request, guildId, { live: true });
+        if (isGuildApiAuthFailure(auth)) {
+            return auth.response;
         }
         const body = await request.json().catch(() => ({}));
         if (!body.confirm) {

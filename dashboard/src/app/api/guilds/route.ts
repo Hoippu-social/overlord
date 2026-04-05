@@ -30,11 +30,28 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    if (token?.role === 'master' && Array.isArray(token.allowedGuilds)) {
+        try {
+            const guilds = await prisma.guild.findMany({
+                where: {
+                    id: { in: token.allowedGuilds },
+                },
+                select: {
+                    id: true,
+                    name: true,
+                    icon: true,
+                },
+            });
+
+            return NextResponse.json(guilds);
+        } catch (error) {
+            console.error('Failed to fetch guilds for master mode:', error);
+            return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+        }
+    }
+
     try {
-        const allowedGuilds = Array.isArray(token?.allowedGuilds)
-            ? token.allowedGuilds.filter((id) => typeof id === 'string')
-            : null;
-        const allowedGuildIds = allowedGuilds?.length ? allowedGuilds : await resolveAllowedGuildIds(accessToken);
+        const allowedGuildIds = await resolveAllowedGuildIds(accessToken, { forceRefresh: true });
         if (!allowedGuildIds.length) {
             return NextResponse.json([]);
         }

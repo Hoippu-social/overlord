@@ -1,11 +1,11 @@
-import { formatInTimeZone } from 'date-fns-tz';
+import { formatInTimeZone, fromZonedTime, toZonedTime } from 'date-fns-tz';
 
 export type StatsPeriod = '24h' | '3d' | '7d' | '14d' | '30d' | '90d' | '180d' | '365d' | 'all';
 
 type VoiceSessionLike = {
     joinedAt: Date;
     leftAt: Date | null;
-    duration: number | null;
+    duration?: number | null;
 };
 
 export const STATS_PERIOD_MAP: Record<StatsPeriod, { key: string; days: number | null }> = {
@@ -67,11 +67,12 @@ export function getStatsPeriodKey(periodValue?: string | null): string {
     return STATS_PERIOD_MAP[normalizeStatsPeriod(periodValue)].key;
 }
 
-export function buildVoiceWhereClause(startDate: Date) {
+export function buildVoiceWhereClause(startDate: Date, endDate = new Date()) {
     return {
+        joinedAt: { lt: endDate },
         OR: [
+            { leftAt: null },
             { leftAt: { gte: startDate } },
-            { leftAt: null, joinedAt: { gte: startDate } },
         ],
     };
 }
@@ -88,6 +89,34 @@ export function getVoiceSessionDurationSeconds(
     return Math.max(0, Math.floor((endDate.getTime() - session.joinedAt.getTime()) / 1000));
 }
 
+export function getVoiceSessionClampedInterval(
+    session: Pick<VoiceSessionLike, 'joinedAt' | 'leftAt'>,
+    startDate: Date,
+    endDate = new Date(),
+    now = endDate
+): { start: Date; end: Date } | null {
+    const sessionEnd = session.leftAt ?? now;
+    const effectiveStart = new Date(Math.max(session.joinedAt.getTime(), startDate.getTime()));
+    const effectiveEnd = new Date(Math.min(sessionEnd.getTime(), endDate.getTime()));
+
+    if (effectiveEnd <= effectiveStart) {
+        return null;
+    }
+
+    return { start: effectiveStart, end: effectiveEnd };
+}
+
+export function getClampedVoiceSessionDurationSeconds(
+    session: Pick<VoiceSessionLike, 'joinedAt' | 'leftAt'>,
+    startDate: Date,
+    endDate = new Date(),
+    now = endDate
+): number {
+    const interval = getVoiceSessionClampedInterval(session, startDate, endDate, now);
+    if (!interval) return 0;
+    return Math.max(0, Math.floor((interval.end.getTime() - interval.start.getTime()) / 1000));
+}
+
 export function getVoiceSessionBucketDate(
     session: Pick<VoiceSessionLike, 'joinedAt' | 'leftAt'>,
     now = new Date()
@@ -97,6 +126,96 @@ export function getVoiceSessionBucketDate(
 
 function pad2(value: number): string {
     return String(value).padStart(2, '0');
+}
+
+function formatZonedBoundary(date: Date, timezone: string, granularity: 'hour' | 'day'): string {
+    const zoned = toZonedTime(date, timezone);
+    const year = zoned.getUTCFullYear();
+    const month = pad2(zoned.getUTCMonth() + 1);
+    const day = pad2(zoned.getUTCDate());
+    const hour = granularity === 'hour' ? pad2(zoned.getUTCHours()) : '00';
+    return `${year}-${month}-${day}T${hour}:00:00`;
+}
+
+export function getZonedBucketStart(
+    date: Date,
+    timezone = 'UTC',
+    granularity: 'hour' | 'day' = 'hour'
+): Date {
+    return fromZonedTime(formatZonedBoundary(date, timezone, granularity), timezone);
+}
+
+export function getNextZonedBucketStart(
+    date: Date,
+    timezone = 'UTC',
+    granularity: 'hour' | 'day' = 'hour'
+): Date {
+    const zoned = toZonedTime(date, timezone);
+
+    if (granularity === 'hour') {
+        zoned.setUTCMinutes(0, 0, 0);
+        zoned.setUTCHours(zoned.getUTCHours() + 1);
+    } else {
+        zoned.setUTCHours(0, 0, 0, 0);
+        zoned.setUTCDate(zoned.getUTCDate() + 1);
+    }
+
+    return fromZonedTime(formatZonedBoundary(zoned, timezone, granularity), timezone);
+}
+
+export function forEachVoiceSessionHourBucket(
+    session: Pick<VoiceSessionLike, 'joinedAt' | 'leftAt'>,
+    options: {
+        startDate: Date;
+        endDate?: Date;
+        timezone?: string;
+        now?: Date;
+    },
+    onBucket: (bucketStart: Date, seconds: number) => void
+): number {
+    const { startDate, endDate = new Date(), timezone = 'UTC', now = endDate } = options;
+    const interval = getVoiceSessionClampedInterval(session, startDate, endDate, now);
+
+    if (!interval) {
+        return 0;
+    }
+
+    const totalSeconds = Math.max(
+        0,
+        Math.floor((interval.end.getTime() - interval.start.getTime()) / 1000)
+    );
+
+    let current = interval.start;
+    let assignedSeconds = 0;
+
+    while (current < interval.end && assignedSeconds < totalSeconds) {
+        const bucketStart = getZonedBucketStart(current, timezone, 'hour');
+        let nextBucketStart = getNextZonedBucketStart(current, timezone, 'hour');
+
+        if (nextBucketStart <= current) {
+            nextBucketStart = new Date(current.getTime() + 60 * 60 * 1000);
+        }
+
+        const segmentEnd =
+            nextBucketStart < interval.end ? nextBucketStart : interval.end;
+        const remainingSeconds = totalSeconds - assignedSeconds;
+        const segmentSeconds =
+            segmentEnd < interval.end
+                ? Math.min(
+                      remainingSeconds,
+                      Math.max(0, Math.floor((segmentEnd.getTime() - current.getTime()) / 1000))
+                  )
+                : remainingSeconds;
+
+        if (segmentSeconds > 0) {
+            onBucket(bucketStart, segmentSeconds);
+            assignedSeconds += segmentSeconds;
+        }
+
+        current = segmentEnd;
+    }
+
+    return totalSeconds;
 }
 
 export function getStatsBucketKey(

@@ -380,7 +380,7 @@ export default function TicketsPage() {
                 classNames={{
                     tabList: "p-0 gap-8 border-b border-[var(--border-divider)] rounded-none w-full",
                     cursor: "bg-transparent border-b-2 border-white rounded-none w-full",
-                    tab: "px-2 py-4 h-auto capitalize",
+                    tab: "h-10 px-2 capitalize",
                     tabContent: "text-sm font-bold group-data-[selected=true]:text-white text-[var(--text-muted)] transition-colors"
                 }}
             >

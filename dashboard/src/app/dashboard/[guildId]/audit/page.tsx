@@ -3,8 +3,6 @@
 import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import {
     Chip,
-    Select,
-    SelectItem,
     Switch,
     Button,
 } from '@nextui-org/react';
@@ -14,7 +12,7 @@ import {
 import { useParams } from 'next/navigation';
 import { useGuildLocale, useGuildTimezone } from '@/lib/i18n';
 import { SectionBlock } from '@/components/SectionBlock';
-import { InteractiveSelect } from '@/components/moderation/ui';
+import { MultiSelectField } from '@/components/moderation/ui';
 import { buildChannelSelectOptions } from '@/lib/channelSelectOptions';
 
 type AuditEvent = {
@@ -35,10 +33,16 @@ type Route = {
     guildId: string;
     tag: string;
     channelId: string;
+    channelIds?: string[];
     enabled: boolean;
     template?: string | null;
     createdAt: string;
     updatedAt: string;
+};
+
+type RouteChannelLike = {
+    channelId?: string | null;
+    channelIds?: string[] | null;
 };
 
 type Channel = {
@@ -82,7 +86,9 @@ type AuditPayload = {
     attachmentsAfter?: AttachmentItem[];
 };
 
-const TAGS = [
+type AuditTagValue = 'moderation' | 'member' | 'message' | 'channel' | 'role' | 'voice' | 'invites' | 'security' | 'bot';
+
+const TAGS: ReadonlyArray<{ value: AuditTagValue; label?: string; icon: React.ElementType }> = [
     { value: 'moderation', label: 'Moderation', icon: ShieldCheck },
     { value: 'member', label: 'Member', icon: Users },
     { value: 'message', label: 'Message', icon: ChatCircleText },
@@ -157,6 +163,41 @@ const strings = {
     },
 } as const;
 
+const uiLabels = {
+    en: {
+        unknownChannel: 'Unknown channel',
+        activeMappings: 'active mappings',
+        syncing: 'Syncing',
+        tags: {
+            moderation: 'Moderation',
+            member: 'Member',
+            message: 'Message',
+            channel: 'Channel',
+            role: 'Role',
+            voice: 'Voice',
+            invites: 'Invites',
+            security: 'Security',
+            bot: 'Bot',
+        },
+    },
+    ru: {
+        unknownChannel: 'Неизвестный канал',
+        activeMappings: 'активных маршрутов',
+        syncing: 'Синхронизация',
+        tags: {
+            moderation: 'Модерация',
+            member: 'Участники',
+            message: 'Сообщения',
+            channel: 'Каналы',
+            role: 'Роли',
+            voice: 'Голос',
+            invites: 'Приглашения',
+            security: 'Безопасность',
+            bot: 'Бот',
+        },
+    },
+} as const;
+
 const severityConfig: Record<string, { color: string; bgColor: string; icon: React.ElementType }> = {
     INFO: { color: 'text-blue-400', bgColor: 'bg-blue-400/10', icon: Info },
     WARN: { color: 'text-amber-400', bgColor: 'bg-amber-400/10', icon: WarningCircle },
@@ -227,12 +268,32 @@ function renderAttachments(label: string, items?: AttachmentItem[]) {
     );
 }
 
+function getRouteChannelIds(route?: RouteChannelLike | null) {
+    const channelIds = Array.isArray(route?.channelIds) && route.channelIds.length > 0
+        ? route.channelIds
+        : route?.channelId
+        ? [route.channelId]
+        : [];
+
+    return Array.from(new Set(channelIds.filter((channelId): channelId is string => Boolean(channelId))));
+}
+
+function formatRouteChannelSummary(route: RouteChannelLike | null | undefined, getChannelName: (id: string) => string, fallbackLabel: string) {
+    const channelLabels = getRouteChannelIds(route).map((channelId) => `#${getChannelName(channelId)}`);
+
+    if (channelLabels.length === 0) return fallbackLabel;
+    if (channelLabels.length <= 2) return channelLabels.join(', ');
+
+    return `${channelLabels[0]}, ${channelLabels[1]} +${channelLabels.length - 2}`;
+}
+
 export default function AuditPage() {
     const params = useParams<{ guildId: string }>();
     const guildId = params.guildId;
     const { locale } = useGuildLocale(guildId);
     const guildTimezone = useGuildTimezone(guildId);
     const text = strings[locale] || strings.en;
+    const ui = uiLabels[locale] || uiLabels.en;
 
     const [events, setEvents] = useState<AuditEvent[]>([]);
     const [routes, setRoutes] = useState<Route[]>([]);
@@ -244,11 +305,12 @@ export default function AuditPage() {
     const [error, setError] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);
 
-    const [selectedTag, setSelectedTag] = useState(TAGS[0].value);
-    const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
+    const [selectedTags, setSelectedTags] = useState<string[]>([TAGS[0].value]);
+    const [selectedChannelIds, setSelectedChannelIds] = useState<string[]>([]);
     const [enabled, setEnabled] = useState(true);
     const [mounted, setMounted] = useState(false);
     const isDirty = useRef(false);
+    const hasStatusOverride = useRef(false);
 
     const routeChannelOptions = useMemo(
         () =>
@@ -267,14 +329,27 @@ export default function AuditPage() {
         [channels, channelCategories]
     );
 
+    const routeTagOptions = useMemo(
+        () =>
+            TAGS.map((tag) => ({
+                id: tag.value,
+                name: ui.tags[tag.value],
+                iconComponent: tag.icon,
+                iconClassName: 'text-[var(--color-primary-1)]',
+            })),
+        [ui]
+    );
+
     useEffect(() => {
         setMounted(true);
     }, []);
 
     const getChannelName = (id?: string | null) => {
-        if (!id) return 'Unknown channel';
+        if (!id) return ui.unknownChannel;
         return enrichedChannels[id]?.name || allChannels.find(c => c.id === id)?.name || id;
     };
+
+    const getTagLabel = useCallback((tag: string) => ui.tags[tag as keyof typeof ui.tags] || tag, [ui]);
 
     const fmtDate = (value: string) => {
         const d = new Date(value);
@@ -301,6 +376,7 @@ export default function AuditPage() {
             const evData = await evRes.json();
             const routeData = await routeRes.json();
             const treeData = treeRes.ok ? await treeRes.json() : { text: [], voice: [], categories: [] };
+            const routeRows: Route[] = Array.isArray(routeData.routes) ? routeData.routes : [];
             const textChannels: Channel[] = Array.isArray(treeData?.text) ? treeData.text : [];
             const voiceChannels: Channel[] = Array.isArray(treeData?.voice) ? treeData.voice : [];
             const categories: Channel[] = Array.isArray(treeData?.categories) ? treeData.categories : [];
@@ -312,7 +388,7 @@ export default function AuditPage() {
             const allCh = Array.from(merged.values());
 
             setEvents(evData.events || []);
-            setRoutes(routeData.routes || []);
+            setRoutes(routeRows);
             setChannels(Array.isArray(textChannels) ? textChannels : []);
             setChannelCategories(categories);
             setAllChannels(allCh);
@@ -321,7 +397,7 @@ export default function AuditPage() {
             const userIds = [...new Set(eventsData.flatMap(ev => [ev.actorId, ev.targetId].filter(Boolean) as string[]))];
             const channelIds = [...new Set([
                 ...eventsData.map(ev => ev.channelId).filter(Boolean),
-                ...routeData.routes?.map((r: Route) => r.channelId).filter(Boolean)
+                ...routeRows.flatMap((route) => getRouteChannelIds(route))
             ] as string[])];
 
             if (userIds.length > 0 || channelIds.length > 0) {
@@ -363,31 +439,32 @@ export default function AuditPage() {
     useEffect(() => {
         if (isDirty.current) return;
 
-        const r = currentRoutesMap.get(selectedTag);
-        if (r) {
-            setSelectedChannelId(r.channelId);
-            setEnabled(r.enabled);
-        } else {
-            setSelectedChannelId(null);
-            setEnabled(true);
-        }
-    }, [selectedTag, currentRoutesMap]);
+        const selectedRoutes = selectedTags
+            .map((tag) => currentRoutesMap.get(tag))
+            .filter((route): route is Route => Boolean(route));
+
+        setSelectedChannelIds(Array.from(new Set(selectedRoutes.flatMap((route) => getRouteChannelIds(route)))));
+
+        const enabledStates = Array.from(new Set(selectedRoutes.map((route) => route.enabled)));
+        setEnabled(enabledStates.length === 1 ? enabledStates[0] : true);
+    }, [selectedTags, currentRoutesMap]);
 
     const saveRoute = async () => {
-        if (!selectedChannelId) return;
+        if (selectedTags.length === 0 || selectedChannelIds.length === 0) return;
         setSaving(true);
         try {
             await fetch(`/api/guilds/${guildId}/audit/routes`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    tag: selectedTag,
-                    channelId: selectedChannelId,
-                    enabled,
+                    tags: selectedTags,
+                    channelIds: selectedChannelIds,
+                    ...(hasStatusOverride.current ? { enabled } : {}),
                 }),
             });
             await loadData();
             isDirty.current = false;
+            hasStatusOverride.current = false;
         } finally {
             setSaving(false);
         }
@@ -416,7 +493,7 @@ export default function AuditPage() {
                 body: JSON.stringify({
                     enabled: !route.enabled,
                     tag: route.tag,
-                    channelId: route.channelId
+                    channelIds: getRouteChannelIds(route)
                 }),
             });
             await loadData();
@@ -450,50 +527,24 @@ export default function AuditPage() {
                         </div>
 
                         <div className="space-y-5">
-                            <Select
+                            <MultiSelectField
                                 label={text.selectTag}
-                                variant="bordered"
-                                classNames={{
-                                    trigger: "bg-[var(--surface-hover)] border border-[var(--border-subtle)] min-h-[64px] rounded-2xl data-[hover=true]:bg-[var(--surface-hover)] data-[hover=true]:border-[var(--border-focus)] transition-all",
-                                    value: "text-lg font-medium pl-2 text-[var(--text-primary)]",
-                                    popoverContent: "bg-[var(--surface-card)] border border-[var(--border-subtle)] rounded-2xl shadow-2xl",
-                                    listbox: "bg-transparent p-2 gap-1"
+                                selected={selectedTags}
+                                onChange={(value) => {
+                                    setSelectedTags(value);
+                                    isDirty.current = false;
+                                    hasStatusOverride.current = false;
                                 }}
-                                selectedKeys={new Set([selectedTag])}
-                                onSelectionChange={(keys) => {
-                                    const [val] = Array.from(keys) as string[];
-                                    if (val) {
-                                        setSelectedTag(val);
-                                        isDirty.current = false;
-                                    }
-                                }}
-                                renderValue={(items) => items.map(item => {
-                                    const tag = TAGS.find(t => t.value === item.key);
-                                    const Icon = tag?.icon || Circle;
-                                    return (
-                                        <div key={item.key} className="flex items-center gap-3">
-                                            <div className="w-8 h-8 rounded-lg bg-[var(--surface-sidebar)] border border-[var(--border-divider)] flex items-center justify-center text-[var(--color-primary-1)]"><Icon size={18} weight="duotone" /></div>
-                                            <span className="text-[var(--text-primary)] font-medium">{tag?.label}</span>
-                                        </div>
-                                    );
-                                })}
-                            >
-                                {TAGS.map((tag) => (
-                                    <SelectItem key={tag.value} textValue={tag.label} className="rounded-xl data-[hover=true]:bg-[var(--surface-hover)]">
-                                        <div className="flex items-center gap-3">
-                                            <tag.icon size={20} weight="duotone" className="text-[var(--color-primary-1)]" />
-                                            <span className="text-base font-medium">{tag.label}</span>
-                                        </div>
-                                    </SelectItem>
-                                ))}
-                            </Select>
+                                options={routeTagOptions}
+                                placeholder={text.selectTag}
+                            />
 
-                            <InteractiveSelect
+                            <MultiSelectField
                                 label={text.selectChannel}
-                                value={selectedChannelId || ''}
+                                selected={selectedChannelIds}
                                 onChange={(value) => {
                                     isDirty.current = true;
-                                    setSelectedChannelId(value || null);
+                                    setSelectedChannelIds(value);
                                 }}
                                 options={routeChannelOptions}
                                 placeholder={text.selectChannel}
@@ -506,6 +557,7 @@ export default function AuditPage() {
                                     onValueChange={(val) => {
                                         setEnabled(val);
                                         isDirty.current = true;
+                                        hasStatusOverride.current = true;
                                     }}
                                     size="lg"
                                     color="success"
@@ -515,6 +567,7 @@ export default function AuditPage() {
                             <Button
                                 className="w-full h-14 rounded-2xl font-bold text-lg bg-[var(--color-primary-1)] text-black shadow-[0_0_20px_rgba(117,241,106,0.15)] hover:shadow-[0_0_25px_rgba(117,241,106,0.25)] transition-all"
                                 isLoading={saving}
+                                isDisabled={saving || selectedTags.length === 0 || selectedChannelIds.length === 0}
                                 onPress={saveRoute}
                                 startContent={!saving && <CheckCircle weight="fill" size={24} />}
                             >
@@ -524,7 +577,7 @@ export default function AuditPage() {
                     </div>
 
                     {/* Active Routes List */}
-                    <SectionBlock title={text.routes} description={routes.length > 0 ? `${routes.length} active mappings` : text.noRoutes} noPadding>
+                    <SectionBlock title={text.routes} description={routes.length > 0 ? `${routes.length} ${ui.activeMappings}` : text.noRoutes} noPadding>
                         {routes.length === 0 ? (
                             <div className="p-6 text-center">
                                 <p className="text-sm text-white/30">{text.noRoutes}</p>
@@ -538,8 +591,8 @@ export default function AuditPage() {
                                             key={r.id}
                                             icon={tagInfo?.icon || Circle}
                                             iconColor={r.enabled ? "text-[#75F16A]" : "text-white/20"}
-                                            label={tagInfo?.label || r.tag}
-                                            subvalue={`#${getChannelName(r.channelId)}`}
+                                            label={getTagLabel(r.tag)}
+                                            subvalue={formatRouteChannelSummary(r, getChannelName, ui.unknownChannel)}
                                             rightElement={
                                                 <div className="flex items-center gap-2">
                                                     <Switch
@@ -575,10 +628,10 @@ export default function AuditPage() {
                         description={text.eventsDesc}
                         action={
                             saving ? (
-                                <div className="flex items-center gap-2 px-3 py-1.5 bg-[var(--color-primary-2)]/10 rounded-full">
-                                    <div className="w-1.5 h-1.5 rounded-full bg-[var(--color-primary-2)] animate-pulse" />
-                                    <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-primary-2)]">Syncing</span>
-                                </div>
+                                    <div className="flex items-center gap-2 px-3 py-1.5 bg-[var(--color-primary-2)]/10 rounded-full">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-[var(--color-primary-2)] animate-pulse" />
+                                        <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-primary-2)]">{ui.syncing}</span>
+                                    </div>
                             ) : undefined
                         }
                         className="bg-transparent border-none shadow-none"
@@ -589,7 +642,7 @@ export default function AuditPage() {
                                 <p className="text-sm text-[var(--text-secondary)]">{text.noEvents}</p>
                             </div>
                         ) : (
-                            <div className="space-y-4">
+                            <div className="space-y-4 lg:max-h-[calc(100vh-14rem)] lg:overflow-y-auto lg:overscroll-contain lg:pr-2">
                                 {events.map((ev, index) => {
                                     const TagIcon = TAG_ICONS[ev.tag] || Circle;
                                     const sev = ev.severity ? severityConfig[ev.severity] : null;
@@ -625,7 +678,7 @@ export default function AuditPage() {
                                                                 )}
                                                             </div>
                                                             <div className="flex items-center gap-2 text-xs text-[var(--text-muted)] mt-1 font-mono">
-                                                                <span className="uppercase tracking-wider font-bold text-[var(--color-primary-1)]/80">{ev.tag}</span>
+                                                                <span className="uppercase tracking-wider font-bold text-[var(--color-primary-1)]/80">{getTagLabel(ev.tag)}</span>
                                                                 <span>•</span>
                                                                 <span>{fmtDate(ev.createdAt)}</span>
                                                             </div>

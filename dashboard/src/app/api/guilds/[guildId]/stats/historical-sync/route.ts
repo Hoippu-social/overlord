@@ -38,7 +38,7 @@ export async function POST(
     const { guildId } = await params;
 
     return withStatsTelemetry({ guildId, endpoint: 'historical-sync', method: 'POST' }, async () => {
-        const access = await requireGuildStatsAccess(request, guildId);
+        const access = await requireGuildStatsAccess(request, guildId, { live: true });
         if (!access.ok) {
             return access.response;
         }

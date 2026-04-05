@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { isStatsPostgres, prisma, statsPrisma } from '@/lib/prisma';
+import { prisma, statsPrisma } from '@/lib/prisma';
 import { requireGuildStatsAccess } from '@/lib/statsAccess';
 import { withStatsTelemetry } from '@/lib/statsTelemetry';
 import {
+    buildStatsBucketLabels,
     buildVoiceWhereClause,
+    forEachVoiceSessionHourBucket,
     formatStatsBucketLabel,
+    getClampedVoiceSessionDurationSeconds,
     getStatsHourOfDay,
     getStatsPeriodKey,
     getStatsStartDate,
-    getVoiceSessionDurationSeconds,
     mergeBucketSeries,
     normalizeStatsPeriod,
 } from '@/lib/stats';
@@ -31,8 +33,7 @@ const isMissingTableError = (error: unknown) => {
 async function enrichTopData(
     guildId: string,
     topChannels: any[],
-    topMembers: any[],
-    category: 'MESSAGES' | 'VOICE'
+    topMembers: any[]
 ) {
     try {
         const userIds = topMembers.map(m => m.userId);
@@ -86,9 +87,9 @@ async function getMergedMessages(guildId: string, startDate: Date) {
     return statsPrisma.statMessage.findMany({ where: { guildId, createdAt: { gte: startDate } } });
 }
 
-async function getMergedVoice(guildId: string, startDate: Date) {
+async function getMergedVoice(guildId: string, startDate: Date, endDate = new Date()) {
     return statsPrisma.statVoiceState.findMany({
-        where: { guildId, ...buildVoiceWhereClause(startDate) }
+        where: { guildId, ...buildVoiceWhereClause(startDate, endDate) }
     });
 }
 
@@ -281,6 +282,75 @@ function enrichWithMedian(data: any[], valueKey: string) {
     return enriched;
 }
 
+function buildVoiceActivityBuckets(
+    sessions: Array<{
+        joinedAt: Date;
+        leftAt: Date | null;
+        userId: string;
+        channelId: string;
+    }>,
+    startDate: Date,
+    endDate: Date,
+    timezone: string
+) {
+    const hourlyBuckets = new Map<string, { date: Date; voiceSeconds: number }>();
+    const topChannelsMap = new Map<string, number>();
+    const topMembersMap = new Map<string, number>();
+    const peakHourTotals = new Array(24).fill(0);
+    const activeUsers = new Set<string>();
+    const activeChannels = new Set<string>();
+
+    let totalVoiceSeconds = 0;
+    let sessionCount = 0;
+
+    for (const session of sessions) {
+        const clampedDuration = getClampedVoiceSessionDurationSeconds(session, startDate, endDate, endDate);
+        if (clampedDuration <= 0) {
+            continue;
+        }
+
+        totalVoiceSeconds += clampedDuration;
+        sessionCount++;
+        activeUsers.add(session.userId);
+        activeChannels.add(session.channelId);
+        topChannelsMap.set(
+            session.channelId,
+            (topChannelsMap.get(session.channelId) || 0) + clampedDuration
+        );
+        topMembersMap.set(
+            session.userId,
+            (topMembersMap.get(session.userId) || 0) + clampedDuration
+        );
+
+        forEachVoiceSessionHourBucket(
+            session,
+            { startDate, endDate, timezone, now: endDate },
+            (bucketStart, seconds) => {
+                const key = bucketStart.toISOString();
+                const entry = hourlyBuckets.get(key) || { date: bucketStart, voiceSeconds: 0 };
+                entry.voiceSeconds += seconds;
+                hourlyBuckets.set(key, entry);
+
+                const hour = getStatsHourOfDay(bucketStart, timezone);
+                peakHourTotals[hour] += seconds;
+            }
+        );
+    }
+
+    return {
+        hourlyBuckets: Array.from(hourlyBuckets.values()).sort(
+            (a, b) => a.date.getTime() - b.date.getTime()
+        ),
+        topChannelsMap,
+        topMembersMap,
+        peakHourTotals,
+        totalVoiceSeconds,
+        sessionCount,
+        uniqueUsers: activeUsers.size,
+        uniqueChannels: activeChannels.size,
+    };
+}
+
 export async function GET(
     request: NextRequest,
     { params }: { params: Promise<{ guildId: string }> }
@@ -443,7 +513,7 @@ export async function GET(
             const hourlyStats = await statsPrisma.statHourly.findMany({
                 where: {
                     guildId,
-                    dateHour: { gte: period === '24h' ? startDate : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }
+                    dateHour: { gte: startDate }
                 }
             });
 
@@ -518,7 +588,7 @@ export async function GET(
 
 
             // Enrich with Discord names/avatars
-            const enriched = await enrichTopData(guildId, topChannels, topMembers, 'MESSAGES');
+            const enriched = await enrichTopData(guildId, topChannels, topMembers);
 
             responseData = {
                 lineChart,
@@ -534,174 +604,71 @@ export async function GET(
 
         // 3. Voice Data
         else if (type === 'voice') {
-            let areaChart: any[] = [];
+            const allVoice = await getMergedVoice(guildId, startDate, now);
+            const voiceActivity = buildVoiceActivityBuckets(allVoice, startDate, now, timezone);
+
+            let areaChart: Array<{ date: string; voice: number; weeklyMedian?: number }> = [];
+
             if (isHourly) {
-                const hourly = await statsPrisma.statHourly.findMany({
-                    where: { guildId, dateHour: { gte: startDate } },
-                    orderBy: { dateHour: 'asc' }
-                });
-                areaChart = hourly.map(h => ({ date: formatStatsBucketLabel(h.dateHour, period, timezone), voice: Math.floor(h.voiceSeconds / 60) }));
+                areaChart = voiceActivity.hourlyBuckets.map((bucket) => ({
+                    date: formatStatsBucketLabel(bucket.date, period, timezone),
+                    voice: Math.floor(bucket.voiceSeconds / 60),
+                }));
             } else {
-                try {
-                    const dailyRows = await statsPrisma.statChannelDaily.groupBy({
-                        by: ['date'],
-                        where: { guildId, date: { gte: startDate } },
-                        _sum: { voiceSeconds: true },
-                        orderBy: { date: 'asc' },
-                    });
-                    areaChart = dailyRows.map((row) => ({
-                        date: formatStatsBucketLabel(row.date, period, timezone),
-                        voice: Math.floor((row._sum.voiceSeconds || 0) / 60),
-                    }));
-                } catch (error) {
-                    if (!isMissingTableError(error)) {
-                        throw error;
-                    }
+                const dailyTotals = new Map<string, number>();
 
-                    const daily = await statsPrisma.statDaily.findMany({
-                        where: { guildId, date: { gte: startDate } },
-                        orderBy: { date: 'asc' },
-                        select: { date: true, voiceSeconds: true }
-                    });
+                for (const label of buildStatsBucketLabels(startDate, now, period, timezone)) {
+                    dailyTotals.set(label, 0);
+                }
 
-                    areaChart = mergeBucketSeries(
-                        daily,
-                        (row) => row.date,
-                        (row) => ({ voiceSeconds: row.voiceSeconds }),
-                        period,
-                        timezone
-                    ).map((row) => ({
-                        date: row.date,
-                        voice: Math.floor(Number(row.voiceSeconds || 0) / 60),
-                    }));
+                for (const bucket of voiceActivity.hourlyBuckets) {
+                    const label = formatStatsBucketLabel(bucket.date, period, timezone);
+                    dailyTotals.set(label, (dailyTotals.get(label) || 0) + bucket.voiceSeconds);
+                }
+
+                areaChart = Array.from(dailyTotals.entries()).map(([date, seconds]) => ({
+                    date,
+                    voice: Math.floor(seconds / 60),
+                }));
+
+                if (areaChart.length > 0) {
+                    areaChart = enrichWithMedian(areaChart, 'voice');
                 }
             }
 
-            if (!isHourly && areaChart.length > 0) {
-                areaChart = enrichWithMedian(areaChart, 'voice');
-            }
+            const topChannels = Array.from(voiceActivity.topChannelsMap.entries())
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 20)
+                .map(([channelId, value]) => ({ channelId, value }));
+            const topMembers = Array.from(voiceActivity.topMembersMap.entries())
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 20)
+                .map(([userId, value]) => ({ userId, value }));
 
-            let topChannels: { channelId: string, value: number }[] = [];
-            let topMembers: { userId: string, value: number }[] = [];
-            let uniqueUsers = 0;
-            let uniqueChannels = 0;
-            let totalVoiceValue = 0;
-
-            let voiceSummaryAvailable = false;
-            if (!isHourly) {
-                const summary = await getVoiceSummaryFromReadModels(guildId, startDate);
-                if (summary) {
-                    voiceSummaryAvailable = true;
-                    topChannels = summary.topChannels;
-                    topMembers = summary.topMembers;
-                    uniqueUsers = summary.uniqueUsers;
-                    uniqueChannels = summary.uniqueChannels;
-                    totalVoiceValue = summary.totalValue;
-                }
-            }
-
-            if (isHourly || (!voiceSummaryAvailable && topChannels.length === 0 && topMembers.length === 0 && uniqueUsers === 0 && uniqueChannels === 0 && totalVoiceValue === 0)) {
-                const periodKey = period.toUpperCase();
-                const validPeriods = ['24H', '3D', '7D', '14D', '30D', '90D', '180D', 'ALL'];
-                const usePreCalc = validPeriods.includes(periodKey) && periodKey !== '24H';
-
-                if (usePreCalc) {
-                    const [topChRaw, topMemRaw] = await Promise.all([
-                        statsPrisma.statTopChannel.findMany({ where: { guildId, period: periodKey, category: 'VOICE' }, orderBy: { value: 'desc' }, take: 20 }),
-                        statsPrisma.statTopMember.findMany({ where: { guildId, period: periodKey, category: 'VOICE' }, orderBy: { value: 'desc' }, take: 20 })
-                    ]);
-                    topChannels = topChRaw.map(t => ({ channelId: t.channelId, value: t.value }));
-                    topMembers = topMemRaw.map(t => ({ userId: t.userId, value: t.value }));
-
-                    const [distinctVChObj, distinctVMemObj] = await Promise.all([
-                        statsPrisma.$queryRaw<{count: number}[]>`
-                            SELECT COUNT(DISTINCT "channelId") as count
-                            FROM "StatVoiceState"
-                            WHERE "guildId" = ${guildId}
-                              AND ("leftAt" >= ${startDate} OR ("leftAt" IS NULL AND "joinedAt" >= ${startDate}))
-                        `,
-                        statsPrisma.$queryRaw<{count: number}[]>`
-                            SELECT COUNT(DISTINCT "userId") as count
-                            FROM "StatVoiceState"
-                            WHERE "guildId" = ${guildId}
-                              AND ("leftAt" >= ${startDate} OR ("leftAt" IS NULL AND "joinedAt" >= ${startDate}))
-                        `
-                    ]);
-                    uniqueUsers = Number(distinctVMemObj[0]?.count || 0);
-                    uniqueChannels = Number(distinctVChObj[0]?.count || 0);
-                } else {
-                    const allVoice = await getMergedVoice(guildId, startDate);
-                    const vcDurMap = new Map<string, number>();
-                    const vmDurMap = new Map<string, number>();
-                    for (const v of allVoice) {
-                        const dur = getVoiceSessionDurationSeconds(v, now);
-                        vcDurMap.set(v.channelId, (vcDurMap.get(v.channelId) || 0) + dur);
-                        vmDurMap.set(v.userId, (vmDurMap.get(v.userId) || 0) + dur);
-                    }
-                    topChannels = Array.from(vcDurMap.entries()).sort((a, b) => b[1] - a[1]).slice(0, 20).map(([id, v]) => ({ channelId: id, value: v }));
-                    topMembers = Array.from(vmDurMap.entries()).sort((a, b) => b[1] - a[1]).slice(0, 20).map(([id, v]) => ({ userId: id, value: v }));
-                    uniqueUsers = vmDurMap.size;
-                    uniqueChannels = vcDurMap.size;
-                }
-
-                const totals = await getTotalValue(guildId, 'VOICE', startDate);
-                totalVoiceValue = totals.totalChannels;
-            } else {
-                // no-op, read-model summary already filled
-            }
-
-            // Peak hour estimation
-            const hourlyStats = await statsPrisma.statHourly.findMany({
-                where: { guildId, dateHour: { gte: startDate } }
-            });
-            const hourlyTotals = new Array(24).fill(0);
-            for (const h of hourlyStats) {
-                const hour = getStatsHourOfDay(h.dateHour, timezone);
-                hourlyTotals[hour] += h.voiceSeconds;
-            }
-            const peakHourIndex = hourlyTotals.indexOf(Math.max(...hourlyTotals));
+            const peakHourIndex = voiceActivity.peakHourTotals.indexOf(
+                Math.max(...voiceActivity.peakHourTotals)
+            );
             const peakHour = `${peakHourIndex.toString().padStart(2, '0')}:00`;
+            const avgSession =
+                voiceActivity.sessionCount > 0
+                    ? Math.floor(voiceActivity.totalVoiceSeconds / voiceActivity.sessionCount)
+                    : 0;
 
-            // Average session: compute via SQL directly to avoid loading all sessions in Node JS
-            const avgRes = isStatsPostgres
-                ? await statsPrisma.$queryRaw<any[]>`
-                    SELECT AVG(
-                        COALESCE(
-                            "duration",
-                            CAST(EXTRACT(EPOCH FROM (COALESCE("leftAt", NOW()) - "joinedAt")) AS INTEGER)
-                        )
-                    ) as avg
-                    FROM "StatVoiceState"
-                    WHERE "guildId" = ${guildId}
-                      AND ("leftAt" >= ${startDate} OR ("leftAt" IS NULL AND "joinedAt" >= ${startDate}))
-                `
-                : await statsPrisma.$queryRaw<any[]>`
-                    SELECT AVG(
-                        COALESCE(
-                            duration,
-                            CAST(strftime('%s', COALESCE(leftAt, datetime('now'))) - strftime('%s', joinedAt) AS INTEGER)
-                        )
-                    ) as avg
-                    FROM "StatVoiceState"
-                    WHERE "guildId" = ${guildId}
-                      AND ("leftAt" >= ${startDate} OR ("leftAt" IS NULL AND "joinedAt" >= ${startDate}))
-                `;
-            let avgSession = Math.floor(Number(avgRes[0]?.avg || 0));
-
-
-            // Enrich with Discord names/avatars
-            const enriched = await enrichTopData(guildId, topChannels, topMembers, 'VOICE');
+            const enriched = await enrichTopData(guildId, topChannels, topMembers);
             responseData = {
                 areaChart,
-                heatmap: hourlyStats.map(h => ({ date: h.dateHour, voice: h.voiceSeconds })),
+                heatmap: voiceActivity.hourlyBuckets.map((bucket) => ({
+                    date: bucket.date,
+                    voice: bucket.voiceSeconds,
+                })),
                 topChannels: enriched.topChannels,
                 topMembers: enriched.topMembers,
-                totalChannelValue: totalVoiceValue,
-                totalMemberValue: totalVoiceValue,
+                totalChannelValue: voiceActivity.totalVoiceSeconds,
+                totalMemberValue: voiceActivity.totalVoiceSeconds,
                 avgSession,
                 peakHour,
-                uniqueUsers,
-                uniqueChannels
+                uniqueUsers: voiceActivity.uniqueUsers,
+                uniqueChannels: voiceActivity.uniqueChannels
             };
         }
 

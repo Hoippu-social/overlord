@@ -14,13 +14,18 @@ type AccessContext = {
     isAdmin: boolean;
 };
 
+type RequireGuildStatsAccessOptions = {
+    live?: boolean;
+};
+
 type AccessResult =
     | { ok: true; context: AccessContext }
     | { ok: false; response: NextResponse };
 
 export async function requireGuildStatsAccess(
     request: NextRequest,
-    guildId: string
+    guildId: string,
+    options: RequireGuildStatsAccessOptions = {}
 ): Promise<AccessResult> {
     const token = (await getAuthToken(request)) as AuthTokenLike | null;
     const accessToken = typeof token?.accessToken === 'string' ? token.accessToken : null;
@@ -32,8 +37,9 @@ export async function requireGuildStatsAccess(
         };
     }
 
-    const isAdmin = accessToken === 'admin' || token?.role === 'admin';
-    if (isAdmin) {
+    const hasGlobalAccess =
+        accessToken === 'admin' || token?.role === 'admin' || token?.role === 'master';
+    if (hasGlobalAccess) {
         return {
             ok: true,
             context: { accessToken, isAdmin: true },
@@ -41,13 +47,17 @@ export async function requireGuildStatsAccess(
     }
 
     const allowedGuilds = Array.isArray(token?.allowedGuilds) ? token.allowedGuilds : null;
-    const hasAccess =
-        (allowedGuilds?.includes(guildId) ?? false) || (await canAccessGuild(accessToken, guildId));
+    const hasAccess = options.live
+        ? await canAccessGuild(accessToken, guildId, { forceRefresh: true })
+        : (allowedGuilds?.includes(guildId) ?? false) || (await canAccessGuild(accessToken, guildId));
 
     if (!hasAccess) {
         return {
             ok: false,
-            response: NextResponse.json({ error: 'Forbidden' }, { status: 403 }),
+            response: NextResponse.json(
+                { error: 'Forbidden', code: 'guild_access_revoked' },
+                { status: 403 }
+            ),
         };
     }
 

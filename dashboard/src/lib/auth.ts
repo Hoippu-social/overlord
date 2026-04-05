@@ -4,6 +4,8 @@ import type { JWT } from 'next-auth/jwt';
 import { getToken } from 'next-auth/jwt';
 import type { NextRequest } from 'next/server';
 import { resolveAllowedGuildIds } from '@/lib/discordAccess';
+import { BOT_OWNER_ID, MASTER_MODE_COOKIE } from '@/lib/constants';
+import { fetchWithTimeout } from '@/lib/requestTimeout';
 
 type DiscordToken = JWT & {
     accessToken?: string;
@@ -11,11 +13,12 @@ type DiscordToken = JWT & {
     accessTokenExpires?: number;
     allowedGuilds?: string[];
     error?: string;
+    role?: string;
 };
 
 const DISCORD_AUTH_URL = 'https://discord.com/api/oauth2/authorize';
 const DISCORD_TOKEN_URL = 'https://discord.com/api/oauth2/token';
-const DISCORD_SCOPES = ['identify', 'guilds', 'guilds.members.read'];
+const DISCORD_SCOPES = ['identify', 'guilds', 'guilds.members.read', 'applications.commands.permissions.update'];
 
 async function refreshAccessToken(token: DiscordToken): Promise<DiscordToken> {
     try {
@@ -25,11 +28,11 @@ async function refreshAccessToken(token: DiscordToken): Promise<DiscordToken> {
         params.set('grant_type', 'refresh_token');
         params.set('refresh_token', token.refreshToken || '');
 
-        const response = await fetch(DISCORD_TOKEN_URL, {
+        const response = await fetchWithTimeout(DISCORD_TOKEN_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: params.toString()
-        });
+        }, 5000, 'Discord token refresh');
 
         const refreshed = await response.json();
         if (!response.ok) {
@@ -71,14 +74,6 @@ export const authOptions: NextAuthOptions = {
     callbacks: {
         async jwt({ token, account }) {
             if (account) {
-                let allowedGuilds: string[] | undefined;
-                if (account.access_token) {
-                    try {
-                        allowedGuilds = await resolveAllowedGuildIds(account.access_token);
-                    } catch (error) {
-                        console.error('Failed to resolve allowed guilds:', error);
-                    }
-                }
                 const expiresAt = account.expires_at
                     ? account.expires_at * 1000
                     : Date.now() + Number(account.expires_in ?? 0) * 1000;
@@ -87,8 +82,7 @@ export const authOptions: NextAuthOptions = {
                     ...token,
                     accessToken: account.access_token,
                     refreshToken: account.refresh_token ?? token.refreshToken,
-                    accessTokenExpires: expiresAt,
-                    allowedGuilds
+                    accessTokenExpires: expiresAt
                 } as DiscordToken;
             }
 
@@ -109,6 +103,13 @@ export const authOptions: NextAuthOptions = {
         async session({ session, token }) {
             if (session.user) {
                 (session.user as { id?: string }).id = token.sub;
+                (session.user as { role?: string }).role = (token as DiscordToken).role;
+                if (!session.user.name && typeof token.name === 'string') {
+                    session.user.name = token.name;
+                }
+                if (!session.user.image && typeof token.picture === 'string') {
+                    session.user.image = token.picture;
+                }
             }
             (session as { accessToken?: string; error?: string }).accessToken = (token as DiscordToken).accessToken;
             (session as { accessToken?: string; error?: string }).error = (token as DiscordToken).error;
@@ -125,9 +126,30 @@ export async function getAuthToken(request: NextRequest) {
     if (sessionToken && sessionToken.value) {
         return {
             accessToken: 'admin',
+            role: 'admin',
             allowedGuilds: undefined // Let `resolveAllowedGuildIds` or `canAccessGuild` handle 'admin'
         };
     }
 
-    return getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
+    const token = (await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET })) as DiscordToken | null;
+    if (!token) {
+        return null;
+    }
+
+    if (token.sub === BOT_OWNER_ID) {
+        token.role = 'owner';
+    }
+
+    if (token.sub === BOT_OWNER_ID && request.cookies.get(MASTER_MODE_COOKIE)?.value === '1') {
+        try {
+            token.allowedGuilds = await resolveAllowedGuildIds('admin');
+            token.role = 'master';
+        } catch (error) {
+            console.error('Failed to apply master mode guild access:', error);
+        }
+    } else {
+        token.allowedGuilds = undefined;
+    }
+
+    return token;
 }

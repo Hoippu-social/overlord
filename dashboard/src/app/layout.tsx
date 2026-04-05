@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 import { Providers } from "./providers";
+import { ensureStatsAutoSyncStarted } from '@/lib/statsAutoSync';
 
 const futura = localFont({
   src: [
@@ -29,6 +30,8 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  ensureStatsAutoSyncStarted();
+
   return (
     <html lang="ru" className="dark" suppressHydrationWarning>
       <body className={`${futura.variable} ${akony.variable} font-sans bg-[#1a1a1a] text-[#e5e5e5]`}>

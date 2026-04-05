@@ -1,12 +1,47 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { Card, CardBody, Button, Progress, Chip } from "@nextui-org/react";
-import { AreaChart, Card as TremorCard, Title } from "@tremor/react";
-import { Power, ArrowClockwise, StopCircle, Cpu, HardDrives, Pulse } from "@phosphor-icons/react";
+import React, { useCallback, useEffect, useState } from 'react';
+import { Card, CardBody, Button, Progress, Chip } from '@nextui-org/react';
+import { AreaChart, Card as TremorCard, Title } from '@tremor/react';
+import { Power, ArrowClockwise, StopCircle, Cpu, HardDrives, Pulse } from '@phosphor-icons/react';
 import { getStoredLocale } from '@/lib/i18n';
 
 type BotStatus = 'ONLINE' | 'OFFLINE' | 'PARTIAL';
+type MetricStatus = 'ok' | 'warning' | 'critical' | 'unknown';
+
+interface PathMetric {
+    path: string | null;
+    bytes: number | null;
+    status: MetricStatus;
+}
+
+interface DiskMetric {
+    path: string;
+    totalBytes: number | null;
+    freeBytes: number | null;
+    usedPercent: number | null;
+    status: MetricStatus;
+}
+
+interface SwapMetric {
+    totalMb: number | null;
+    usedMb: number | null;
+    peakMb: number | null;
+    status: MetricStatus;
+}
+
+interface StorageDiagnostics {
+    disk: DiskMetric;
+    swap: SwapMetric;
+    temp: PathMetric;
+    npmCache: PathMetric;
+    playwrightCache: PathMetric;
+    workspaceCache: PathMetric;
+    database: PathMetric;
+    logs: PathMetric;
+    backups: PathMetric;
+    updatedAt: string;
+}
 
 interface SystemStats {
     cpu: number;
@@ -15,6 +50,7 @@ interface SystemStats {
     uptime: string;
     ping: number | null;
     botStatus: BotStatus;
+    diagnostics: StorageDiagnostics;
     modules: {
         discord: boolean;
         lavalink: boolean;
@@ -42,6 +78,23 @@ const strings = {
         gatewayLatency: 'Gateway latency',
         cpuHistory: 'CPU History',
         memoryHistory: 'Memory History',
+        storageTitle: 'Storage Watch',
+        storageSubtitle: 'Track the places that usually fill up first',
+        diskFree: 'Disk Free',
+        systemTemp: 'System Temp',
+        packageCache: 'NPM Cache',
+        browserCache: 'Playwright Cache',
+        workspaceCache: 'Workspace Cache',
+        databaseFiles: 'Database Files',
+        logs: 'Logs',
+        backups: 'Backups',
+        swap: 'Swap / Pagefile',
+        updated: 'Updated',
+        healthy: 'Healthy',
+        watch: 'Watch',
+        critical: 'Critical',
+        unavailable: 'Unavailable',
+        peak: 'Peak',
     },
     ru: {
         title: 'Состояние системы',
@@ -62,8 +115,49 @@ const strings = {
         gatewayLatency: 'Задержка шлюза',
         cpuHistory: 'История CPU',
         memoryHistory: 'История памяти',
+        storageTitle: 'Контроль хранилища',
+        storageSubtitle: 'Куда чаще всего утекает диск и кэш',
+        diskFree: 'Свободно на диске',
+        systemTemp: 'Системный Temp',
+        packageCache: 'Кэш NPM',
+        browserCache: 'Кэш Playwright',
+        workspaceCache: 'Кэш рабочей среды',
+        databaseFiles: 'Файлы базы',
+        logs: 'Логи',
+        backups: 'Бэкапы',
+        swap: 'Swap / pagefile',
+        updated: 'Обновлено',
+        healthy: 'Норма',
+        watch: 'Следить',
+        critical: 'Критично',
+        unavailable: 'Недоступно',
+        peak: 'Пик',
     },
 } as const;
+
+const emptyDiagnostics: StorageDiagnostics = {
+    disk: {
+        path: 'system',
+        totalBytes: null,
+        freeBytes: null,
+        usedPercent: null,
+        status: 'unknown',
+    },
+    swap: {
+        totalMb: null,
+        usedMb: null,
+        peakMb: null,
+        status: 'unknown',
+    },
+    temp: { path: null, bytes: null, status: 'unknown' },
+    npmCache: { path: null, bytes: null, status: 'unknown' },
+    playwrightCache: { path: null, bytes: null, status: 'unknown' },
+    workspaceCache: { path: null, bytes: null, status: 'unknown' },
+    database: { path: null, bytes: null, status: 'unknown' },
+    logs: { path: null, bytes: null, status: 'unknown' },
+    backups: { path: null, bytes: null, status: 'unknown' },
+    updatedAt: new Date(0).toISOString(),
+};
 
 export default function GlobalSystemPage() {
     const [locale] = useState(getStoredLocale());
@@ -75,41 +169,50 @@ export default function GlobalSystemPage() {
         uptime: '0s',
         ping: null,
         botStatus: 'OFFLINE',
+        diagnostics: emptyDiagnostics,
         modules: {
             discord: false,
             lavalink: false,
-            database: false
-        }
+            database: false,
+        },
     });
-    const [cpuHistory, setCpuHistory] = useState<{ date: string; CPU: number }[]>([]);
-    const [ramHistory, setRamHistory] = useState<{ date: string; RAM: number }[]>([]);
+    const [cpuHistory, setCpuHistory] = useState<Array<{ date: string; CPU: number }>>([]);
+    const [ramHistory, setRamHistory] = useState<Array<{ date: string; RAM: number }>>([]);
     const [loading, setLoading] = useState(false);
 
-    useEffect(() => {
-        void fetchStats();
-        const interval = setInterval(() => {
-            void fetchStats();
-        }, 5000);
-        return () => clearInterval(interval);
-    }, [locale]);
-
-    const fetchStats = async () => {
+    const fetchStats = useCallback(async () => {
         try {
             const res = await fetch('/api/system');
-            if (!res.ok) return;
+            if (!res.ok) {
+                return;
+            }
 
-            const data = await res.json();
+            const data = (await res.json()) as SystemStats;
             setStats(data);
 
             const localeTag = locale === 'ru' ? 'ru-RU' : 'en-US';
-            const now = new Date().toLocaleTimeString(localeTag, { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            const now = new Date().toLocaleTimeString(localeTag, {
+                hour12: false,
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+            });
 
             setCpuHistory((prev) => [...prev, { date: now, CPU: data.cpu }].slice(-20));
             setRamHistory((prev) => [...prev, { date: now, RAM: data.memory }].slice(-20));
         } catch (error) {
             console.error('Failed to fetch stats:', error);
         }
-    };
+    }, [locale]);
+
+    useEffect(() => {
+        void fetchStats();
+        const interval = setInterval(() => {
+            void fetchStats();
+        }, 5000);
+
+        return () => clearInterval(interval);
+    }, [locale, fetchStats]);
 
     const handleAction = async (action: 'start' | 'stop' | 'restart' | 'kill') => {
         setLoading(true);
@@ -117,7 +220,7 @@ export default function GlobalSystemPage() {
             await fetch('/api/system', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action })
+                body: JSON.stringify({ action }),
             });
             setTimeout(() => void fetchStats(), 2000);
         } catch (error) {
@@ -129,22 +232,61 @@ export default function GlobalSystemPage() {
 
     const getStatusColor = (status: BotStatus) => {
         switch (status) {
-            case 'ONLINE': return 'success';
-            case 'OFFLINE': return 'danger';
-            case 'PARTIAL': return 'warning';
-            default: return 'default';
+            case 'ONLINE':
+                return 'success';
+            case 'OFFLINE':
+                return 'danger';
+            case 'PARTIAL':
+                return 'warning';
+            default:
+                return 'default';
         }
     };
 
     const getPingState = (ping: number | null) => {
-        if (ping === null || ping === undefined) return { label: text.noData, className: 'text-default-500' };
-        if (ping < 100) return { label: text.excellent, className: 'text-success' };
-        if (ping < 200) return { label: text.good, className: 'text-warning' };
+        if (ping === null || ping === undefined) {
+            return { label: text.noData, className: 'text-default-500' };
+        }
+        if (ping < 100) {
+            return { label: text.excellent, className: 'text-success' };
+        }
+        if (ping < 200) {
+            return { label: text.good, className: 'text-warning' };
+        }
         return { label: text.high, className: 'text-danger' };
     };
 
     const memoryPercent = stats.totalMemory ? Math.min(100, Math.round((stats.memory / stats.totalMemory) * 100)) : 0;
     const pingState = getPingState(stats.ping);
+    const diskValue = stats.diagnostics.disk.totalBytes && stats.diagnostics.disk.freeBytes !== null
+        ? `${formatBytes(stats.diagnostics.disk.freeBytes)} / ${formatBytes(stats.diagnostics.disk.totalBytes)}`
+        : text.noData;
+    const swapValue = stats.diagnostics.swap.usedMb !== null
+        ? `${stats.diagnostics.swap.usedMb} MB${stats.diagnostics.swap.totalMb !== null ? ` / ${stats.diagnostics.swap.totalMb} MB` : ''}`
+        : text.noData;
+    const updatedAt = stats.diagnostics.updatedAt !== new Date(0).toISOString()
+        ? new Date(stats.diagnostics.updatedAt).toLocaleTimeString(locale === 'ru' ? 'ru-RU' : 'en-US', {
+            hour12: false,
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+        })
+        : text.noData;
+
+    const renderMetricRow = (label: string, metric: PathMetric) => (
+        <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+                <div className="text-sm font-medium text-white">{label}</div>
+                <div className="truncate text-xs text-default-500">{metric.path || text.noData}</div>
+            </div>
+            <div className="flex flex-col items-end gap-2 text-right">
+                <span className="text-sm font-semibold text-white">{formatBytes(metric.bytes)}</span>
+                <Chip color={getMetricColor(metric.status)} size="sm" variant="flat">
+                    {getMetricLabel(metric.status, text)}
+                </Chip>
+            </div>
+        </div>
+    );
 
     return (
         <div className="min-h-screen bg-background p-8">
@@ -245,7 +387,8 @@ export default function GlobalSystemPage() {
                             </div>
                             <div className="flex items-end gap-2">
                                 <span className="text-3xl font-bold">
-                                    {stats.ping ?? text.noData}{stats.ping !== null && stats.ping !== undefined ? 'ms' : ''}
+                                    {stats.ping ?? text.noData}
+                                    {stats.ping !== null && stats.ping !== undefined ? 'ms' : ''}
                                 </span>
                                 <span className={`text-sm mb-1 ${pingState.className}`}>{pingState.label}</span>
                             </div>
@@ -261,8 +404,8 @@ export default function GlobalSystemPage() {
                             className="h-72 mt-4"
                             data={cpuHistory}
                             index="date"
-                            categories={["CPU"]}
-                            colors={["indigo"]}
+                            categories={['CPU']}
+                            colors={['indigo']}
                             valueFormatter={(number) => `${number}%`}
                             showAnimation
                             autoMinValue
@@ -275,15 +418,132 @@ export default function GlobalSystemPage() {
                             className="h-72 mt-4"
                             data={ramHistory}
                             index="date"
-                            categories={["RAM"]}
-                            colors={["emerald"]}
+                            categories={['RAM']}
+                            colors={['emerald']}
                             valueFormatter={(number) => `${number} MB`}
                             showAnimation
                             autoMinValue
                         />
                     </TremorCard>
                 </div>
+
+                <div className="space-y-4">
+                    <div className="flex flex-col gap-1">
+                        <h2 className="text-2xl font-bold text-white">{text.storageTitle}</h2>
+                        <p className="text-default-500">{text.storageSubtitle}</p>
+                    </div>
+
+                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                        <Card className="bg-surface border border-divider">
+                            <CardBody className="space-y-4 p-6">
+                                <div className="flex items-center justify-between gap-4">
+                                    <div>
+                                        <div className="text-sm font-medium text-default-500">{text.diskFree}</div>
+                                        <div className="mt-1 text-2xl font-bold text-white">{diskValue}</div>
+                                        <div className="mt-1 text-xs text-default-400">{stats.diagnostics.disk.path}</div>
+                                    </div>
+                                    <Chip color={getMetricColor(stats.diagnostics.disk.status)} variant="flat">
+                                        {getMetricLabel(stats.diagnostics.disk.status, text)}
+                                    </Chip>
+                                </div>
+                                <Progress
+                                    value={stats.diagnostics.disk.usedPercent ?? 0}
+                                    color={getProgressColor(stats.diagnostics.disk.status)}
+                                    size="sm"
+                                />
+                                <div className="flex items-center justify-between gap-4 text-sm text-default-400">
+                                    <span>{text.swap}</span>
+                                    <span>{swapValue}</span>
+                                </div>
+                                {stats.diagnostics.swap.peakMb !== null && (
+                                    <div className="text-xs text-default-500">
+                                        {text.peak}: {stats.diagnostics.swap.peakMb} MB
+                                    </div>
+                                )}
+                            </CardBody>
+                        </Card>
+
+                        <Card className="bg-surface border border-divider">
+                            <CardBody className="space-y-4 p-6">
+                                {renderMetricRow(text.systemTemp, stats.diagnostics.temp)}
+                                {renderMetricRow(text.packageCache, stats.diagnostics.npmCache)}
+                                {renderMetricRow(text.browserCache, stats.diagnostics.playwrightCache)}
+                            </CardBody>
+                        </Card>
+
+                        <Card className="bg-surface border border-divider">
+                            <CardBody className="space-y-4 p-6">
+                                {renderMetricRow(text.workspaceCache, stats.diagnostics.workspaceCache)}
+                                {renderMetricRow(text.databaseFiles, stats.diagnostics.database)}
+                            </CardBody>
+                        </Card>
+
+                        <Card className="bg-surface border border-divider">
+                            <CardBody className="space-y-4 p-6">
+                                {renderMetricRow(text.logs, stats.diagnostics.logs)}
+                                {renderMetricRow(text.backups, stats.diagnostics.backups)}
+                                <div className="pt-1 text-xs text-default-500">
+                                    {text.updated}: {updatedAt}
+                                </div>
+                            </CardBody>
+                        </Card>
+                    </div>
+                </div>
             </div>
         </div>
     );
+}
+
+function formatBytes(bytes: number | null): string {
+    if (bytes === null) {
+        return '-';
+    }
+
+    if (bytes < 1024) {
+        return `${bytes} B`;
+    }
+
+    const units = ['KB', 'MB', 'GB', 'TB'];
+    let value = bytes / 1024;
+    let unitIndex = 0;
+
+    while (value >= 1024 && unitIndex < units.length - 1) {
+        value /= 1024;
+        unitIndex += 1;
+    }
+
+    return `${value.toFixed(value >= 100 ? 0 : 1)} ${units[unitIndex]}`;
+}
+
+function getMetricColor(status: MetricStatus): 'success' | 'warning' | 'danger' | 'default' {
+    switch (status) {
+        case 'ok':
+            return 'success';
+        case 'warning':
+            return 'warning';
+        case 'critical':
+            return 'danger';
+        default:
+            return 'default';
+    }
+}
+
+function getProgressColor(status: MetricStatus): 'success' | 'warning' | 'danger' | 'default' {
+    return getMetricColor(status);
+}
+
+function getMetricLabel(
+    status: MetricStatus,
+    text: { healthy: string; watch: string; critical: string; unavailable: string }
+): string {
+    switch (status) {
+        case 'ok':
+            return text.healthy;
+        case 'warning':
+            return text.watch;
+        case 'critical':
+            return text.critical;
+        default:
+            return text.unavailable;
+    }
 }

@@ -19,6 +19,8 @@ type SelectOption = {
     id: string;
     name?: string | null;
     color?: string | number;
+    iconComponent?: React.ElementType;
+    iconClassName?: string;
     type?: number | string | null;
     position?: number | null;
     parentId?: string | null;
@@ -240,6 +242,11 @@ function OptionIcon({ option }: { option: SelectOption }) {
         return null;
     }
 
+    if (option.iconComponent) {
+        const CustomIcon = option.iconComponent;
+        return <CustomIcon size={16} weight="duotone" className={option.iconClassName ?? 'text-[var(--color-primary-1)]'} />;
+    }
+
     const color = parseColor(option.color);
 
     if (isChannelOption(option)) {
@@ -332,12 +339,13 @@ function getRoleOptionTone(option: SelectOption) {
 export function InteractiveSelect({ label, value, options, placeholder, onChange, icon, disabled = false }: { label?: string; value: string; options: SelectOption[]; placeholder?: string; onChange: (v: string) => void; icon?: React.ReactNode; disabled?: boolean }) {
     const selectedOption = options.find((option) => option.id === value);
     const selectedActionTone = getActionTone(selectedOption?.id);
+    const triggerIcon = icon ?? (selectedOption ? <OptionIcon option={selectedOption} /> : null);
 
     return (
         <div className="space-y-2 group relative min-w-0">
             {label && <span className="text-sm font-semibold tracking-wide text-white/50 transition-colors group-hover:text-white/80">{label}</span>}
-            <div className={`relative w-full rounded-2xl border border-white/10 bg-black/20 backdrop-blur-md shadow-inner transition-all duration-300 ${disabled ? 'cursor-not-allowed opacity-45' : 'hover:bg-black/40 hover:border-white/20 focus-within:border-[var(--color-primary-1)] focus-within:ring-2 focus-within:ring-[var(--color-primary-1)]/20'} ${icon ? 'pl-11' : ''}`}>
-                {icon && <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-white/40">{icon}</div>}
+            <div className={`relative w-full rounded-2xl border border-white/10 bg-black/20 backdrop-blur-md shadow-inner transition-all duration-300 ${disabled ? 'cursor-not-allowed opacity-45' : 'hover:bg-black/40 hover:border-white/20 focus-within:border-[var(--color-primary-1)] focus-within:ring-2 focus-within:ring-[var(--color-primary-1)]/20'} ${triggerIcon ? 'pl-11' : ''}`}>
+                {triggerIcon && <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-white/40">{triggerIcon}</div>}
                 <Autocomplete
                     aria-label={label || placeholder || 'Select option'}
                     defaultItems={options}
@@ -359,7 +367,7 @@ export function InteractiveSelect({ label, value, options, placeholder, onChange
                     }}
                     inputProps={{
                         classNames: {
-                            inputWrapper: `min-h-[52px] rounded-2xl border-0 bg-transparent shadow-none ${icon ? 'pl-0 pr-4' : 'px-4'} data-[hover=true]:bg-transparent`,
+                            inputWrapper: `min-h-[52px] rounded-2xl border-0 bg-transparent shadow-none ${triggerIcon ? 'pl-0 pr-4' : 'px-4'} data-[hover=true]:bg-transparent`,
                             input: `text-sm font-medium ${disabled ? 'text-white/35 placeholder:text-white/18' : selectedActionTone ? `${selectedActionTone.triggerText} placeholder:text-white/30` : 'text-white/90 placeholder:text-white/30'}`,
                             clearButton: "text-white/50 hover:text-white"
                         }
@@ -566,29 +574,7 @@ export function TagsInputField({ label, tags, placeholder, onAdd, onRemove }: { 
     );
 }
 
-export function SegmentedTabs({ active, onChange, labels, tabs, icons }: { active: string; onChange: (tab: string) => void; labels: Record<string, string>; tabs: readonly string[]; icons?: Record<string, React.ReactNode> }) {
-    return (
-        <div className="flex items-center gap-1 flex-wrap bg-[#111111] border border-white/[0.04] rounded-2xl p-1.5 shadow-sm shadow-black/20 w-full min-w-0">
-            {tabs.map((tab) => {
-                const isActive = active === tab;
-                return (
-                    <button
-                        key={tab}
-                        type="button"
-                        onClick={() => onChange(tab)}
-                        className={`flex-1 flex justify-center items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-bold transition-all whitespace-nowrap ${isActive
-                                ? 'border-[#7AAA7A] bg-[#7AAA7A]/15 text-white shadow-[0_0_18px_rgba(122,170,122,0.16)]'
-                                : 'border-transparent text-white/40 hover:text-white/80 hover:bg-white/[0.04]'
-                            }`}
-                    >
-                        {icons && icons[tab] && <span>{icons[tab]}</span>}
-                        <span>{labels[tab]}</span>
-                    </button>
-                );
-            })}
-        </div>
-    );
-}
+export { SegmentedTabs } from '@/components/common/SegmentedTabs';
 
 // --- Missed Components ---
 
@@ -660,7 +646,7 @@ export function MultiSelectField({ label, options, selected, onChange, placehold
                     allowsCustomValue={false}
                     isClearable
                     isVirtualized={false}
-                    placeholder={selected.length === 0 ? (placeholder || 'Type to search and add...') : 'Type to add more...'}
+                    placeholder={selected.length === 0 ? (placeholder || 'Type to search and add...') : undefined}
                     classNames={{
                         base: "w-full",
                         listboxWrapper: "bg-[#111111]",

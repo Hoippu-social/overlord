@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getAuthToken } from '@/lib/auth';
-import { canAccessGuild } from '@/lib/discordAccess';
+import { syncGuildCommandVisibility } from '@/lib/discordCommandPermissions';
+import { authorizeGuildApiRequest, isGuildApiAuthFailure } from '@/lib/guildApiAuth';
 import { upsertTimezoneRebuildState } from '@/lib/statsControl';
 
 type BotSettingsClient = {
@@ -52,17 +52,10 @@ const isMissingTableError = (error: unknown) => {
 };
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ guildId: string }> }) {
-    const token = await getAuthToken(request);
-    const accessToken = typeof token?.accessToken === 'string' ? token.accessToken : null;
-    if (!accessToken) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const { guildId } = await params;
-    const allowedGuilds = Array.isArray(token?.allowedGuilds) ? token.allowedGuilds : null;
-    const hasAccess = allowedGuilds ? allowedGuilds.includes(guildId) : await canAccessGuild(accessToken, guildId);
-    if (!hasAccess) {
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    const auth = await authorizeGuildApiRequest(request, guildId);
+    if (isGuildApiAuthFailure(auth)) {
+        return auth.response;
     }
 
     const guild = await prisma.guild.findUnique({
@@ -99,18 +92,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 }
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ guildId: string }> }) {
-    const token = await getAuthToken(request);
-    const accessToken = typeof token?.accessToken === 'string' ? token.accessToken : null;
-    if (!accessToken) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const { guildId } = await params;
-    const allowedGuilds = Array.isArray(token?.allowedGuilds) ? token.allowedGuilds : null;
-    const hasAccess = allowedGuilds ? allowedGuilds.includes(guildId) : await canAccessGuild(accessToken, guildId);
-    if (!hasAccess) {
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    const auth = await authorizeGuildApiRequest(request, guildId, { live: true });
+    if (isGuildApiAuthFailure(auth)) {
+        return auth.response;
     }
+    const { accessToken } = auth;
 
     const botSettingsClient = getBotSettingsClient();
     if (!botSettingsClient) {
@@ -125,8 +112,26 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const prefixInput = typeof body.prefix === 'string' ? body.prefix.trim() : '';
     const prefix = prefixInput.length > 0 ? prefixInput.slice(0, 5) : null;
     const prefixCommandsEnabled = body.prefixCommandsEnabled === false ? false : true;
+    const commandChannelMode = normalizeChannelMode(body.commandChannelMode);
+    const allowedTextChannels = normalizeStringArray(body.allowedTextChannels);
     const locale = normalizeLocale(body.locale);
     const timezone = normalizeTimezone(body.timezone);
+    const shouldSyncCommandVisibility = body.syncDiscordCommandPermissions === true;
+    const payloadGuildChannels = Array.isArray(body.guildChannels) ? JSON.stringify(body.guildChannels) : null;
+
+    const [guild, moderationConfig] = shouldSyncCommandVisibility
+        ? await Promise.all([
+            prisma.guild.findUnique({
+                where: { id: guildId },
+                select: { channels: true },
+            }),
+            prisma.moderationConfig.findUnique({
+                where: { guildId },
+                select: { commandRules: true },
+            }),
+        ])
+        : [null, null];
+    let syncWarning: string | null = null;
 
     if (prefix) {
         await prisma.guild.upsert({
@@ -139,8 +144,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     try {
         const updatePayload: Record<string, unknown> = {
             prefixCommandsEnabled,
-            commandChannelMode: normalizeChannelMode(body.commandChannelMode),
-            allowedTextChannels: JSON.stringify(normalizeStringArray(body.allowedTextChannels)),
+            commandChannelMode,
+            allowedTextChannels: JSON.stringify(allowedTextChannels),
             adminRoles: JSON.stringify(normalizeStringArray(body.adminRoles)),
             restoreRolesOnRejoin: Boolean(body.restoreRolesOnRejoin),
             restoreNicknameOnRejoin: Boolean(body.restoreNicknameOnRejoin)
@@ -159,8 +164,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             create: {
                 guildId,
                 prefixCommandsEnabled,
-                commandChannelMode: normalizeChannelMode(body.commandChannelMode),
-                allowedTextChannels: JSON.stringify(normalizeStringArray(body.allowedTextChannels)),
+                commandChannelMode,
+                allowedTextChannels: JSON.stringify(allowedTextChannels),
                 adminRoles: JSON.stringify(normalizeStringArray(body.adminRoles)),
                 restoreRolesOnRejoin: Boolean(body.restoreRolesOnRejoin),
                 restoreNicknameOnRejoin: Boolean(body.restoreNicknameOnRejoin),
@@ -169,11 +174,31 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             }
         });
 
+        if (shouldSyncCommandVisibility && accessToken === 'admin') {
+            syncWarning = 'discord_oauth_required';
+        } else if (shouldSyncCommandVisibility) {
+            await syncGuildCommandVisibility({
+                guildId,
+                accessToken,
+                mode: commandChannelMode,
+                selectedChannelIds: allowedTextChannels,
+                commandRules: (() => {
+                    try {
+                        const parsed = moderationConfig?.commandRules ? JSON.parse(moderationConfig.commandRules) : [];
+                        return Array.isArray(parsed) ? parsed : [];
+                    } catch {
+                        return [];
+                    }
+                })(),
+                guildChannelsJson: payloadGuildChannels ?? guild?.channels ?? null,
+            });
+        }
+
         if (timezone) {
             await upsertTimezoneRebuildState(guildId, timezone);
         }
 
-        return NextResponse.json(config);
+        return NextResponse.json({ config, syncWarning });
     } catch (error) {
         if (isMissingTableError(error)) {
             return NextResponse.json(
@@ -183,6 +208,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         }
 
         console.error('Failed to save bot settings:', error);
-        return NextResponse.json({ error: 'Failed to save bot settings.' }, { status: 500 });
+        const message = error instanceof Error && error.message ? error.message : 'Failed to save bot settings.';
+        return NextResponse.json({ error: message }, { status: 500 });
     }
 }

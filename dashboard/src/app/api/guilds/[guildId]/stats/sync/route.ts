@@ -4,8 +4,18 @@ import type { Prisma } from '@prisma/client';
 import { updateSyncStatus } from './status/route';
 import { toZonedTime, fromZonedTime } from 'date-fns-tz';
 import { requireGuildStatsAccess } from '@/lib/statsAccess';
-import { getVoiceSessionBucketDate, getVoiceSessionDurationSeconds } from '@/lib/stats';
+import {
+    buildVoiceWhereClause,
+    forEachVoiceSessionHourBucket,
+    getClampedVoiceSessionDurationSeconds,
+} from '@/lib/stats';
 import { withStatsTelemetry } from '@/lib/statsTelemetry';
+
+const isInternalStatsSyncRequest = (request: NextRequest) => {
+    const secret = process.env.NEXTAUTH_SECRET;
+    if (!secret) return false;
+    return request.headers.get('x-stats-cron-key') === secret;
+};
 
 const isMissingTableError = (error: unknown) => {
     const err = error as { code?: string; message?: string };
@@ -95,7 +105,7 @@ async function aggregateMemberEvents(
         let fetched = 0;
 
         while (true) {
-            const chunk: any[] = await statsPrisma.auditLogEvent.findMany({
+            const chunk: Array<{ id: number; createdAt: Date; payload: string | null }> = await statsPrisma.auditLogEvent.findMany({
                 where: {
                     guildId,
                     tag: 'invites',
@@ -301,9 +311,11 @@ export async function POST(
 ) {
     const { guildId } = await params;
     return withStatsTelemetry({ guildId, endpoint: 'sync', method: 'POST' }, async () => {
-        const access = await requireGuildStatsAccess(request, guildId);
-        if (!access.ok) {
-            return access.response;
+        if (!isInternalStatsSyncRequest(request)) {
+            const access = await requireGuildStatsAccess(request, guildId, { live: true });
+            if (!access.ok) {
+                return access.response;
+            }
         }
 
         let customDays: number | null = null;
@@ -322,6 +334,7 @@ export async function POST(
         const since30d = new Date();
         since30d.setDate(since30d.getDate() - 30);
         since30d.setHours(0, 0, 0, 0);
+        const syncNow = new Date();
         let aggregationTimezone = 'UTC';
 
         try {
@@ -447,7 +460,7 @@ export async function POST(
         let fetchedMsgs = 0;
         
         while (true) {
-            const chunk: any[] = await statsPrisma.statMessage.findMany({
+            const chunk: Array<{ id: number; createdAt: Date; authorId: string; channelId: string }> = await statsPrisma.statMessage.findMany({
                 where: { guildId, createdAt: { gte: since } },
                 take: 50000,
                 skip: msgCursor ? 1 : 0,
@@ -484,13 +497,25 @@ export async function POST(
         let fetchedVoice = 0;
 
         while (true) {
-            const chunk: any[] = await statsPrisma.statVoiceState.findMany({
+            const chunk: Array<{
+                id: number;
+                joinedAt: Date;
+                leftAt: Date | null;
+                duration: number | null;
+                userId: string;
+                channelId: string;
+            }> = await statsPrisma.statVoiceState.findMany({
                 where: {
                     guildId,
-                    OR: [
-                        { leftAt: { gte: since } },
-                        { leftAt: null, joinedAt: { gte: since } }
-                    ]
+                    ...buildVoiceWhereClause(since, syncNow),
+                },
+                select: {
+                    id: true,
+                    joinedAt: true,
+                    leftAt: true,
+                    duration: true,
+                    userId: true,
+                    channelId: true,
                 },
                 take: 50000,
                 skip: voiceCursor ? 1 : 0,
@@ -503,19 +528,33 @@ export async function POST(
             for (const session of chunk) {
                 if (!session.joinedAt) continue;
 
-                const duration = getVoiceSessionDurationSeconds(session, new Date());
-                const endDate = getVoiceSessionBucketDate(session, new Date());
-                const h = getHourlyEntry(endDate);
-                h.voice += duration;
-                const d = getDailyEntry(endDate);
-                d.voice += duration;
-                getMemberDailyEntry(session.userId, endDate).voiceSeconds += duration;
-                getChannelDailyEntry(session.channelId, endDate).voiceSeconds += duration;
+                forEachVoiceSessionHourBucket(
+                    session,
+                    { startDate: since, endDate: syncNow, timezone: tz, now: syncNow },
+                    (bucketStart, seconds) => {
+                        getHourlyEntry(bucketStart).voice += seconds;
+                        getDailyEntry(bucketStart).voice += seconds;
+                        getMemberDailyEntry(session.userId, bucketStart).voiceSeconds += seconds;
+                        getChannelDailyEntry(session.channelId, bucketStart).voiceSeconds += seconds;
+                    }
+                );
 
-                // Inline Top Calculation
-                if (endDate >= since30d) {
-                    topVoiceChannelMap.set(session.channelId, (topVoiceChannelMap.get(session.channelId) || 0) + duration);
-                    topVoiceMemberMap.set(session.userId, (topVoiceMemberMap.get(session.userId) || 0) + duration);
+                const topWindowDuration = getClampedVoiceSessionDurationSeconds(
+                    session,
+                    since30d,
+                    syncNow,
+                    syncNow
+                );
+
+                if (topWindowDuration > 0) {
+                    topVoiceChannelMap.set(
+                        session.channelId,
+                        (topVoiceChannelMap.get(session.channelId) || 0) + topWindowDuration
+                    );
+                    topVoiceMemberMap.set(
+                        session.userId,
+                        (topVoiceMemberMap.get(session.userId) || 0) + topWindowDuration
+                    );
                 }
             }
             voiceCursor = chunk[chunk.length - 1].id;
