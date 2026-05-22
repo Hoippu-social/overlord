@@ -1,0 +1,4 @@
+interface:
+  display_name: "Overlord Dashboard Identity"
+  short_description: "Overlord dashboard visual rules"
+  default_prompt: "Use $overlord-dashboard-identity to adapt dashboard UI to the Overlord visual system."

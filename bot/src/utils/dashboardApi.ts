@@ -1,7 +1,10 @@
 import http from 'http';
 import { Client } from 'discord.js';
 import logger from './logger';
-import { prisma } from './database';
+import { prisma, statsPrisma } from './database';
+import { reviewAppealTicket } from '../services/AppealService';
+import { syncAppealPanels } from '../services/AppealInteractionService';
+import { parseAuditRouteChannelIds, serializeAuditRouteChannelIds } from './auditRouteChannels';
 
 const PORT = Number.parseInt(process.env.DASHBOARD_API_PORT || '3002', 10);
 const API_KEY = process.env.DASHBOARD_API_KEY || '';
@@ -255,7 +258,7 @@ export function startDashboardApi(client: Client): http.Server {
                 if (tag) where.tag = tag;
                 if (beforeId) where.id = { lt: beforeId };
 
-                const rows = await prisma.auditLogEvent.findMany({
+                const rows = await statsPrisma.auditLogEvent.findMany({
                     where,
                     orderBy: { id: 'desc' },
                     take: limit,
@@ -297,7 +300,7 @@ export function startDashboardApi(client: Client): http.Server {
                 if (authorId) where.authorId = authorId;
                 if (beforeId) where.id = { lt: beforeId };
 
-                const rows = await prisma.messageEvent.findMany({
+                const rows = await statsPrisma.messageEvent.findMany({
                     where,
                     orderBy: { id: 'desc' },
                     take: limit,
@@ -321,50 +324,438 @@ export function startDashboardApi(client: Client): http.Server {
                         where: { guildId },
                         orderBy: { tag: 'asc' },
                     });
+                    const normalizedRoutes = routes.map((route) => ({
+                        ...route,
+                        channelIds: parseAuditRouteChannelIds(route.channelId),
+                    }));
                     res.writeHead(200, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ ok: true, routes }));
+                    res.end(JSON.stringify({ ok: true, routes: normalizedRoutes }));
                     return;
                 }
 
                 if (req.method === 'POST') {
                     const raw = await readBody(req);
                     const body = raw ? JSON.parse(raw) : {};
-                    const tag = typeof body.tag === 'string' ? body.tag : '';
-                    const channelId = typeof body.channelId === 'string' ? body.channelId : '';
-                    const enabled = typeof body.enabled === 'boolean' ? body.enabled : true;
+                    const tags = Array.from(
+                        new Set(
+                            [
+                                ...(typeof body.tag === 'string' ? [body.tag] : []),
+                                ...(Array.isArray(body.tags) ? body.tags : []),
+                            ]
+                                .filter((tag): tag is string => typeof tag === 'string')
+                                .map((tag) => tag.trim())
+                                .filter(Boolean)
+                        )
+                    );
+                    const channelIds = Array.from(
+                        new Set(
+                            [
+                                ...(typeof body.channelId === 'string' ? [body.channelId] : []),
+                                ...(Array.isArray(body.channelIds) ? body.channelIds : []),
+                            ]
+                                .filter((channelId): channelId is string => typeof channelId === 'string')
+                                .map((channelId) => channelId.trim())
+                                .filter(Boolean)
+                        )
+                    );
+                    const enabled = typeof body.enabled === 'boolean' ? body.enabled : undefined;
+                    const hasTemplate = Object.prototype.hasOwnProperty.call(body, 'template');
                     const template = typeof body.template === 'string' ? body.template : null;
+                    const hasMentions = Object.prototype.hasOwnProperty.call(body, 'mentions');
                     const mentions = body.mentions ? JSON.stringify(body.mentions) : null;
 
-                    if (!tag || !channelId) {
+                    if (tags.length === 0 || channelIds.length === 0) {
                         res.writeHead(400);
-                        res.end('tag and channelId are required');
+                        res.end('tags and channelIds are required');
                         return;
                     }
 
-                    const route = await prisma.auditTagRoute.upsert({
-                        where: { guildId_tag: { guildId, tag } },
-                        update: { channelId, enabled, template, mentions },
-                        create: { guildId, tag, channelId, enabled, template, mentions },
-                    });
+                    const serializedChannelIds = serializeAuditRouteChannelIds(channelIds);
+                    const routes = await prisma.$transaction(
+                        tags.map((tag) =>
+                            prisma.auditTagRoute.upsert({
+                                where: { guildId_tag: { guildId, tag } },
+                                update: {
+                                    channelId: serializedChannelIds,
+                                    ...(typeof enabled === 'boolean' ? { enabled } : {}),
+                                    ...(hasTemplate ? { template } : {}),
+                                    ...(hasMentions ? { mentions } : {}),
+                                },
+                                create: {
+                                    guildId,
+                                    tag,
+                                    channelId: serializedChannelIds,
+                                    enabled: enabled ?? true,
+                                    template: hasTemplate ? template : null,
+                                    mentions: hasMentions ? mentions : null,
+                                },
+                            })
+                        )
+                    );
+                    const normalizedRoutes = routes.map((route) => ({
+                        ...route,
+                        channelIds: parseAuditRouteChannelIds(route.channelId),
+                    }));
                     res.writeHead(200, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ ok: true, route }));
+                    res.end(JSON.stringify({
+                        ok: true,
+                        route: normalizedRoutes[0] ?? null,
+                        routes: normalizedRoutes,
+                    }));
                     return;
                 }
 
                 if (req.method === 'DELETE') {
                     const raw = await readBody(req);
                     const body = raw ? JSON.parse(raw) : {};
-                    const tag = typeof body.tag === 'string' ? body.tag : url.searchParams.get('tag') || '';
-                    if (!tag) {
+                    const tags = Array.from(
+                        new Set(
+                            [
+                                ...(url.searchParams.get('tag') ? [url.searchParams.get('tag')] : []),
+                                ...(typeof body.tag === 'string' ? [body.tag] : []),
+                                ...(Array.isArray(body.tags) ? body.tags : []),
+                            ]
+                                .filter((tag): tag is string => typeof tag === 'string')
+                                .map((tag) => tag.trim())
+                                .filter(Boolean)
+                        )
+                    );
+                    if (tags.length === 0) {
                         res.writeHead(400);
-                        res.end('tag is required');
+                        res.end('tag or tags are required');
                         return;
                     }
-                    await prisma.auditTagRoute.delete({
-                        where: { guildId_tag: { guildId, tag } },
+                    const result = await prisma.auditTagRoute.deleteMany({
+                        where: {
+                            guildId,
+                            tag: { in: tags },
+                        },
                     });
                     res.writeHead(200, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ ok: true }));
+                    res.end(JSON.stringify({ ok: true, count: result.count }));
+                    return;
+                }
+
+                res.writeHead(405);
+                res.end('Method Not Allowed');
+                return;
+            }
+
+
+            // /api/enrich — resolve user/channel info from Discord cache
+            if (url.pathname === '/api/appeals/review') {
+                if (req.method !== 'POST') {
+                    res.writeHead(405);
+                    res.end('Method Not Allowed');
+                    return;
+                }
+
+                const raw = await readBody(req);
+                const body = raw ? JSON.parse(raw) : {};
+                const guildId = typeof body.guildId === 'string' ? body.guildId : '';
+                const reviewerId = typeof body.reviewerId === 'string' ? body.reviewerId.trim() : '';
+                const ticketId = Number(body.ticketId);
+                const note = typeof body.note === 'string' && body.note.trim().length ? body.note.trim() : null;
+                const decision = typeof body.decision === 'string' ? body.decision.trim().toUpperCase() : '';
+
+                if (!guildId || !reviewerId || !Number.isInteger(ticketId) || ticketId < 1 || !decision) {
+                    res.writeHead(400);
+                    res.end('guildId, reviewerId, ticketId and decision are required');
+                    return;
+                }
+
+                if (!['IN_REVIEW', 'ACCEPTED', 'REJECTED', 'PARDONED'].includes(decision)) {
+                    res.writeHead(400);
+                    res.end('Invalid decision');
+                    return;
+                }
+
+                const guild = client.guilds.cache.get(guildId) || await client.guilds.fetch(guildId).catch(() => null);
+                if (!guild) {
+                    res.writeHead(404);
+                    res.end('Guild not found');
+                    return;
+                }
+
+                try {
+                    const ticket = await reviewAppealTicket({
+                        guild,
+                        ticketId,
+                        reviewerId,
+                        decision: decision as 'IN_REVIEW' | 'ACCEPTED' | 'REJECTED' | 'PARDONED',
+                        note,
+                        client,
+                    });
+
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ ok: true, ticket }));
+                    return;
+                } catch (error) {
+                    const message = error instanceof Error ? error.message : 'Failed to review appeal ticket';
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ ok: false, error: message }));
+                    return;
+                }
+            }
+
+            if (url.pathname === '/api/appeals/sync-panel') {
+                if (req.method !== 'POST') {
+                    res.writeHead(405);
+                    res.end('Method Not Allowed');
+                    return;
+                }
+
+                const raw = await readBody(req);
+                const body = raw ? JSON.parse(raw) : {};
+                const guildId = typeof body.guildId === 'string' ? body.guildId : '';
+
+                if (!guildId) {
+                    res.writeHead(400);
+                    res.end('guildId is required');
+                    return;
+                }
+
+                try {
+                    const result = await syncAppealPanels(client, guildId);
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ ok: true, result }));
+                    return;
+                } catch (error) {
+                    const message = error instanceof Error ? error.message : 'Failed to sync appeal panel';
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ ok: false, error: message }));
+                    return;
+                }
+            }
+
+            if (url.pathname === '/api/enrich') {
+                if (req.method !== 'POST') {
+                    res.writeHead(405);
+                    res.end('Method Not Allowed');
+                    return;
+                }
+
+                const raw = await readBody(req);
+                const body = raw ? JSON.parse(raw) : {};
+                const guildId = typeof body.guildId === 'string' ? body.guildId : '';
+                const userIds: string[] = Array.isArray(body.userIds) ? body.userIds : [];
+                const channelIds: string[] = Array.isArray(body.channelIds) ? body.channelIds : [];
+
+                if (!guildId) {
+                    res.writeHead(400);
+                    res.end('guildId is required');
+                    return;
+                }
+
+                const guild = client.guilds.cache.get(guildId);
+                const users: Record<string, any> = {};
+                const channels: Record<string, any> = {};
+
+                // Resolve users
+                for (const userId of userIds) {
+                    try {
+                        // Try guild member first (get server nickname)
+                        let member = guild?.members.cache.get(userId);
+                        if (!member && guild) {
+                            try { member = await guild.members.fetch(userId); } catch { }
+                        }
+
+                        if (member) {
+                            const user = member.user;
+                            const avatarUrl = member.displayAvatarURL({ size: 64, extension: 'webp' });
+                            const topRole = member.roles.highest.id !== member.guild.id
+                                ? member.roles.highest
+                                : member.roles.cache
+                                    .filter((role) => role.id !== member.guild.id)
+                                    .sort((left, right) => right.position - left.position)
+                                    .first() ?? null;
+                            users[userId] = {
+                                id: userId,
+                                name: member.displayName,           // server nickname or username
+                                username: user.username,
+                                discriminator: user.discriminator,
+                                tag: user.discriminator !== '0' ? `${user.username}#${user.discriminator}` : `@${user.username}`,
+                                avatar: avatarUrl,
+                                globalName: user.globalName || user.username,
+                                roleName: topRole?.name ?? null,
+                                roleColor: topRole?.color || null,
+                            };
+                        } else {
+                            // Fallback: try to fetch user globally
+                            try {
+                                const user = await client.users.fetch(userId);
+                                users[userId] = {
+                                    id: userId,
+                                    name: user.globalName || user.username,
+                                    username: user.username,
+                                    discriminator: user.discriminator,
+                                    tag: user.discriminator !== '0' ? `${user.username}#${user.discriminator}` : `@${user.username}`,
+                                    avatar: user.displayAvatarURL({ size: 64, extension: 'webp' }),
+                                    globalName: user.globalName || user.username,
+                                    roleName: null,
+                                    roleColor: null,
+                                };
+                            } catch {
+                                users[userId] = { id: userId, name: userId, username: userId, tag: userId, avatar: null, roleName: null, roleColor: null };
+                            }
+                        }
+                    } catch {
+                        users[userId] = { id: userId, name: userId, username: userId, tag: userId, avatar: null, roleName: null, roleColor: null };
+                    }
+                }
+
+                // Resolve channels
+                for (const channelId of channelIds) {
+                    const channel = guild?.channels.cache.get(channelId) || client.channels.cache.get(channelId);
+                    if (channel && 'name' in channel) {
+                        channels[channelId] = {
+                            id: channelId,
+                            name: channel.name,
+                            type: channel.type,
+                        };
+                    } else {
+                        channels[channelId] = { id: channelId, name: channelId, type: null };
+                    }
+                }
+
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ ok: true, users, channels }));
+                return;
+            }
+
+            // /api/search — search guild members by nickname, username or tag
+            if (url.pathname === '/api/search') {
+                if (req.method !== 'GET') {
+                    res.writeHead(405);
+                    res.end('Method Not Allowed');
+                    return;
+                }
+
+                const guildId = url.searchParams.get('guildId') || '';
+                const query = (url.searchParams.get('q') || '').toLowerCase().trim();
+                const type = url.searchParams.get('type') || 'users'; // users | channels
+
+                if (!guildId || !query) {
+                    res.writeHead(400);
+                    res.end('guildId and q are required');
+                    return;
+                }
+
+                const guild = client.guilds.cache.get(guildId);
+                if (!guild) {
+                    res.writeHead(404);
+                    res.end('Guild not found');
+                    return;
+                }
+
+                if (type === 'users') {
+                    // Search in cache first
+                    const results = guild.members.cache
+                        .filter(m => {
+                            const nick = m.displayName.toLowerCase();
+                            const username = m.user.username.toLowerCase();
+                            const tag = m.user.tag.toLowerCase();
+                            return nick.includes(query) || username.includes(query) || tag.includes(query);
+                        })
+                        .map(m => ({
+                            id: m.user.id,
+                            name: m.displayName,
+                            username: m.user.username,
+                            tag: m.user.discriminator !== '0'
+                                ? `${m.user.username}#${m.user.discriminator}`
+                                : `@${m.user.username}`,
+                            avatar: m.displayAvatarURL({ size: 64, extension: 'webp' }),
+                        }))
+                        .slice(0, 25);
+
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ ok: true, results: Array.from(results.values()) }));
+                    return;
+                }
+
+                if (type === 'channels') {
+                    const results = guild.channels.cache
+                        .filter(c => 'name' in c && c.name!.toLowerCase().includes(query))
+                        .map(c => ({
+                            id: c.id,
+                            name: (c as any).name,
+                            type: c.type,
+                        }))
+                        .slice(0, 25);
+
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ ok: true, results: Array.from(results.values()) }));
+                    return;
+                }
+
+                res.writeHead(400);
+                res.end('Invalid type');
+                return;
+            }
+
+            // /api/stats/historical-sync — collect historical messages from Discord channels
+            if (url.pathname === '/api/stats/historical-sync') {
+                const { HistoricalSyncService } = await import('../services/HistoricalSyncService');
+
+                if (req.method === 'GET') {
+                    const guildId = url.searchParams.get('guildId') || '';
+                    if (!guildId) {
+                        res.writeHead(400);
+                        res.end('guildId is required');
+                        return;
+                    }
+                    const running = HistoricalSyncService.isSyncRunning(guildId);
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ ok: true, running }));
+                    return;
+                }
+
+                if (req.method === 'POST') {
+                    const raw = await readBody(req);
+                    const body = raw ? JSON.parse(raw) : {};
+                    const guildId = typeof body.guildId === 'string' ? body.guildId : '';
+                    const days = Math.min(Number(body.days) || 90, 90);
+
+                    if (!guildId) {
+                        res.writeHead(400);
+                        res.end('guildId is required');
+                        return;
+                    }
+
+                    // SSE stream for progress
+                    res.writeHead(200, {
+                        'Content-Type': 'text/event-stream',
+                        'Cache-Control': 'no-cache',
+                        'Connection': 'keep-alive',
+                    });
+
+                    const sendEvent = (data: any) => {
+                        try { res.write(`data: ${JSON.stringify(data)}\n\n`); } catch { }
+                    };
+
+                    // Heartbeat to keep connection alive during long syncs
+                    const heartbeat = setInterval(() => {
+                        try { res.write(': heartbeat\n\n'); } catch { }
+                    }, 15_000);
+
+                    try {
+                        logger.info(`[HistoricalSync] Starting for guild ${guildId}, ${days} days`);
+                        const result = await HistoricalSyncService.collectHistoricalData(
+                            client,
+                            guildId,
+                            days,
+                            (progress) => sendEvent({ type: 'progress', ...progress })
+                        );
+                        logger.info(`[HistoricalSync] Done: ${result.messagesCollected} new messages`);
+                        sendEvent({ type: 'complete', ...result });
+                    } catch (error) {
+                        logger.error('[HistoricalSync] Error:', error);
+                        sendEvent({ type: 'error', error: error instanceof Error ? error.message : 'Unknown error' });
+                    } finally {
+                        clearInterval(heartbeat);
+                    }
+
+                    res.end();
                     return;
                 }
 
