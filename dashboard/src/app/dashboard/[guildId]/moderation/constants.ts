@@ -1,4 +1,4 @@
-import {
+﻿import {
     AiIncidentState,
     AnalyticsState,
     AppealReviewDecision,
@@ -233,6 +233,68 @@ export const emptyConfig = (): ConfigState => ({
         pardonLogChannelId: '',
         allowUserAppeals: true,
         allowDirectPardon: true,
+        threadChannelId: '',
+        logChannelId: '',
+        triageRoleIds: [],
+        reviewerRoleIds: [],
+        mentionRoleIds: [],
+        allowedActionTypes: ['WARN', 'TIMEOUT', 'MUTE', 'BAN', 'TEMPBAN'],
+        appealWindowDays: 14,
+        oneOpenAppealPerCase: true,
+        firstResponseSlaHours: 24,
+        autoCloseHours: 72,
+        dedicatedPanel: {
+            enabled: false,
+            channelId: '',
+            title: 'ÐžÐ±Ð¶Ð°Ð»Ð¾Ð²Ð°Ð½Ð¸Ðµ Ð½Ð°ÐºÐ°Ð·Ð°Ð½Ð¸Ñ',
+            description: 'Ð¡Ð¾Ð·Ð´Ð°Ð¹Ñ‚Ðµ Ð¾Ð±Ñ€Ð°Ñ‰ÐµÐ½Ð¸Ðµ, Ñ‡Ñ‚Ð¾Ð±Ñ‹ Ð¾ÑÐ¿Ð¾Ñ€Ð¸Ñ‚ÑŒ Ñ€ÐµÑˆÐµÐ½Ð¸Ðµ Ð¼Ð¾Ð´ÐµÑ€Ð°Ñ†Ð¸Ð¸ Ð¸ Ð¾Ñ‚ÑÐ»ÐµÐ´Ð¸Ñ‚ÑŒ Ð²ÐµÑÑŒ Ð¿Ñ€Ð¾Ñ†ÐµÑÑ Ð²Ð½ÑƒÑ‚Ñ€Ð¸ Discord.',
+            buttonLabel: 'ÐŸÐ¾Ð´Ð°Ñ‚ÑŒ Ð°Ð¿ÐµÐ»Ð»ÑÑ†Ð¸ÑŽ',
+            buttonEmoji: 'âš–ï¸',
+        },
+        sharedPlacement:
+        {
+            enabled: false,
+            channelId: '',
+            label: 'ÐÐ¿ÐµÐ»Ð»ÑÑ†Ð¸Ñ Ð½Ð°ÐºÐ°Ð·Ð°Ð½Ð¸Ñ',
+            description: 'ÐžÑÐ¿Ð¾Ñ€Ð¸Ñ‚ÑŒ Ð²Ñ‹Ð´Ð°Ð½Ð½Ð¾Ðµ Ð½Ð°ÐºÐ°Ð·Ð°Ð½Ð¸Ðµ Ð¸ Ð¿Ñ€ÐµÐ´Ð¾ÑÑ‚Ð°Ð²Ð¸Ñ‚ÑŒ ÑÐ²Ð¾Ð¸ Ð°Ñ€Ð³ÑƒÐ¼ÐµÐ½Ñ‚Ñ‹.',
+            emoji: 'âš–ï¸',
+            sortOrder: 90,
+        },
+        firstEmbed: {
+            title: 'ÐÐ¿ÐµÐ»Ð»ÑÑ†Ð¸Ñ #{appealId} â€¢ ÐšÐµÐ¹Ñ #{caseNumber}',
+            intro: 'Ð—Ð°Ð¿Ñ€Ð¾Ñ Ð¿Ñ€Ð¸Ð½ÑÑ‚. Ð¡Ð»ÐµÐ´Ð¸Ñ‚Ðµ Ð·Ð° Ð¸Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸ÐµÐ¼ ÑÑ‚Ð°Ñ‚ÑƒÑÐ° Ð² ÑÑ‚Ð¾Ð¼ Ñ‚Ñ€ÐµÐ´Ðµ Ð¸ Ð¿Ñ€Ð¸ Ð½ÐµÐ¾Ð±Ñ…Ð¾Ð´Ð¸Ð¼Ð¾ÑÑ‚Ð¸ Ð´Ð¾Ð¿Ð¾Ð»Ð½ÑÐ¹Ñ‚Ðµ Ð¸Ð½Ñ„Ð¾Ñ€Ð¼Ð°Ñ†Ð¸ÑŽ.',
+            footer: 'ÐœÑ‹ Ð¾Ð±Ð½Ð¾Ð²Ð¸Ð¼ ÑÑ‚Ð°Ñ‚ÑƒÑ Ð·Ð´ÐµÑÑŒ, ÐºÐ°Ðº Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ð°Ð¿ÐµÐ»Ð»ÑÑ†Ð¸Ñ Ð¿ÐµÑ€ÐµÐ¹Ð´Ñ‘Ñ‚ Ðº ÑÐ»ÐµÐ´ÑƒÑŽÑ‰ÐµÐ¼Ñƒ ÑÑ‚Ð°Ð¿Ñƒ.',
+        },
+        intakeQuestions: [
+            {
+                id: 'disagreement',
+                label: 'Ð¡ Ñ‡ÐµÐ¼ Ð¸Ð¼ÐµÐ½Ð½Ð¾ Ð²Ñ‹ Ð½Ðµ ÑÐ¾Ð³Ð»Ð°ÑÐ½Ñ‹?',
+                placeholder: 'ÐšÑ€Ð°Ñ‚ÐºÐ¾ Ð¾Ð¿Ð¸ÑˆÐ¸Ñ‚Ðµ, ÐºÐ°ÐºÐ¾Ðµ Ñ€ÐµÑˆÐµÐ½Ð¸Ðµ Ð²Ñ‹ Ð¾ÑÐ¿Ð°Ñ€Ð¸Ð²Ð°ÐµÑ‚Ðµ.',
+                required: true,
+                long: false,
+            },
+            {
+                id: 'reasoning',
+                label: 'ÐŸÐ¾Ñ‡ÐµÐ¼Ñƒ Ñ€ÐµÑˆÐµÐ½Ð¸Ðµ Ð½ÑƒÐ¶Ð½Ð¾ Ð¿ÐµÑ€ÐµÑÐ¼Ð¾Ñ‚Ñ€ÐµÑ‚ÑŒ?',
+                placeholder: 'ÐžÐ¿Ð¸ÑˆÐ¸Ñ‚Ðµ ÑÐ²Ð¾ÑŽ Ð¿Ð¾Ð·Ð¸Ñ†Ð¸ÑŽ Ð¸ Ð¾Ð±ÑÑ‚Ð¾ÑÑ‚ÐµÐ»ÑŒÑÑ‚Ð²Ð° Ð¿Ð¾Ð´Ñ€Ð¾Ð±Ð½ÐµÐµ.',
+                required: true,
+                long: true,
+            },
+            {
+                id: 'outcome',
+                label: 'ÐšÐ°ÐºÐ¾Ð³Ð¾ Ñ€ÐµÐ·ÑƒÐ»ÑŒÑ‚Ð°Ñ‚Ð° Ð²Ñ‹ Ð¾Ð¶Ð¸Ð´Ð°ÐµÑ‚Ðµ?',
+                placeholder: 'ÐÐ°Ð¿Ñ€Ð¸Ð¼ÐµÑ€: ÑÐ½ÑÑ‚ÑŒ Ð½Ð°ÐºÐ°Ð·Ð°Ð½Ð¸Ðµ, ÑÐ¾ÐºÑ€Ð°Ñ‚Ð¸Ñ‚ÑŒ ÑÑ€Ð¾Ðº, Ð¿ÐµÑ€ÐµÑÐ¼Ð¾Ñ‚Ñ€ÐµÑ‚ÑŒ Ð¿Ñ€Ð¸Ñ‡Ð¸Ð½Ñƒ.',
+                required: true,
+                long: false,
+            },
+            {
+                id: 'evidence',
+                label: 'Ð”Ð¾ÐºÐ°Ð·Ð°Ñ‚ÐµÐ»ÑŒÑÑ‚Ð²Ð° Ð¸Ð»Ð¸ Ð´Ð¾Ð¿Ð¾Ð»Ð½Ð¸Ñ‚ÐµÐ»ÑŒÐ½Ñ‹Ðµ ÑÑÑ‹Ð»ÐºÐ¸',
+                placeholder: 'ÐŸÑ€Ð¸Ð»Ð¾Ð¶Ð¸Ñ‚Ðµ ÑÑÑ‹Ð»ÐºÐ¸, ÐºÐ¾Ð½Ñ‚ÐµÐºÑÑ‚ Ð¸Ð»Ð¸ ÑƒÑ‚Ð¾Ñ‡Ð½ÐµÐ½Ð¸Ñ, ÐºÐ¾Ñ‚Ð¾Ñ€Ñ‹Ðµ Ð¿Ð¾Ð¼Ð¾Ð³ÑƒÑ‚ Ð² Ñ€Ð°ÑÑÐ¼Ð¾Ñ‚Ñ€ÐµÐ½Ð¸Ð¸.',
+                required: false,
+                long: true,
+            },
+        ],
     },
     retentionPolicies: [],
 });
@@ -285,3 +347,4 @@ export function updateAtIndex<T>(items: T[], index: number, nextItem: T) {
 export function removeAtIndex<T>(items: T[], index: number) {
     return items.filter((_, itemIndex) => itemIndex !== index);
 }
+

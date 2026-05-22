@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { syncGuildCommandVisibility } from '@/lib/discordCommandPermissions';
 import { authorizeGuildApiRequest, isGuildApiAuthFailure } from '@/lib/guildApiAuth';
+import { normalizeAppealSettings, readAppealSettings, writeAppealSettings } from '@/lib/appealsConfig';
+
+const BOT_API_PORT = process.env.DASHBOARD_API_PORT || '3002';
+const BOT_API_URL = process.env.DASHBOARD_API_URL || `http://127.0.0.1:${BOT_API_PORT}`;
+const BOT_API_KEY = process.env.DASHBOARD_API_KEY || '';
 
 const AI_CATEGORIES = [
     'toxicity',
@@ -201,6 +206,12 @@ const parseGuildPayload = (value: string | null) => {
     }
 };
 
+const buildBotHeaders = () => {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (BOT_API_KEY) headers['x-dashboard-key'] = BOT_API_KEY;
+    return headers;
+};
+
 const textChannelTypes = new Set([0, 5, 11, 12, 15, 16, 'text', 'announcement', 'news', 'public_thread', 'private_thread', 'forum', 'media']);
 const voiceChannelTypes = new Set([2, 13, 'voice', 'GUILD_VOICE', 'stage_voice', 'GUILD_STAGE_VOICE', 'cast']);
 const categoryChannelTypes = new Set([4, 'category', 'GUILD_CATEGORY']);
@@ -287,7 +298,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
         await ensureModerationDefaults(guildId);
 
-        const [guild, config, roleBindings, commandGrants, automodRules, customRules, sanctionSteps, aiConfig, aiCategories, appealConfig, retentionPolicies] =
+        const [guild, config, roleBindings, commandGrants, automodRules, customRules, sanctionSteps, aiConfig, aiCategories, appealConfig, retentionPolicies, appealSettings] =
             await Promise.all([
                 prisma.guild.findUnique({
                     where: { id: guildId },
@@ -324,6 +335,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
                     where: { guildId },
                     orderBy: [{ category: 'asc' }],
                 }),
+                readAppealSettings(guildId),
             ]);
 
         const roles = parseGuildPayload(guild?.roles ?? null).map((role) => ({
@@ -391,6 +403,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
                     pardonLogChannelId: appealConfig.pardonLogChannelId,
                     allowUserAppeals: appealConfig.allowUserAppeals,
                     allowDirectPardon: appealConfig.allowDirectPardon,
+                    ...appealSettings,
                 }
                 : null,
             retentionPolicies,
@@ -667,6 +680,26 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
                 });
             }
         });
+
+        await writeAppealSettings(guildId, normalizeAppealSettings(appealConfig));
+
+        const appealSyncResponse = await fetch(`${BOT_API_URL}/api/appeals/sync-panel`, {
+            method: 'POST',
+            headers: buildBotHeaders(),
+            body: JSON.stringify({ guildId }),
+        }).catch((error) => {
+            console.warn('Failed to sync appeal entry surfaces:', error);
+            return null;
+        });
+
+        if (appealSyncResponse && !appealSyncResponse.ok) {
+            const syncError = await appealSyncResponse.json().catch(() => null);
+            const syncMessage =
+                (syncError && typeof syncError.error === 'string' && syncError.error) ||
+                (syncError && typeof syncError.message === 'string' && syncError.message) ||
+                'Failed to sync appeal entry surfaces.';
+            throw new Error(syncMessage);
+        }
 
         let syncWarning: string | null = null;
         if (syncDiscordCommandPermissions && accessToken === 'admin') {

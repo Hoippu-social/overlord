@@ -1,5 +1,6 @@
 import { AutomodActionConfig, AutomodAdvertisingConfig, AutomodBanwordsConfig, AutomodCommandChannelsConfig, AutomodEmojiConfig, AutomodEmojiSpamConfig, AutomodFloodAction, AutomodFloodConfig, AutomodFloodWindowUnit, AutomodImageFilterConfig, AutomodLinesConfig, AutomodLinksConfig, AutomodMentionSpamConfig, AutomodSpamConfig, AutomodZalgoConfig, CommandRule, ConfigState } from './types';
 import { createDefaultCommandRules, getDefaultCommandRule } from '@/lib/commandCatalog';
+import { normalizeAppealSettings } from '@/lib/appealsConfig';
 
 type JsonObject = Record<string, unknown>;
 
@@ -643,6 +644,7 @@ export function buildConfigStateFromResponse(cData: unknown): ConfigState {
             pardonLogChannelId: typeof appealConfig.pardonLogChannelId === 'string' ? appealConfig.pardonLogChannelId : '',
             allowUserAppeals: appealConfig.allowUserAppeals !== false,
             allowDirectPardon: appealConfig.allowDirectPardon !== false,
+            ...normalizeAppealSettings(appealConfig),
         },
         retentionPolicies: asArray(data.retentionPolicies).map((rawPolicy) => {
             const policy = asObject(rawPolicy);

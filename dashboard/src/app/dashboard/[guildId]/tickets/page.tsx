@@ -1,7 +1,7 @@
-'use client';
+﻿'use client';
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import {
     Spinner,
     Switch,
@@ -48,6 +48,7 @@ type TicketCategoryStats = {
 type TicketCategory = {
     id: number;
     name: string;
+    description?: string | null;
     channelId: string | null;
     stats: TicketCategoryStats;
     saveHistory: boolean;
@@ -58,6 +59,9 @@ type TicketCategory = {
     buttonText: string;
     buttonEmoji: string | null;
     buttonStyle: string;
+    systemManagedBy?: 'appeals' | null;
+    systemCategoryKind?: string | null;
+    sortOrder?: number | null;
 };
 
 type ChannelOption = {
@@ -141,48 +145,48 @@ const MESSAGES = {
         searchCategories: "Filter categories..."
     },
     ru: {
-        title: "Служба Поддержки",
-        subtitle: "Управление обращениями, маршрутизация и аналитика.",
-        overview: "Дашборд",
-        settings: "Настройки Проекта",
-        loggingTitle: "Аудит и Логи",
-        loggingDesc: "Сохранение транскриптов и событий тикетов в безопасный канал.",
-        logChannelLabel: "Канал архива транскриптов",
-        logChannelPlaceholder: "Выберите канал...",
-        adminToolsTitle: "Быстрые Ссылки",
-        transcripts: "Архив Тикетов",
-        transcriptsDesc: "История закрытых обращений.",
-        statistics: "Эффективность Агентов",
-        statisticsDesc: "Время решения и аналитика.",
-        categoriesTitle: "Категории Обращений",
-        categoriesDesc: "Темы поддержки и правила маршрутизации.",
-        createCategory: "Новая Категория",
-        activeTickets: "Открыто",
-        totalTickets: "Всего",
-        edit: "Настроить",
-        save: "Сохранить",
-        saved: "Сохранено",
-        auditLogWarn: "Выберите канал для включения логов.",
-        soon: "Скоро",
-        openTickets: "Создано тикетов",
-        unsolvedTickets: "Нерешенные",
-        resolvedTickets: "Решенные",
-        avgResolution: "Среднее время решения",
-        ticketsActivity: "Объем Тикетов",
-        ticketsByCategory: "По Категориям",
-        customerSatisfaction: "Индекс CSAT",
-        dateDay1: "За 24 часа",
-        dateDay3: "За 3 дня",
-        dateDay7: "За 7 дней",
-        dateDay14: "За 14 дней",
-        dateDay30: "За 30 дней",
-        dateMonth3: "За 90 дней",
-        dateYear1: "За год",
-        positive: "Довольны",
-        neutral: "Нейтрально",
-        negative: "Недовольны",
-        noData: "Недостаточно данных",
-        searchCategories: "Фильтр категорий..."
+        title: "Ð¡Ð»ÑƒÐ¶Ð±Ð° ÐŸÐ¾Ð´Ð´ÐµÑ€Ð¶ÐºÐ¸",
+        subtitle: "Ð£Ð¿Ñ€Ð°Ð²Ð»ÐµÐ½Ð¸Ðµ Ð¾Ð±Ñ€Ð°Ñ‰ÐµÐ½Ð¸ÑÐ¼Ð¸, Ð¼Ð°Ñ€ÑˆÑ€ÑƒÑ‚Ð¸Ð·Ð°Ñ†Ð¸Ñ Ð¸ Ð°Ð½Ð°Ð»Ð¸Ñ‚Ð¸ÐºÐ°.",
+        overview: "Ð”Ð°ÑˆÐ±Ð¾Ñ€Ð´",
+        settings: "ÐÐ°ÑÑ‚Ñ€Ð¾Ð¹ÐºÐ¸ ÐŸÑ€Ð¾ÐµÐºÑ‚Ð°",
+        loggingTitle: "ÐÑƒÐ´Ð¸Ñ‚ Ð¸ Ð›Ð¾Ð³Ð¸",
+        loggingDesc: "Ð¡Ð¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð¸Ðµ Ñ‚Ñ€Ð°Ð½ÑÐºÑ€Ð¸Ð¿Ñ‚Ð¾Ð² Ð¸ ÑÐ¾Ð±Ñ‹Ñ‚Ð¸Ð¹ Ñ‚Ð¸ÐºÐµÑ‚Ð¾Ð² Ð² Ð±ÐµÐ·Ð¾Ð¿Ð°ÑÐ½Ñ‹Ð¹ ÐºÐ°Ð½Ð°Ð».",
+        logChannelLabel: "ÐšÐ°Ð½Ð°Ð» Ð°Ñ€Ñ…Ð¸Ð²Ð° Ñ‚Ñ€Ð°Ð½ÑÐºÑ€Ð¸Ð¿Ñ‚Ð¾Ð²",
+        logChannelPlaceholder: "Ð’Ñ‹Ð±ÐµÑ€Ð¸Ñ‚Ðµ ÐºÐ°Ð½Ð°Ð»...",
+        adminToolsTitle: "Ð‘Ñ‹ÑÑ‚Ñ€Ñ‹Ðµ Ð¡ÑÑ‹Ð»ÐºÐ¸",
+        transcripts: "ÐÑ€Ñ…Ð¸Ð² Ð¢Ð¸ÐºÐµÑ‚Ð¾Ð²",
+        transcriptsDesc: "Ð˜ÑÑ‚Ð¾Ñ€Ð¸Ñ Ð·Ð°ÐºÑ€Ñ‹Ñ‚Ñ‹Ñ… Ð¾Ð±Ñ€Ð°Ñ‰ÐµÐ½Ð¸Ð¹.",
+        statistics: "Ð­Ñ„Ñ„ÐµÐºÑ‚Ð¸Ð²Ð½Ð¾ÑÑ‚ÑŒ ÐÐ³ÐµÐ½Ñ‚Ð¾Ð²",
+        statisticsDesc: "Ð’Ñ€ÐµÐ¼Ñ Ñ€ÐµÑˆÐµÐ½Ð¸Ñ Ð¸ Ð°Ð½Ð°Ð»Ð¸Ñ‚Ð¸ÐºÐ°.",
+        categoriesTitle: "ÐšÐ°Ñ‚ÐµÐ³Ð¾Ñ€Ð¸Ð¸ ÐžÐ±Ñ€Ð°Ñ‰ÐµÐ½Ð¸Ð¹",
+        categoriesDesc: "Ð¢ÐµÐ¼Ñ‹ Ð¿Ð¾Ð´Ð´ÐµÑ€Ð¶ÐºÐ¸ Ð¸ Ð¿Ñ€Ð°Ð²Ð¸Ð»Ð° Ð¼Ð°Ñ€ÑˆÑ€ÑƒÑ‚Ð¸Ð·Ð°Ñ†Ð¸Ð¸.",
+        createCategory: "ÐÐ¾Ð²Ð°Ñ ÐšÐ°Ñ‚ÐµÐ³Ð¾Ñ€Ð¸Ñ",
+        activeTickets: "ÐžÑ‚ÐºÑ€Ñ‹Ñ‚Ð¾",
+        totalTickets: "Ð’ÑÐµÐ³Ð¾",
+        edit: "ÐÐ°ÑÑ‚Ñ€Ð¾Ð¸Ñ‚ÑŒ",
+        save: "Ð¡Ð¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚ÑŒ",
+        saved: "Ð¡Ð¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð¾",
+        auditLogWarn: "Ð’Ñ‹Ð±ÐµÑ€Ð¸Ñ‚Ðµ ÐºÐ°Ð½Ð°Ð» Ð´Ð»Ñ Ð²ÐºÐ»ÑŽÑ‡ÐµÐ½Ð¸Ñ Ð»Ð¾Ð³Ð¾Ð².",
+        soon: "Ð¡ÐºÐ¾Ñ€Ð¾",
+        openTickets: "Ð¡Ð¾Ð·Ð´Ð°Ð½Ð¾ Ñ‚Ð¸ÐºÐµÑ‚Ð¾Ð²",
+        unsolvedTickets: "ÐÐµÑ€ÐµÑˆÐµÐ½Ð½Ñ‹Ðµ",
+        resolvedTickets: "Ð ÐµÑˆÐµÐ½Ð½Ñ‹Ðµ",
+        avgResolution: "Ð¡Ñ€ÐµÐ´Ð½ÐµÐµ Ð²Ñ€ÐµÐ¼Ñ Ñ€ÐµÑˆÐµÐ½Ð¸Ñ",
+        ticketsActivity: "ÐžÐ±ÑŠÐµÐ¼ Ð¢Ð¸ÐºÐµÑ‚Ð¾Ð²",
+        ticketsByCategory: "ÐŸÐ¾ ÐšÐ°Ñ‚ÐµÐ³Ð¾Ñ€Ð¸ÑÐ¼",
+        customerSatisfaction: "Ð˜Ð½Ð´ÐµÐºÑ CSAT",
+        dateDay1: "Ð—Ð° 24 Ñ‡Ð°ÑÐ°",
+        dateDay3: "Ð—Ð° 3 Ð´Ð½Ñ",
+        dateDay7: "Ð—Ð° 7 Ð´Ð½ÐµÐ¹",
+        dateDay14: "Ð—Ð° 14 Ð´Ð½ÐµÐ¹",
+        dateDay30: "Ð—Ð° 30 Ð´Ð½ÐµÐ¹",
+        dateMonth3: "Ð—Ð° 90 Ð´Ð½ÐµÐ¹",
+        dateYear1: "Ð—Ð° Ð³Ð¾Ð´",
+        positive: "Ð”Ð¾Ð²Ð¾Ð»ÑŒÐ½Ñ‹",
+        neutral: "ÐÐµÐ¹Ñ‚Ñ€Ð°Ð»ÑŒÐ½Ð¾",
+        negative: "ÐÐµÐ´Ð¾Ð²Ð¾Ð»ÑŒÐ½Ñ‹",
+        noData: "ÐÐµÐ´Ð¾ÑÑ‚Ð°Ñ‚Ð¾Ñ‡Ð½Ð¾ Ð´Ð°Ð½Ð½Ñ‹Ñ…",
+        searchCategories: "Ð¤Ð¸Ð»ÑŒÑ‚Ñ€ ÐºÐ°Ñ‚ÐµÐ³Ð¾Ñ€Ð¸Ð¹..."
     }
 } as const;
 
@@ -199,7 +203,7 @@ const StatCard = ({ title, value, icon, trend }: { title: string, value: string 
             <span className="text-4xl font-black font-akony text-white tracking-tight">{value}</span>
             {trend && (
                 <span className={`text-xs font-bold pb-1.5 ${trend.isPositive ? 'text-emerald-500' : 'text-rose-500'}`}>
-                    {trend.isPositive ? '↑' : '↓'} {Math.abs(trend.value)}%
+                    {trend.isPositive ? 'â†‘' : 'â†“'} {Math.abs(trend.value)}%
                 </span>
             )}
         </div>
@@ -210,6 +214,7 @@ const StatCard = ({ title, value, icon, trend }: { title: string, value: string 
 
 export default function TicketsPage() {
     const { guildId } = useParams<{ guildId: string }>();
+    const router = useRouter();
     const { locale } = useGuildLocale(guildId);
     const t = MESSAGES[locale as keyof typeof MESSAGES] || MESSAGES.en;
 
@@ -325,7 +330,22 @@ export default function TicketsPage() {
         }
     };
 
-    const filteredCategories = categories.filter(c => c.name.toLowerCase().includes(searchQuery.toLowerCase()));
+    const filteredCategories = categories
+        .filter(c => c.name.toLowerCase().includes(searchQuery.toLowerCase()))
+        .sort((left, right) => {
+            const leftOrder = typeof left.sortOrder === 'number' ? left.sortOrder : Number.MAX_SAFE_INTEGER;
+            const rightOrder = typeof right.sortOrder === 'number' ? right.sortOrder : Number.MAX_SAFE_INTEGER;
+            return leftOrder - rightOrder;
+        });
+
+    const openCategory = (category: TicketCategory) => {
+        if (category.systemManagedBy === 'appeals') {
+            router.push(`/dashboard/${guildId}/moderation?tab=appeals`);
+            return;
+        }
+
+        openEditModal(category);
+    };
 
     if (loading && !config) {
         return (
@@ -648,25 +668,32 @@ export default function TicketsPage() {
                                     </div>
                                 ) : (
                                     filteredCategories.map((cat) => (
-                                        <div key={cat.id} className="group bg-[var(--surface-card)] border border-[var(--border-subtle)] hover:border-[#3b82f6]/30 rounded-[24px] p-5 transition-all duration-200 shadow-sm hover:shadow-md cursor-pointer flex items-center justify-between" onClick={() => openEditModal(cat)}>
+                                        <div key={`${cat.systemManagedBy || 'ticket'}-${cat.id}`} className={`group flex cursor-pointer items-center justify-between rounded-[24px] p-5 shadow-sm transition-all duration-200 hover:shadow-md ${cat.systemManagedBy === 'appeals' ? 'border border-[#7AAA7A]/30 bg-[linear-gradient(135deg,rgba(122,170,122,0.12),rgba(16,24,16,0.62))] hover:border-[#7AAA7A]/45' : 'bg-[var(--surface-card)] border border-[var(--border-subtle)] hover:border-[#3b82f6]/30'}`} onClick={() => openCategory(cat)}>
                                             <div className="flex items-center gap-4">
-                                                <div className="w-12 h-12 rounded-xl bg-[var(--surface-hover)] border border-[var(--border-divider)] flex items-center justify-center shrink-0">
+                                                <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${cat.systemManagedBy === 'appeals' ? 'border border-[#7AAA7A]/20 bg-[#7AAA7A]/10' : 'bg-[var(--surface-hover)] border border-[var(--border-divider)]'}`}>
                                                     <span className="text-xl">{cat.buttonEmoji || '📝'}</span>
                                                 </div>
                                                 <div>
-                                                    <div className="flex items-center gap-2 mb-1">
-                                                        <h4 className="font-bold text-white leading-none">{cat.name}</h4>
-                                                        {cat.mentionAgents && <span className="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-500 text-[10px] font-bold uppercase tracking-wider">Alerts</span>}
+                                                    <div className="mb-1 flex items-center gap-2">
+                                                        <h4 className="font-bold leading-none text-white">{cat.name}</h4>
+                                                        {cat.systemManagedBy === 'appeals' ? <span className="rounded bg-[#7AAA7A]/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[#9AD49A]">{locale === 'ru' ? '\u0423\u043f\u0440\u0430\u0432\u043b\u044f\u0435\u0442\u0441\u044f \u0430\u043f\u0435\u043b\u043b\u044f\u0446\u0438\u044f\u043c\u0438' : 'Managed by Appeals'}</span> : null}
+                                                        {cat.mentionAgents && <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-500">Alerts</span>}
                                                     </div>
-                                                    <div className="flex items-center gap-3 text-xs text-[var(--text-muted)] font-medium">
-                                                        <span className="flex items-center gap-1.5"><Ticket size={14} /> Total: {cat.stats?.total || 0}</span>
-                                                        <span className="w-1 h-1 rounded-full bg-[var(--border-divider)]" />
-                                                        <span className="flex items-center gap-1.5 text-emerald-400"><CircleDashed size={14} /> Active: {cat.stats?.active || 0}</span>
-                                                    </div>
+                                                    {cat.systemManagedBy === 'appeals' ? (
+                                                        <p className="max-w-[640px] text-xs font-medium text-white/55">
+                                                            {cat.description || (locale === 'ru' ? '\u041a\u0430\u0442\u0435\u0433\u043e\u0440\u0438\u044f \u043e\u043f\u0443\u0431\u043b\u0438\u043a\u043e\u0432\u0430\u043d\u0430 \u0432 \u043e\u0431\u0449\u0435\u0439 ticket-\u043f\u0430\u043d\u0435\u043b\u0438, \u043d\u043e \u043f\u043e\u043b\u043d\u043e\u0441\u0442\u044c\u044e \u043d\u0430\u0441\u0442\u0440\u0430\u0438\u0432\u0430\u0435\u0442\u0441\u044f \u0432 \u043c\u043e\u0434\u0443\u043b\u0435 \u0430\u043f\u0435\u043b\u043b\u044f\u0446\u0438\u0439.' : 'This category is published in the shared ticket panel but configured from the appeals module.')}
+                                                        </p>
+                                                    ) : (
+                                                        <div className="flex items-center gap-3 text-xs font-medium text-[var(--text-muted)]">
+                                                            <span className="flex items-center gap-1.5"><Ticket size={14} /> Total: {cat.stats?.total || 0}</span>
+                                                            <span className="h-1 w-1 rounded-full bg-[var(--border-divider)]" />
+                                                            <span className="flex items-center gap-1.5 text-emerald-400"><CircleDashed size={14} /> Active: {cat.stats?.active || 0}</span>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
 
-                                            <div className="w-8 h-8 rounded-full bg-[var(--surface-hover)] border border-[var(--border-divider)] flex items-center justify-center text-[var(--text-muted)] group-hover:text-white group-hover:bg-[#3b82f6] group-hover:border-[#3b82f6] transition-all">
+                                            <div className={`flex h-8 w-8 items-center justify-center rounded-full transition-all ${cat.systemManagedBy === 'appeals' ? 'border border-[#7AAA7A]/20 bg-[#7AAA7A]/10 text-[#9AD49A] group-hover:border-[#7AAA7A]/35 group-hover:bg-[#7AAA7A]/15' : 'border border-[var(--border-divider)] bg-[var(--surface-hover)] text-[var(--text-muted)] group-hover:border-[#3b82f6] group-hover:bg-[#3b82f6] group-hover:text-white'}`}>
                                                 <Gear size={16} weight="fill" />
                                             </div>
                                         </div>
@@ -761,3 +788,4 @@ export default function TicketsPage() {
         </div>
     );
 }
+

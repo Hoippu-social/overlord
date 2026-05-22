@@ -7,7 +7,10 @@ import dotenv from "dotenv";
 dotenv.config({ path: path.resolve(__dirname, "../bot/.env") });
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  outputFileTracingRoot: __dirname,
+  turbopack: {
+    root: __dirname,
+  },
 };
 
 export default nextConfig;

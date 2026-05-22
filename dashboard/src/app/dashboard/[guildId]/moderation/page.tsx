@@ -63,6 +63,31 @@ const STRINGS = {
 
 const TAB_KEYS = ['overview', 'access', 'automod', 'ai', 'appeals', 'retention', 'analytics'] as const;
 
+function parseSaveErrorMessage(rawError: unknown, fallback: string) {
+    if (!rawError || typeof rawError !== 'object') {
+        return fallback;
+    }
+
+    const direct = 'error' in rawError && typeof rawError.error === 'string' ? rawError.error : null;
+    if (!direct) {
+        return fallback;
+    }
+
+    try {
+        const parsed = JSON.parse(direct) as { error?: string; message?: string };
+        if (typeof parsed.message === 'string' && parsed.message.trim()) {
+            return parsed.message;
+        }
+        if (typeof parsed.error === 'string' && parsed.error.trim()) {
+            return parsed.error;
+        }
+    } catch {
+        return direct;
+    }
+
+    return direct;
+}
+
 export default function ModerationPage({ params }: { params: Promise<{ guildId: string }> }) {
     const { guildId } = React.use(params);
     const router = useRouter();
@@ -178,15 +203,13 @@ export default function ModerationPage({ params }: { params: Promise<{ guildId: 
                 body: JSON.stringify({
                     ...buildModerationSavePayload(config),
                     guildChannels: config.channels,
-                    syncDiscordCommandPermissions: true,
+                    syncDiscordCommandPermissions: currentTab === 'access',
                 }),
             });
 
             if (!response.ok) {
                 const saveError = await response.json().catch(() => null);
-                const message =
-                    (saveError && typeof saveError.error === 'string' && saveError.error) ||
-                    text.saveFailed;
+                const message = parseSaveErrorMessage(saveError, text.saveFailed);
                 throw new Error(message);
             }
 

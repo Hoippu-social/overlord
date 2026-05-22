@@ -4,6 +4,7 @@ import React, { useMemo } from 'react';
 import { useParams } from 'next/navigation';
 
 import {
+    ChartBar,
     ChatsTeardrop,
     MicrophoneStage,
     TrendDown,
@@ -18,6 +19,7 @@ import { buildStatsBucketLabels } from "@/lib/stats";
 import { StatsCard } from "@/components/stats/StatsCard";
 import { ChartContainer } from "@/components/stats/ChartContainer";
 import { ChartTooltip } from "@/components/stats/ChartTooltip";
+import { StatsPageHeader, StatsPageShell } from "@/components/stats/StatsPageScaffold";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 
@@ -83,7 +85,7 @@ export default function StatsOverview() {
     const guildTimezone = useGuildTimezone(guildId);
     const text = strings[locale];
 
-    const [period, setPeriod] = usePersistentPeriod('7d');
+    const [period] = usePersistentPeriod('7d');
 
     const { data, loading } = useStats({ guildId, type: 'overview', period });
 
@@ -111,10 +113,16 @@ export default function StatsOverview() {
     const isMemberChangePositive = memberChange >= 0;
 
     return (
-        <div className="space-y-6 animate-fade-in">
+        <StatsPageShell className="animate-fade-in">
+            <StatsPageHeader
+                title={text.title}
+                subtitle={text.subtitle}
+                icon={<ChartBar size={26} weight="fill" />}
+                iconClassName="text-primary"
+            />
 
             {/* Key Metrics Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 px-6">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 sm:gap-4">
                 <StatsCard
                     title={text.totalMessages}
                     value={formatLocaleNumber(cards.totalMessages, locale)}
@@ -148,12 +156,8 @@ export default function StatsOverview() {
             </div>
 
             {/* Activity Chart */}
-            <div className="px-6">
-                <ChartContainer
-                    title={text.activityChart}
-                    subtitle={text.activityChartDesc}
-                    loading={loading}
-                >
+            <div>
+                <ChartContainer title={text.activityChart} subtitle={text.activityChartDesc} loading={loading} height={320}>
                     <ResponsiveContainer width="100%" height="100%">
                         <AreaChart data={activityData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                             <defs>
@@ -241,6 +245,6 @@ export default function StatsOverview() {
                     </ResponsiveContainer>
                 </ChartContainer>
             </div>
-        </div>
+        </StatsPageShell>
     );
 }

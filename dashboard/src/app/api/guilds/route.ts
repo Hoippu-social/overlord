@@ -2,12 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getAuthToken } from '@/lib/auth';
 import { resolveAllowedGuildIds } from '@/lib/discordAccess';
+import { LOCAL_SESSION_COOKIE_NAME } from '@/lib/authCookies';
 
 export async function GET(request: NextRequest) {
     const token = await getAuthToken(request);
     const accessToken = typeof token?.accessToken === 'string' ? token.accessToken : null;
 
-    const sessionToken = request.cookies.get('session');
+    const sessionToken = request.cookies.get(LOCAL_SESSION_COOKIE_NAME);
 
     // Admin login using password
     if (sessionToken && sessionToken.value) {
@@ -68,9 +69,9 @@ export async function GET(request: NextRequest) {
         });
 
         return NextResponse.json(filteredGuilds);
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Failed to fetch guilds:', error);
-        if (error?.message?.includes('401')) {
+        if (error instanceof Error && error.message.includes('401')) {
             return NextResponse.json({ error: 'Unauthorized Discord Token' }, { status: 401 });
         }
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });

@@ -3,6 +3,7 @@ import { Client } from 'discord.js';
 import logger from './logger';
 import { prisma, statsPrisma } from './database';
 import { reviewAppealTicket } from '../services/AppealService';
+import { syncAppealPanels } from '../services/AppealInteractionService';
 import { parseAuditRouteChannelIds, serializeAuditRouteChannelIds } from './auditRouteChannels';
 
 const PORT = Number.parseInt(process.env.DASHBOARD_API_PORT || '3002', 10);
@@ -491,6 +492,36 @@ export function startDashboardApi(client: Client): http.Server {
                     return;
                 } catch (error) {
                     const message = error instanceof Error ? error.message : 'Failed to review appeal ticket';
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ ok: false, error: message }));
+                    return;
+                }
+            }
+
+            if (url.pathname === '/api/appeals/sync-panel') {
+                if (req.method !== 'POST') {
+                    res.writeHead(405);
+                    res.end('Method Not Allowed');
+                    return;
+                }
+
+                const raw = await readBody(req);
+                const body = raw ? JSON.parse(raw) : {};
+                const guildId = typeof body.guildId === 'string' ? body.guildId : '';
+
+                if (!guildId) {
+                    res.writeHead(400);
+                    res.end('guildId is required');
+                    return;
+                }
+
+                try {
+                    const result = await syncAppealPanels(client, guildId);
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ ok: true, result }));
+                    return;
+                } catch (error) {
+                    const message = error instanceof Error ? error.message : 'Failed to sync appeal panel';
                     res.writeHead(400, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify({ ok: false, error: message }));
                     return;

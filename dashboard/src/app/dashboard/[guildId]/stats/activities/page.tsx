@@ -1,12 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import { useParams } from 'next/navigation';
-import { Button, Select, SelectItem, Progress } from "@nextui-org/react";
 import {
     GameController,
-    ArrowsClockwise,
-    CalendarCheck,
     Clock,
     Trophy
 } from "@phosphor-icons/react";
@@ -16,6 +13,7 @@ import { usePersistentPeriod } from "@/hooks/usePersistentPeriod";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { StatsCard } from "@/components/stats/StatsCard";
 import { ChartContainer } from "@/components/stats/ChartContainer";
+import { StatsPageHeader, StatsPageShell } from "@/components/stats/StatsPageScaffold";
 
 import { StatsTopWidget, COLORS } from "@/components/stats/StatsTopWidget";
 
@@ -69,36 +67,14 @@ export default function ActivitiesPage() {
     const text = strings[locale];
     const isMobile = useMediaQuery('(max-width: 768px)');
 
-    const [period, setPeriod] = usePersistentPeriod('7d');
-    const { data, loading, refresh } = useStats({ guildId, type: 'activities', period });
-    const [syncing, setSyncing] = useState(false);
+    const [period] = usePersistentPeriod('7d');
+    const { data, loading } = useStats({ guildId, type: 'activities', period });
 
     const formatSeconds = (seconds: number) => {
         const h = Math.floor(seconds / 3600);
         const m = Math.floor((seconds % 3600) / 60);
         if (h > 0) return `${h}\u00A0${text.hours} ${m}\u00A0${text.minutes}`;
         return `${m}\u00A0${text.minutes}`;
-    };
-
-    const handleSync = async () => {
-        setSyncing(true);
-        try {
-            let days = 90;
-            if (period === 'all') days = 365;
-            else if (period.endsWith('d')) days = parseInt(period);
-
-            await fetch(`/api/guilds/${guildId}/stats/sync`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ days })
-            });
-            await new Promise(r => setTimeout(r, 1000));
-            refresh();
-        } catch (error) {
-            console.error(error);
-        } finally {
-            setSyncing(false);
-        }
     };
 
     const topActivities = data?.topActivities || [];
@@ -111,40 +87,36 @@ export default function ActivitiesPage() {
 
 
     return (
-        <div className="p-6 space-y-6 min-h-screen">
-            {/* Header */}
-            <div className="flex items-center gap-4 mb-2">
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-500/20 to-blue-500/20 border border-cyan-500/10 flex items-center justify-center backdrop-blur-sm shadow-xl flex-shrink-0">
-                    <GameController size={32} weight="fill" className="text-cyan-500 drop-shadow-lg" />
-                </div>
-                <div>
-                    <h1 className="text-3xl font-black text-white tracking-tight">{text.title}</h1>
-                    <p className="text-default-400 font-medium">{text.subtitle}</p>
-                </div>
-            </div>
+        <StatsPageShell>
+            <StatsPageHeader
+                title={text.title}
+                subtitle={text.subtitle}
+                icon={<GameController size={26} weight="fill" />}
+                iconClassName="text-primary"
+            />
 
             {/* Summary Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 sm:gap-4 lg:gap-6">
                 <StatsCard
                     title={text.totalPlaytime}
                     value={`${totalHours}\u00A0${text.hours}`}
                     icon={<Clock size={24} weight="fill" />}
                     loading={loading}
-                    className="border-cyan-500/20"
+                    className="border-primary/20"
                 />
                 <StatsCard
                     title={text.topGame}
                     value={topGameName}
                     icon={<Trophy size={24} weight="fill" />}
                     loading={loading}
-                    className="border-amber-500/20"
+                    className="border-warning/20"
                 />
             </div>
 
             {/* Charts */}
-            <div className="grid grid-cols-1 gap-6">
+            <div className="grid grid-cols-1 gap-4 sm:gap-6">
                 <ChartContainer title={text.topActivities} loading={loading} height={isMobile ? 'auto' : 500}>
-                    <div className="flex flex-col-reverse lg:flex-row gap-8 h-full">
+                    <div className="flex min-h-[560px] flex-col-reverse gap-6 lg:h-full lg:min-h-0 lg:flex-row lg:gap-8">
                         {/* List Section */}
                         <div className="w-full lg:flex-1 h-auto lg:h-full lg:overflow-y-auto pr-2 pl-2 custom-scrollbar">
                             <div className="space-y-4 lg:space-y-6">
@@ -225,6 +197,6 @@ export default function ActivitiesPage() {
                     </div>
                 </ChartContainer>
             </div>
-        </div>
+        </StatsPageShell>
     );
 }

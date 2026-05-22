@@ -10,6 +10,7 @@ import { FastAverageColor } from 'fast-average-color';
 import { getStoredLocale } from '@/lib/i18n';
 import { BOT_OWNER_ID } from '@/lib/constants';
 import { fetchWithTimeout } from '@/lib/requestTimeout';
+import { getBrowserPublicHost, toPublicDashboardPath } from '@/lib/publicDashboard';
 
 interface Guild {
     id: string;
@@ -177,7 +178,7 @@ function ServerTile({
             transition={{ duration: 0.45, delay: Math.min(index * 0.04, 0.28) }}
             className="list-none"
         >
-            <Link href={`/dashboard/${guild.id}`} className="group block h-full focus:outline-none">
+            <Link href={toPublicDashboardPath(`/dashboard/${guild.id}`, getBrowserPublicHost())} className="group block h-full focus:outline-none">
                 <article
                     className="relative flex h-full min-h-[20rem] flex-col overflow-hidden rounded-[30px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(13,16,20,0.96),rgba(8,10,14,0.98))] p-5 shadow-[0_22px_60px_-28px_rgba(0,0,0,0.9)] transition-all duration-500 group-hover:-translate-y-1.5 group-hover:border-[color:var(--guild-accent-line)] group-hover:shadow-[0_32px_80px_-28px_var(--guild-accent-glow)] group-focus-visible:-translate-y-1.5 group-focus-visible:border-[color:var(--guild-accent-line)] group-focus-visible:shadow-[0_32px_80px_-28px_var(--guild-accent-glow)]"
                     style={styles}

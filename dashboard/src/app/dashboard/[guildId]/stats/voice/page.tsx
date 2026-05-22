@@ -1,13 +1,12 @@
-﻿'use client';
+'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { useParams } from 'next/navigation';
 import {
     MicrophoneStage,
     SpeakerHigh,
     Users,
     Hash,
-    ArrowsClockwise,
     CalendarCheck,
     Clock,
 } from "@phosphor-icons/react";
@@ -19,6 +18,7 @@ import { StatsCard } from "@/components/stats/StatsCard";
 import { ChartContainer } from "@/components/stats/ChartContainer";
 import { StatsTopWidget } from "@/components/stats/StatsTopWidget";
 import { ChartTooltip } from "@/components/stats/ChartTooltip";
+import { StatsHeatmap, StatsPageHeader, StatsPageShell } from "@/components/stats/StatsPageScaffold";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Line } from 'recharts';
 
 
@@ -99,30 +99,8 @@ export default function VoicePage() {
     const guildTimezone = useGuildTimezone(guildId);
     const text = strings[locale];
 
-    const [period, setPeriod] = usePersistentPeriod('7d');
-    const { data, loading, refresh } = useStats({ guildId, type: 'voice', period });
-    const [syncing, setSyncing] = useState(false);
-
-    const handleSync = async () => {
-        setSyncing(true);
-        try {
-            let days = 90;
-            if (period === 'all') days = 365;
-            else if (period.endsWith('d')) days = parseInt(period);
-
-            await fetch(`/api/guilds/${guildId}/stats/sync`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ days })
-            });
-            await new Promise(r => setTimeout(r, 1000));
-            refresh();
-        } catch (error) {
-            console.error("Sync failed:", error);
-        } finally {
-            setSyncing(false);
-        }
-    };
+    const [period] = usePersistentPeriod('7d');
+    const { data, loading } = useStats({ guildId, type: 'voice', period });
 
     // Days starting from Monday
     const days = [text.monday, text.tuesday, text.wednesday, text.thursday, text.friday, text.saturday, text.sunday];
@@ -180,20 +158,16 @@ export default function VoicePage() {
     }));
 
     return (
-        <div className="p-6 space-y-6 min-h-screen">
-            {/* Header */}
-            <div className="flex items-center gap-4 mb-2">
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-orange-500/20 to-amber-500/20 border border-orange-500/10 flex items-center justify-center backdrop-blur-sm shadow-xl flex-shrink-0">
-                    <MicrophoneStage size={32} weight="fill" className="text-orange-500 drop-shadow-lg" />
-                </div>
-                <div>
-                    <h1 className="text-3xl font-black text-white tracking-tight">{text.title}</h1>
-                    <p className="text-default-400 font-medium">{text.subtitle}</p>
-                </div>
-            </div>
+        <StatsPageShell>
+            <StatsPageHeader
+                title={text.title}
+                subtitle={text.subtitle}
+                icon={<MicrophoneStage size={26} weight="fill" />}
+                iconClassName="text-warning"
+            />
 
             {/* Summary Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5 sm:gap-4 lg:gap-6">
                 <StatsCard
                     title={text.totalTime}
                     value={autoFormatMinutes(totalMinutes, text)}
@@ -227,11 +201,11 @@ export default function VoicePage() {
             </div>
 
             {/* Voice Activity Chart & Heatmap */}
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 sm:gap-6">
                 <ChartContainer
                     title={text.voiceActivity}
                     loading={loading}
-                    height={350}
+                    height={340}
                     className="h-full"
                 >
                     <ResponsiveContainer width="100%" height="100%">
@@ -299,60 +273,20 @@ export default function VoicePage() {
                     subtitle={text.heatmapDesc}
                     className="h-full"
                     loading={loading}
-                    height={350}
+                    height={340}
                 >
-                    <div className="h-full flex flex-col justify-center overflow-x-auto">
-                        <div className="min-w-max">
-                            {/* Hour labels */}
-                            <div className="flex mb-2">
-                                <div className="w-8 flex-shrink-0" />
-                                <div className="flex flex-1">
-                                    {Array.from({ length: 24 }).map((_, i) => (
-                                        <div
-                                            key={i}
-                                            className="flex-1 text-[10px] text-default-400 text-center min-w-[12px]"
-                                        >
-                                            {i % 2 === 0 ? i : ''}
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                            {/* Heatmap grid */}
-                            {heatmapGrid.map((row, dayIndex) => (
-                                <div key={dayIndex} className="flex items-center mb-1">
-                                    <div className="w-8 flex-shrink-0 text-xs text-default-400 font-medium">{days[dayIndex].slice(0, 3)}</div>
-                                    <div className="flex flex-1">
-                                        {row.map((value, hour) => {
-                                            const intensity = value / maxHeatmapValue;
-                                            return (
-                                                <div
-                                                    key={`${dayIndex}-${hour}`}
-                                                    className="group/cell relative h-6 flex-1 mx-[1px] min-w-[12px] rounded-full transition-transform hover:scale-110 hover:z-20 cursor-pointer"
-                                                    style={{
-                                                        backgroundColor: value > 0
-                                                            ? `rgba(249, 115, 22, ${0.15 + intensity * 0.85})`
-                                                            : 'rgba(255, 255, 255, 0.03)',
-                                                    }}
-                                                >
-                                                    <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-4 py-2 rounded-2xl bg-[#111111]/95 border border-white/[0.04] backdrop-blur-xl shadow-2xl opacity-0 scale-95 group-hover/cell:opacity-100 group-hover/cell:scale-100 transition-all duration-100 whitespace-nowrap z-50">
-                                                        <div className="font-bold text-white text-sm">{days[dayIndex]} {hour}:00</div>
-                                                        <div className="text-xs text-default-300">
-                                                            {autoFormatSeconds(value, text)}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
+                    <StatsHeatmap
+                        days={days}
+                        grid={heatmapGrid}
+                        maxValue={maxHeatmapValue}
+                        color="245, 158, 11"
+                        valueLabel={(value, day, hour) => `${day} ${hour}:00 - ${autoFormatSeconds(value, text)}`}
+                    />
                 </ChartContainer>
             </div>
 
             {/* Top Channels & Members */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 sm:gap-6">
                 <StatsTopWidget
                     title={text.topChannels}
                     data={topChannels.map((c: any) => ({
@@ -386,7 +320,7 @@ export default function VoicePage() {
                     othersLabel={text.other}
                 />
             </div>
-        </div>
+        </StatsPageShell>
     );
 }
 

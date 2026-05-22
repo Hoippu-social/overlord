@@ -218,6 +218,44 @@ export type AppealConfig = {
     pardonLogChannelId: string;
     allowUserAppeals: boolean;
     allowDirectPardon: boolean;
+    threadChannelId: string;
+    logChannelId: string;
+    triageRoleIds: string[];
+    reviewerRoleIds: string[];
+    mentionRoleIds: string[];
+    allowedActionTypes: string[];
+    appealWindowDays: number;
+    oneOpenAppealPerCase: boolean;
+    firstResponseSlaHours: number;
+    autoCloseHours: number;
+    dedicatedPanel: {
+        enabled: boolean;
+        channelId: string;
+        title: string;
+        description: string;
+        buttonLabel: string;
+        buttonEmoji: string;
+    };
+    sharedPlacement: {
+        enabled: boolean;
+        channelId: string;
+        label: string;
+        description: string;
+        emoji: string;
+        sortOrder: number;
+    };
+    firstEmbed: {
+        title: string;
+        intro: string;
+        footer: string;
+    };
+    intakeQuestions: Array<{
+        id: string;
+        label: string;
+        placeholder: string;
+        required: boolean;
+        long: boolean;
+    }>;
 };
 
 export type RetentionPolicy = {
@@ -383,6 +421,17 @@ export type AppealTicket = {
         targetUserId: string;
         actorUserId?: string | null;
     };
+    events?: AppealEvent[];
+};
+
+export type AppealEvent = {
+    id: number;
+    ticketId: number;
+    eventType: string;
+    actorUserId?: string | null;
+    note?: string | null;
+    payload?: Record<string, unknown> | null;
+    createdAt: string;
 };
 
 export type AppealTicketState = {

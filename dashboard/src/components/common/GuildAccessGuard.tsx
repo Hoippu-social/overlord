@@ -6,6 +6,7 @@ import { Button, Modal, ModalBody, ModalContent } from '@nextui-org/react';
 import { ArrowRight, WarningCircle } from '@phosphor-icons/react';
 import { motion } from 'framer-motion';
 import { useGuildLocale } from '@/lib/i18n';
+import { getBrowserPublicHost, getDashboardHomePath } from '@/lib/publicDashboard';
 
 const ACCESS_POLL_INTERVAL_MS = 2000;
 const REDIRECT_DELAY_MS = 5000;
@@ -81,7 +82,7 @@ export function GuildAccessGuard({ guildId }: GuildAccessGuardProps) {
         }
 
         exitTimerRef.current = window.setTimeout(() => {
-            router.replace('/dashboard');
+            router.replace(getDashboardHomePath(getBrowserPublicHost()));
             router.refresh();
         }, EXIT_ANIMATION_MS);
     }, [router]);
@@ -143,12 +144,11 @@ export function GuildAccessGuard({ guildId }: GuildAccessGuardProps) {
             return;
         }
 
-        setElapsedMs(0);
-        setIsClosing(false);
-        setProgressAnimated(false);
         redirectTriggeredRef.current = false;
 
         const animationFrameId = window.requestAnimationFrame(() => {
+            setElapsedMs(0);
+            setIsClosing(false);
             setProgressAnimated(true);
         });
 

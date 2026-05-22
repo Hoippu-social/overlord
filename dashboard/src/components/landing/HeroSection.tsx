@@ -1,9 +1,9 @@
 "use client";
 
-import { ArrowUpRight } from "@phosphor-icons/react";
-import { motion, useReducedMotion, useScroll, useTransform } from "framer-motion";
+import { ArrowUpRight, ChartBar, ChatsTeardrop, Scroll, ShieldCheck, Ticket } from "@phosphor-icons/react";
+import { motion, useReducedMotion } from "framer-motion";
+import Image from "next/image";
 import Link from "next/link";
-import { useRef } from "react";
 import { content, type Language } from "@/locales/landing";
 
 type LandingCopy = (typeof content)[Language];
@@ -12,111 +12,173 @@ interface HeroSectionProps {
   copy: LandingCopy["hero"];
 }
 
+const moduleIcons = [ShieldCheck, ChartBar, Ticket, ChatsTeardrop] as const;
+
 export function HeroSection({ copy }: HeroSectionProps) {
   const prefersReducedMotion = useReducedMotion();
-  const sectionRef = useRef<HTMLElement | null>(null);
   const easing = [0.16, 1, 0.3, 1] as const;
-
-  const { scrollYProgress } = useScroll({
-    target: sectionRef,
-    offset: ["start start", "end start"],
-  });
-
-  const contentY = useTransform(scrollYProgress, [0, 1], [0, prefersReducedMotion ? 0 : -32]);
-  const asideY = useTransform(scrollYProgress, [0, 1], [0, prefersReducedMotion ? 0 : 48]);
 
   return (
     <section
       id="hero"
-      ref={sectionRef}
-      className="relative min-h-[100svh] scroll-mt-24 px-4 pb-14 pt-28 sm:scroll-mt-28 sm:px-6 sm:pb-16 sm:pt-32 lg:px-10 lg:pb-20"
+      className="landing-hero-plane relative min-h-[88svh] overflow-hidden px-4 pb-12 pt-28 sm:px-6 sm:pb-14 sm:pt-32 lg:px-8"
     >
-      <div className="pointer-events-none absolute right-[4%] top-[16%] h-64 w-64 rounded-full bg-[radial-gradient(circle,rgba(117,241,106,0.16),rgba(143,94,255,0.08),transparent_72%)] blur-3xl sm:h-80 sm:w-80" />
-      <div className="pointer-events-none absolute inset-x-0 top-[33%] h-px bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.08),transparent)]" />
+      <div className="pointer-events-none absolute inset-0 landing-grid" />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-[linear-gradient(90deg,transparent,var(--landing-line-strong),transparent)]" />
 
-      <div className="mx-auto flex min-h-[calc(100svh-8rem)] max-w-[1480px] flex-col justify-end">
-        <motion.div
-          initial={prefersReducedMotion ? false : { opacity: 0, y: 22 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={prefersReducedMotion ? { duration: 0 } : { duration: 0.78, ease: easing }}
-          style={prefersReducedMotion ? undefined : { y: contentY }}
-          className="max-w-full overflow-hidden"
-        >
-          <p className="landing-kicker">{copy.eyebrow}</p>
-          <div className="mt-6 font-akony text-[clamp(1.8rem,7vw,2.5rem)] leading-[0.82] tracking-[0.08em] text-[var(--landing-text)] sm:text-[clamp(2.55rem,9.1vw,7rem)]">
-            {copy.brand}
-          </div>
-        </motion.div>
-
-        <div className="mt-8 grid gap-12 lg:grid-cols-[minmax(0,0.74fr)_minmax(19rem,0.26fr)] lg:items-end lg:gap-14">
+      <div className="relative z-10 mx-auto grid max-w-[1500px] gap-10 lg:grid-cols-[minmax(0,0.95fr)_minmax(360px,0.72fr)] lg:items-end lg:gap-12 xl:gap-16">
+        <div className="min-w-0">
           <motion.div
-            initial={prefersReducedMotion ? false : { opacity: 0, y: 28 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={prefersReducedMotion ? { duration: 0 } : { duration: 0.85, ease: easing }}
-            style={prefersReducedMotion ? undefined : { y: contentY }}
-            className="min-w-0 max-w-[38rem]"
+            initial={prefersReducedMotion ? false : { y: 20 }}
+            animate={{ y: 0 }}
+            transition={prefersReducedMotion ? { duration: 0 } : { duration: 0.72, ease: easing }}
+            className="max-w-full overflow-hidden"
           >
-            <h1 className="landing-display-title max-w-full text-[clamp(1.55rem,5.2vw,2.6rem)] font-semibold uppercase leading-[0.96] tracking-[0.04em] text-[var(--landing-text)] sm:max-w-[10ch] sm:text-[clamp(1.95rem,6vw,4.8rem)]">
+            <p className="landing-kicker">{copy.eyebrow}</p>
+            <div className="mt-5 max-w-full font-akony text-[2.35rem] leading-[0.82] tracking-[0.04em] text-[var(--landing-text)] min-[380px]:text-[2.85rem] sm:text-[3.4rem] md:text-[4.35rem] lg:text-[5.35rem] xl:text-[6rem]">
+              {copy.brand}
+            </div>
+          </motion.div>
+
+          <motion.div
+            initial={prefersReducedMotion ? false : { y: 24 }}
+            animate={{ y: 0 }}
+            transition={prefersReducedMotion ? { duration: 0 } : { duration: 0.82, delay: 0.08, ease: easing }}
+            className="mt-8 max-w-[44rem]"
+          >
+            <h1 className="landing-display-title font-sans text-[1.9rem] font-bold uppercase leading-[1.04] tracking-[0.02em] text-[var(--landing-text)] sm:text-[2.45rem] lg:text-[3.4rem] xl:text-[3.9rem]">
               {copy.title}
             </h1>
 
-            <p className="mt-8 max-w-[34rem] text-base leading-[1.9] text-[var(--landing-muted)] sm:text-lg lg:text-[1.08rem]">
+            <p className="mt-7 max-w-[39rem] text-base leading-[1.85] text-[var(--landing-muted)] sm:text-lg">
               {copy.body}
             </p>
-            <p className="mt-5 text-[0.72rem] uppercase tracking-[0.3em] text-[var(--landing-soft)] sm:text-[0.8rem]">
-              {copy.note}
-            </p>
-            <p className="mt-4 text-[0.62rem] uppercase tracking-[0.34em] text-[var(--landing-soft)]">{copy.rail.join(" / ")}</p>
 
-            <div className="mt-9 flex flex-col gap-3 sm:flex-row">
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Link href="/login" aria-label={copy.primary} className="landing-button-primary w-full sm:w-auto">
                 {copy.primary}
                 <ArrowUpRight size={16} weight="bold" />
               </Link>
+              <Link href="#modules" aria-label={copy.secondary} className="landing-button-secondary w-full sm:w-auto">
+                {copy.secondary}
+              </Link>
             </div>
 
-            <div className="mt-12 grid gap-4 border-t border-[var(--landing-line)] pt-6 sm:grid-cols-3">
-              {copy.stats.map((item) => (
-                <div key={item.label} className="min-w-0">
-                  <div className="tabular text-[1.8rem] font-semibold uppercase tracking-[0.08em] text-[var(--landing-accent-strong)] sm:text-[2.2rem]">
-                    {item.value}
+            <div className="mt-10 hidden gap-4 border-t border-[var(--landing-line)] pt-5 lg:grid lg:grid-cols-3">
+              {copy.metrics.map((metric) => (
+                <div key={metric.value} className="min-w-0">
+                  <div className="tabular text-[1.55rem] font-bold uppercase tracking-[0.08em] text-[var(--landing-accent-strong)] sm:text-[1.9rem]">
+                    {metric.value}
                   </div>
-                  <div className="mt-2 max-w-[18ch] text-[0.68rem] uppercase leading-[1.7] tracking-[0.26em] text-[var(--landing-soft)]">
-                    {item.label}
+                  <div className="mt-2 max-w-[19ch] text-[0.68rem] uppercase leading-[1.65] tracking-[0.2em] text-[var(--landing-soft)]">
+                    {metric.label}
                   </div>
                 </div>
               ))}
             </div>
           </motion.div>
-
-          <motion.aside
-            initial={prefersReducedMotion ? false : { opacity: 0, y: 24 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={prefersReducedMotion ? { duration: 0 } : { duration: 0.92, delay: 0.12, ease: easing }}
-            style={prefersReducedMotion ? undefined : { y: asideY }}
-            className="min-w-0 lg:justify-self-end"
-          >
-            <div className="max-w-[24rem] border-t border-[var(--landing-line)] pt-5">
-              <p className="text-[0.62rem] uppercase tracking-[0.34em] text-[var(--landing-accent)]">{copy.plaqueEyebrow}</p>
-              <h2 className="landing-display-title mt-3 max-w-[12ch] text-[1.15rem] font-semibold uppercase leading-[1.12] tracking-[0.14em] text-[var(--landing-text)] sm:text-[1.35rem]">
-                {copy.plaqueTitle}
-              </h2>
-              <p className="mt-4 text-sm leading-[1.85] text-[var(--landing-muted)] sm:text-[0.98rem]">{copy.plaqueBody}</p>
-            </div>
-
-            <div className="mt-6 border-t border-[var(--landing-line)]">
-              {copy.plaquePoints.map((point, index) => (
-                <div key={point} className="grid gap-2 border-b border-[var(--landing-line)] py-4 sm:grid-cols-[60px_minmax(0,1fr)] sm:gap-4">
-                  <div className="tabular text-[0.9rem] font-semibold uppercase tracking-[0.18em] text-[var(--landing-accent)]">
-                    {String(index + 1).padStart(2, "0")}
-                  </div>
-                  <div className="text-[0.68rem] uppercase leading-[1.8] tracking-[0.24em] text-[var(--landing-soft)]">{point}</div>
-                </div>
-              ))}
-            </div>
-          </motion.aside>
         </div>
+
+        <motion.div
+          initial={prefersReducedMotion ? false : { y: 28 }}
+          animate={{ y: 0 }}
+          transition={prefersReducedMotion ? { duration: 0 } : { duration: 0.88, delay: 0.16, ease: easing }}
+          className="min-w-0 lg:justify-self-end"
+        >
+          <CommandSurface copy={copy} />
+        </motion.div>
       </div>
     </section>
+  );
+}
+
+function CommandSurface({ copy }: HeroSectionProps) {
+  return (
+    <div className="landing-panel relative mx-auto w-full max-w-[34rem] overflow-hidden rounded-[2rem] p-4 sm:p-5">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,transparent,rgba(117,241,106,0.46),transparent)]" />
+
+      <div className="flex items-center justify-between gap-4 border-b border-[var(--landing-line)] pb-4">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-[var(--landing-line)] bg-[rgba(117,241,106,0.08)]">
+            <Image src="/logos/logo-color.svg" alt="" width={28} height={28} className="h-7 w-7 object-contain" />
+          </div>
+          <div className="min-w-0">
+            <div className="text-[0.62rem] uppercase tracking-[0.28em] text-[var(--landing-accent)]">{copy.preview.eyebrow}</div>
+            <div className="mt-1 truncate text-[1rem] font-bold text-[var(--landing-text)] sm:text-[1.12rem]">{copy.preview.title}</div>
+          </div>
+        </div>
+        <div className="shrink-0 rounded-full border border-[rgba(117,241,106,0.28)] bg-[rgba(117,241,106,0.1)] px-3 py-2 text-[0.62rem] font-bold uppercase tracking-[0.2em] text-[var(--landing-accent-strong)]">
+          {copy.preview.load}
+        </div>
+      </div>
+
+      <div className="grid gap-3 py-4 sm:grid-cols-3">
+        {[
+          { label: copy.preview.incidents, icon: ShieldCheck },
+          { label: copy.preview.response, icon: Scroll },
+          { label: copy.preview.queue, icon: Ticket },
+        ].map((item) => {
+          const Icon = item.icon;
+
+          return (
+            <div key={item.label} className="min-w-0 rounded-2xl border border-[var(--landing-line)] bg-[rgba(255,255,255,0.025)] p-3">
+              <Icon size={18} weight="bold" className="text-[var(--landing-accent)]" />
+              <div className="mt-4 truncate text-sm font-bold text-[var(--landing-text)]">{item.label}</div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
+        <div className="min-w-0 rounded-[1.4rem] border border-[var(--landing-line)] bg-[rgba(255,255,255,0.02)] p-4">
+          <div className="mb-4 text-[0.62rem] uppercase tracking-[0.26em] text-[var(--landing-soft)]">system map</div>
+          <div className="grid grid-cols-2 gap-2">
+            {copy.rail.map((label, index) => {
+              const Icon = moduleIcons[index] ?? ShieldCheck;
+
+              return (
+                <div key={label} className="min-w-0 rounded-2xl border border-[var(--landing-line)] bg-[rgba(6,6,6,0.44)] p-3">
+                  <Icon size={17} weight="bold" className="text-[var(--landing-accent)]" />
+                  <div className="mt-3 truncate text-[0.66rem] font-bold uppercase tracking-[0.16em] text-[var(--landing-text)]">{label}</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="min-w-0 rounded-[1.4rem] border border-[var(--landing-line)] bg-[rgba(6,6,6,0.36)] p-4">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div className="text-[0.62rem] uppercase tracking-[0.26em] text-[var(--landing-soft)]">signal stream</div>
+            <div className="h-2 w-2 rounded-full bg-[var(--color-primary-1)] shadow-[0_0_18px_rgba(117,241,106,0.58)]" />
+          </div>
+
+          <div className="space-y-2">
+            {copy.signals.map((signal) => (
+              <div key={signal.title} className="flex min-w-0 items-center justify-between gap-3 rounded-2xl border border-[var(--landing-line)] bg-[rgba(255,255,255,0.025)] px-3 py-3">
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-bold text-[var(--landing-text)]">{signal.title}</div>
+                  <div className="mt-1 truncate text-[0.62rem] uppercase tracking-[0.16em] text-[var(--landing-soft)]">{signal.meta}</div>
+                </div>
+                <div
+                  className={`h-8 w-1.5 shrink-0 rounded-full ${
+                    signal.tone === "violet"
+                      ? "bg-[var(--color-primary-2)] shadow-[0_0_16px_rgba(143,94,255,0.36)]"
+                      : "bg-[var(--color-primary-1)] shadow-[0_0_16px_rgba(117,241,106,0.36)]"
+                  }`}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4 flex flex-wrap gap-2 border-t border-[var(--landing-line)] pt-4">
+        {copy.preview.channels.map((channel) => (
+          <span key={channel} className="landing-pill rounded-full px-3 py-2 text-[0.62rem] font-bold uppercase leading-none tracking-[0.16em] text-[var(--landing-soft)]">
+            {channel}
+          </span>
+        ))}
+      </div>
+    </div>
   );
 }

@@ -1,14 +1,14 @@
-﻿'use client';
+'use client';
 
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { useParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
-import { Select, SelectItem, Input, Button } from '@nextui-org/react';
+import { Input } from '@nextui-org/react';
 import * as THREE from 'three';
 
 
 import {
-    MicrophoneStage, ChatText, Intersect, MagnifyingGlass, User, ArrowsClockwise,
+    MicrophoneStage, ChatText, Intersect, MagnifyingGlass, User,
     Cube, CornersOut, CornersIn
 } from '@phosphor-icons/react';
 
@@ -109,11 +109,10 @@ export default function ContactsPage() {
     const { locale } = useGuildLocale(guildId);
     const t = strings[locale];
 
-    const [period, setPeriod] = usePersistentPeriod('30d');
+    const [period] = usePersistentPeriod('30d');
     const [mode, setMode] = useState<'voice' | 'text' | 'mixed'>('mixed');
     const [data, setData] = useState<ContactsData | null>(null);
     const [loading, setLoading] = useState(true);
-    const [refreshKey, setRefreshKey] = useState(0);
     const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
     const [hoveredNode, setHoveredNode] = useState<string | null>(null);
     const [search, setSearch] = useState('');
@@ -172,7 +171,7 @@ export default function ContactsPage() {
             })
             .catch(() => setData(null))
             .finally(() => setLoading(false));
-    }, [guildId, period, mode, selectedUserId, refreshKey]);
+    }, [guildId, period, mode, selectedUserId]);
 
     const showEgoSelector = data?.graphMode === 'ego' && !selectedUserId;
 
@@ -429,9 +428,10 @@ export default function ContactsPage() {
         const active = mode === m;
         return (
             <button
+                type="button"
                 onClick={() => handleModeChange(m)}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-bold transition-all ${active
-                    ? 'bg-[#75F16A] text-[#0a0a0a] shadow-[0_0_14px_rgba(117,241,106,0.3)]'
+                className={`flex flex-none items-center gap-1.5 rounded-full px-3 py-2 text-sm font-bold transition-all ${active
+                    ? 'bg-primary text-black shadow-[0_0_14px_rgba(117,241,106,0.3)]'
                     : 'text-white/40 hover:text-white/70 hover:bg-white/[0.04]'
                     }`}
             >
@@ -443,13 +443,13 @@ export default function ContactsPage() {
 
     // â”€â”€â”€ Render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     return (
-        <div className="flex flex-col gap-4 px-6 pb-6" style={{ height: 'calc(100vh - 160px)', minHeight: 520 }}>
+        <div className="flex flex-col gap-3 px-3 pb-4 sm:gap-4 sm:px-0 sm:pb-6" style={{ height: 'calc(100dvh - 150px)', minHeight: 440 }}>
 
             {/* Controls */}
-            <div className="flex items-center justify-between w-full">
-                <div className="flex items-center gap-3">
+            <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
                     {/* Mode toggle */}
-                    <div className="flex items-center bg-[#111111] border border-white/[0.04] rounded-full p-1 gap-0.5 shadow-sm shadow-black/20">
+                    <div className="no-scrollbar flex max-w-full items-center gap-0.5 overflow-x-auto rounded-2xl border border-divider bg-surface p-1 shadow-sm shadow-black/20 sm:rounded-full">
                         <ModeButton m="voice" icon={MicrophoneStage} label={t.voice} />
                         <ModeButton m="text" icon={ChatText} label={t.text} />
                         <ModeButton m="mixed" icon={Intersect} label={t.mixed} />
@@ -477,7 +477,7 @@ export default function ContactsPage() {
 
             {/* Ego mode user picker */}
             {!loading && data?.graphMode === 'ego' && (
-                <div className="bg-[#111111] border border-white/[0.05] rounded-2xl p-4 flex-shrink-0">
+                <div className="flex-shrink-0 rounded-2xl border border-divider bg-surface p-3 sm:p-4">
                     <p className="text-white/40 text-xs mb-3">{t.egoBanner}</p>
                     <Input
                         placeholder={t.searchUser}
@@ -485,7 +485,7 @@ export default function ContactsPage() {
                         onValueChange={setSearch}
                         startContent={<MagnifyingGlass size={14} className="text-white/30" />}
                         classNames={{
-                            base: "max-w-xs mb-3",
+                            base: "mb-3 w-full sm:max-w-xs",
                             inputWrapper: "bg-white/[0.04] border border-white/[0.06] rounded-xl h-9",
                             input: "text-sm text-white/80",
                         }}
@@ -495,8 +495,8 @@ export default function ContactsPage() {
                             <button
                                 key={u.id}
                                 onClick={() => setSelectedUserId(u.id === selectedUserId ? null : u.id)}
-                                className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all border ${u.id === selectedUserId
-                                    ? 'bg-[#75F16A]/10 text-[#75F16A] border-[#75F16A]/30'
+                                className={`flex max-w-full items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition-all ${u.id === selectedUserId
+                                    ? 'bg-primary/10 text-primary border-primary/30'
                                     : 'bg-white/[0.03] text-white/60 border-white/[0.05] hover:bg-white/[0.06] hover:text-white/80'
                                     }`}
                             >
@@ -515,27 +515,27 @@ export default function ContactsPage() {
             <div
                 ref={containerRef}
                 className="flex-1 relative rounded-2xl overflow-hidden border border-white/[0.04] bg-[#080808]"
-                style={{ minHeight: 300 }}
+                style={{ minHeight: 320 }}
             >
                 {/* Floating View Toggles */}
-                <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
+                <div className="absolute right-3 top-3 z-20 flex items-center gap-2 sm:right-4 sm:top-4">
                     <button
                         onClick={() => setIs3D(!is3D)}
-                        className={`flex items-center justify-center w-9 h-9 rounded-full border backdrop-blur-md shadow-lg transition-all ${is3D ? 'bg-[#75F16A]/20 text-[#75F16A] border-[#75F16A]/40' : 'bg-black/60 text-white/60 border-white/[0.08] hover:text-white hover:bg-black/80'}`}
+                        className={`flex h-9 w-9 items-center justify-center rounded-full border shadow-lg backdrop-blur-md transition-all ${is3D ? 'border-primary/40 bg-primary/20 text-primary' : 'border-white/[0.08] bg-black/60 text-white/60 hover:bg-black/80 hover:text-white'}`}
                         title={is3D ? t.mode2D : t.mode3D}
                     >
                         <Cube size={18} weight={is3D ? 'fill' : 'regular'} />
                     </button>
                     <button
                         onClick={toggleFullscreen}
-                        className={`flex items-center justify-center w-9 h-9 rounded-full border backdrop-blur-md shadow-lg transition-all ${isFullscreen ? 'bg-[#75F16A]/20 text-[#75F16A] border-[#75F16A]/40' : 'bg-black/60 text-white/60 border-white/[0.08] hover:text-white hover:bg-black/80'}`}
+                        className={`flex h-9 w-9 items-center justify-center rounded-full border shadow-lg backdrop-blur-md transition-all ${isFullscreen ? 'border-primary/40 bg-primary/20 text-primary' : 'border-white/[0.08] bg-black/60 text-white/60 hover:bg-black/80 hover:text-white'}`}
                         title={t.fullscreen}
                     >
                         {isFullscreen ? <CornersIn size={18} /> : <CornersOut size={18} />}
                     </button>
                 </div>
                 {/* Legend */}
-                <div className="absolute top-4 left-4 z-10 bg-black/60 backdrop-blur-md rounded-xl p-3 border border-white/[0.06] pointer-events-none">
+                <div className="pointer-events-none absolute left-4 top-4 z-10 hidden rounded-xl border border-white/[0.06] bg-black/60 p-3 backdrop-blur-md sm:block">
                     {(mode === 'voice' || mode === 'mixed') && (
                         <div className="flex items-center gap-2 mb-1">
                             <div className="w-5 h-px rounded-full" style={{ backgroundColor: EDGE_COLORS.voice, height: 2 }} />
@@ -576,7 +576,7 @@ export default function ContactsPage() {
                 {/* Loading */}
                 {loading && (
                     <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
-                        <div className="w-9 h-9 border-2 border-[#75F16A]/20 border-t-[#75F16A] rounded-full animate-spin" />
+                        <div className="h-9 w-9 animate-spin rounded-full border-2 border-primary/20 border-t-primary" />
                         <p className="text-white/30 text-sm">{t.loading}</p>
                     </div>
                 )}

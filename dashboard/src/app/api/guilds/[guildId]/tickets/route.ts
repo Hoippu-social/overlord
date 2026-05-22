@@ -2,6 +2,45 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { fetchGuildChannels, parseChannels } from '@/lib/discord-api';
 import { authorizeGuildApiRequest, isGuildApiAuthFailure } from '@/lib/guildApiAuth';
+import { readAppealSettings } from '@/lib/appealsConfig';
+
+type TicketConfigRecord = {
+    enabled: boolean;
+    logChannelId: string | null;
+};
+
+type TicketCategoryRecord = {
+    id: number;
+    guildId: string;
+    name: string;
+    channelId: string | null;
+    saveHistory: boolean;
+    mentionAgents: boolean;
+    allowUserClose: boolean;
+    enableRating: boolean;
+    messagePayload: string | null;
+    buttonText: string;
+    buttonEmoji: string | null;
+    buttonStyle: string;
+    _count: {
+        tickets: number;
+    };
+};
+
+type ActiveCountRecord = {
+    categoryId: number;
+    _count: {
+        _all: number;
+    };
+};
+
+type PeriodTicketRecord = {
+    status: string;
+    createdAt: Date;
+    closedAt: Date | null;
+    rating: number | null;
+    categoryId: number | null;
+};
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ guildId: string }> }) {
     try {
@@ -21,25 +60,25 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         startDate.setDate(startDate.getDate() - days);
         startDate.setHours(0, 0, 0, 0); // Start of day
 
-        // @ts-ignore
-        const config = await prisma.ticketConfig.findUnique({ where: { guildId } });
-        // @ts-ignore
+        // @ts-expect-error Legacy Prisma client in this workspace is behind the live DB schema.
+        const config = await prisma.ticketConfig.findUnique({ where: { guildId } }) as TicketConfigRecord | null;
+        // @ts-expect-error Legacy Prisma client in this workspace is behind the live DB schema.
         const categories = await prisma.ticketCategory.findMany({
             where: { guildId },
             include: { _count: { select: { tickets: true } } }
-        });
+        }) as TicketCategoryRecord[];
 
         // 1. Calculate active tickets per category
-        // @ts-ignore
+        // @ts-expect-error Legacy Prisma client in this workspace is behind the live DB schema.
         const activeCounts = await prisma.ticket.groupBy({
             by: ['categoryId'],
             where: { guildId, status: 'OPEN' },
             _count: { _all: true }
-        });
+        }) as ActiveCountRecord[];
 
-        const activeMap = new Map(activeCounts.map((c: any) => [c.categoryId, c._count._all]));
+        const activeMap = new Map(activeCounts.map((count) => [count.categoryId, count._count._all]));
 
-        const categoriesWithStats = categories.map((cat: any) => ({
+        const categoriesWithStats = categories.map((cat) => ({
             ...cat,
             stats: {
                 total: cat._count.tickets,
@@ -47,19 +86,45 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
             }
         }));
 
+        const appealSettings = await readAppealSettings(guildId);
+        const appealPlacementCategory = appealSettings.sharedPlacement.enabled
+            ? {
+                id: -1,
+                name: appealSettings.sharedPlacement.label,
+                description: appealSettings.sharedPlacement.description,
+                channelId: appealSettings.sharedPlacement.channelId || null,
+                stats: { total: 0, active: 0 },
+                saveHistory: true,
+                mentionAgents: false,
+                allowUserClose: false,
+                enableRating: false,
+                messagePayload: null,
+                buttonText: appealSettings.sharedPlacement.label,
+                buttonEmoji: appealSettings.sharedPlacement.emoji,
+                buttonStyle: 'PRIMARY',
+                systemManagedBy: 'appeals',
+                systemCategoryKind: 'punishment_appeal',
+                sortOrder: appealSettings.sharedPlacement.sortOrder,
+            }
+            : null;
+
+        const mergedCategories = appealPlacementCategory
+            ? [...categoriesWithStats, appealPlacementCategory]
+            : categoriesWithStats;
+
         // Fetch Discord channels for selector
         const rawChannels = await fetchGuildChannels(guildId);
         const channels = parseChannels(rawChannels || []);
 
         // 2. Global stats based on period
-        // @ts-ignore
+        // @ts-expect-error Legacy Prisma client in this workspace is behind the live DB schema.
         const periodTickets = await prisma.ticket.findMany({
             where: {
                 guildId,
                 createdAt: { gte: startDate }
             },
             select: { status: true, createdAt: true, closedAt: true, rating: true, categoryId: true }
-        });
+        }) as PeriodTicketRecord[];
 
         let open = 0, onHold = 0, closed = 0;
         let totalResolutionTime = 0;
@@ -68,25 +133,25 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         const ratings = { positive: 0, neutral: 0, negative: 0, total: 0 };
         const categoryPieData: Record<string, number> = {};
 
-        periodTickets.forEach((t: any) => {
-            if (t.status === 'OPEN') open++;
-            else if (t.status === 'ON_HOLD') onHold++;
-            else if (t.status === 'CLOSED') {
+        periodTickets.forEach((ticket) => {
+            if (ticket.status === 'OPEN') open++;
+            else if (ticket.status === 'ON_HOLD') onHold++;
+            else if (ticket.status === 'CLOSED') {
                 closed++;
-                if (t.closedAt) {
-                    totalResolutionTime += (t.closedAt.getTime() - t.createdAt.getTime());
+                if (ticket.closedAt) {
+                    totalResolutionTime += (ticket.closedAt.getTime() - ticket.createdAt.getTime());
                     resolvedCount++;
                 }
             }
 
-            if (t.rating) {
+            if (ticket.rating) {
                 ratings.total++;
-                if (t.rating >= 4) ratings.positive++;
-                else if (t.rating === 3) ratings.neutral++;
+                if (ticket.rating >= 4) ratings.positive++;
+                else if (ticket.rating === 3) ratings.neutral++;
                 else ratings.negative++;
             }
 
-            const catName = categories.find((c: any) => c.id === t.categoryId)?.name || 'Unknown';
+            const catName = categories.find((category) => category.id === ticket.categoryId)?.name || 'Unknown';
             categoryPieData[catName] = (categoryPieData[catName] || 0) + 1;
         });
 
@@ -111,16 +176,16 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
             };
         });
 
-        periodTickets.forEach((t: any) => {
-            const d = t.createdAt;
+        periodTickets.forEach((ticket) => {
+            const d = ticket.createdAt;
             const dateStr = `${d.getDate().toString().padStart(2, '0')}.${(d.getMonth() + 1).toString().padStart(2, '0')}`;
             const dayEntry = activityData.find(a => a.date === dateStr);
             if (dayEntry) {
                 dayEntry.created++;
             }
 
-            if (t.status === 'CLOSED' && t.closedAt) {
-                const cd = t.closedAt;
+            if (ticket.status === 'CLOSED' && ticket.closedAt) {
+                const cd = ticket.closedAt;
                 const cdateStr = `${cd.getDate().toString().padStart(2, '0')}.${(cd.getMonth() + 1).toString().padStart(2, '0')}`;
                 const cdayEntry = activityData.find(a => a.date === cdateStr);
                 if (cdayEntry) {
@@ -129,10 +194,11 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
             }
         });
 
-        return NextResponse.json({ config, categories: categoriesWithStats, channels, globalStats, activityData });
-    } catch (error: any) {
+        return NextResponse.json({ config, categories: mergedCategories, channels, globalStats, activityData });
+    } catch (error: unknown) {
         console.error('Error fetching tickets:', error);
-        return NextResponse.json({ error: error?.message || 'Failed to load tickets' }, { status: 500 });
+        const message = error instanceof Error ? error.message : 'Failed to load tickets';
+        return NextResponse.json({ error: message }, { status: 500 });
     }
 }
 
@@ -144,7 +210,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             return auth.response;
         }
 
-        const body = await request.json();
+        const body = await request.json() as { name?: string };
         const { name } = body;
 
         if (!name) {
@@ -160,7 +226,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             }]
         };
 
-        // @ts-ignore
+        // @ts-expect-error Legacy Prisma client in this workspace is behind the live DB schema.
         const category = await prisma.ticketCategory.create({
             data: {
                 guildId,
@@ -176,8 +242,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         });
 
         return NextResponse.json({ category });
-    } catch (error: any) {
-        return NextResponse.json({ error: error?.message || 'Failed to create category' }, { status: 500 });
+    } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : 'Failed to create category';
+        return NextResponse.json({ error: message }, { status: 500 });
     }
 }
 
@@ -189,10 +256,10 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
             return auth.response;
         }
 
-        const body = await request.json();
+        const body = await request.json() as { enabled: boolean; logChannelId: string | null };
         const { enabled, logChannelId } = body;
 
-        // @ts-ignore
+        // @ts-expect-error Legacy Prisma client in this workspace is behind the live DB schema.
         const config = await prisma.ticketConfig.upsert({
             where: { guildId },
             update: { enabled, logChannelId },
@@ -200,7 +267,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         });
 
         return NextResponse.json({ config });
-    } catch (error: any) {
-        return NextResponse.json({ error: error?.message || 'Failed to update config' }, { status: 500 });
+    } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : 'Failed to update config';
+        return NextResponse.json({ error: message }, { status: 500 });
     }
 }

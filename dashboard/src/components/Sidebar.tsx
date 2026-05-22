@@ -22,6 +22,7 @@ import {
 } from '@phosphor-icons/react';
 import { useGuildLocale } from '@/lib/i18n';
 import { Popover, PopoverContent, PopoverTrigger } from '@nextui-org/react';
+import { getBrowserPublicHost, getDashboardHomePath } from '@/lib/publicDashboard';
 
 interface SidebarProps {
     guildId: string;
@@ -94,10 +95,15 @@ export const Sidebar: React.FC<SidebarProps> = ({ guildId, guildName, guildIcon 
     const [guildMenuOpen, setGuildMenuOpen] = useState(false);
     const [guilds, setGuilds] = useState<GuildSummary[]>([]);
     const [guildsLoading, setGuildsLoading] = useState(true);
+    const [dashboardHomePath, setDashboardHomePath] = useState('/dashboard');
 
     useEffect(() => {
         setMobileOpen(false);
     }, [pathname]);
+
+    useEffect(() => {
+        setDashboardHomePath(getDashboardHomePath(getBrowserPublicHost()));
+    }, []);
 
     useEffect(() => {
         let active = true;
@@ -338,7 +344,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ guildId, guildName, guildIcon 
 
             <div className="flex gap-2 border-t border-[var(--border-divider)] p-6">
                 <button
-                    onClick={() => router.push('/dashboard')}
+                    onClick={() => router.push(dashboardHomePath)}
                     className="flex flex-1 items-center justify-center gap-3 rounded-full border border-[var(--border-divider)] bg-[var(--surface-card)] px-4 py-3 text-sm font-bold text-white/50 transition-all hover:bg-[var(--surface-hover)] hover:text-white"
                 >
                     <ArrowLeft size={18} />

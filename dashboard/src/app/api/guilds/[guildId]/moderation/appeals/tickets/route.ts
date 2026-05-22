@@ -3,6 +3,25 @@ import { prisma } from '@/lib/prisma';
 import { getAuthToken } from '@/lib/auth';
 import { canAccessGuild } from '@/lib/discordAccess';
 
+type AppealEventRecord = {
+    id: number;
+    ticketId: number;
+    eventType: string;
+    actorUserId: string | null;
+    note: string | null;
+    payload: string | null;
+    createdAt: Date;
+};
+
+function parseEventPayload(payload: string | null) {
+    if (!payload) return null;
+    try {
+        return JSON.parse(payload) as Record<string, unknown>;
+    } catch {
+        return null;
+    }
+}
+
 export async function GET(request: NextRequest, { params }: { params: Promise<{ guildId: string }> }) {
     try {
         const token = await getAuthToken(request);
@@ -50,6 +69,40 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
             },
         });
 
+        const ticketIds = tickets.map((ticket) => ticket.id);
+        let rawEvents: AppealEventRecord[] = [];
+        if (ticketIds.length) {
+            try {
+                rawEvents = await prisma.$queryRawUnsafe<AppealEventRecord[]>(
+                    `SELECT "id", "ticketId", "eventType", "actorUserId", "note", "payload", "createdAt"
+                     FROM "AppealEvent"
+                     WHERE "ticketId" IN (${ticketIds.map(() => '?').join(', ')})
+                     ORDER BY "createdAt" DESC, "id" DESC`,
+                    ...ticketIds,
+                );
+            } catch {
+                rawEvents = [];
+            }
+        }
+        const eventsByTicketId = new Map<number, AppealEventRecord[]>();
+        for (const event of rawEvents) {
+            const current = eventsByTicketId.get(event.ticketId) ?? [];
+            current.push(event);
+            eventsByTicketId.set(event.ticketId, current);
+        }
+        const ticketsWithEvents = tickets.map((ticket) => ({
+            ...ticket,
+            events: (eventsByTicketId.get(ticket.id) ?? []).map((event) => ({
+                id: event.id,
+                ticketId: event.ticketId,
+                eventType: event.eventType,
+                actorUserId: event.actorUserId,
+                note: event.note,
+                payload: parseEventPayload(event.payload),
+                createdAt: event.createdAt,
+            })),
+        }));
+
         return NextResponse.json({
             summary: {
                 total: tickets.length,
@@ -58,7 +111,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
                 accepted: tickets.filter((ticket) => ticket.status === 'ACCEPTED' || ticket.status === 'PARDONED').length,
                 rejected: tickets.filter((ticket) => ticket.status === 'REJECTED').length,
             },
-            tickets,
+            tickets: ticketsWithEvents,
         });
     } catch (error) {
         console.error('Failed to load appeal tickets:', error);

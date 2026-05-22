@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { Card, CardBody, CardHeader, Avatar, Tooltip, Link } from "@nextui-org/react";
-import { List, ChartPie, Eye, EyeSlash, Hash, User } from "@phosphor-icons/react";
+import { Card, CardBody, CardHeader, Avatar, Link } from "@nextui-org/react";
+import { List, ChartPie, Hash, User } from "@phosphor-icons/react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
 import { motion, AnimatePresence } from 'framer-motion';
 import { formatLocaleNumber } from "@/lib/utils";
@@ -11,9 +11,10 @@ interface TopItem {
     value: number;
     avatar?: string;
     discordUrl?: string; // For channels
+    drilldownUrl?: string;
     color?: string;
     username?: string;
-    [key: string]: any;
+    [key: string]: unknown;
 }
 
 interface StatsTopWidgetProps {
@@ -81,7 +82,7 @@ export const StatsTopWidget: React.FC<StatsTopWidgetProps> = ({
         }
 
         return items;
-    }, [data, othersValue]);
+    }, [data, othersValue, othersLabel]);
 
     const activeData = useMemo(() => {
         return pieData.filter(item => !hiddenIds.has(item.id));
@@ -89,7 +90,7 @@ export const StatsTopWidget: React.FC<StatsTopWidgetProps> = ({
 
     const [activeIndex, setActiveIndex] = useState<number | null>(null);
 
-    const onPieEnter = (_: any, index: number) => {
+    const onPieEnter = (_: unknown, index: number) => {
         setActiveIndex(index);
     };
 
@@ -127,12 +128,12 @@ export const StatsTopWidget: React.FC<StatsTopWidgetProps> = ({
     }, [activeIndex, activeData, locale, valueFormatter]);
 
     return (
-        <Card className={`h-full bg-[#111111] border border-white/[0.04] shadow-sm shadow-black/20 rounded-[32px] overflow-hidden ${className || ''}`}>
+        <Card className={`h-full overflow-hidden rounded-[22px] border border-divider bg-surface shadow-sm shadow-black/20 sm:rounded-[32px] ${className || ''}`}>
             {!hideHeader && (
-                <CardHeader className="flex justify-between items-center px-8 py-6 pb-2">
-                    <div className="flex items-center gap-3">
+                <CardHeader className="flex items-center justify-between gap-3 px-4 pb-2 pt-4 sm:px-8 sm:pt-6">
+                    <div className="flex min-w-0 items-center gap-3">
                         {icon && <div className="text-white/40 flex-shrink-0">{icon}</div>}
-                        <h3 className="text-sm font-semibold text-white/40 tracking-wide">{title}</h3>
+                        <h3 className="truncate text-sm font-semibold tracking-wide text-white/40">{title}</h3>
                     </div>
                     {!hideControls && (
                         <div className="flex gap-1 bg-white/[0.04] p-1 rounded-full border border-white/[0.04]">
@@ -141,7 +142,7 @@ export const StatsTopWidget: React.FC<StatsTopWidgetProps> = ({
                                 onClick={() => setViewType('list')}
                                 className={`flex items-center justify-center w-8 h-8 rounded-full transition-all ${
                                     viewType === 'list'
-                                        ? 'bg-[#75F16A] text-[#0a0a0a] shadow-[0_0_14px_rgba(117,241,106,0.35)]'
+                                        ? 'bg-primary text-black shadow-[0_0_14px_rgba(117,241,106,0.35)]'
                                         : 'text-white/30 hover:text-white/70 hover:bg-white/[0.06]'
                                 }`}
                                 aria-label={locale === 'ru' ? 'Список' : 'List view'}
@@ -153,7 +154,7 @@ export const StatsTopWidget: React.FC<StatsTopWidgetProps> = ({
                                 onClick={() => setViewType('pie')}
                                 className={`flex items-center justify-center w-8 h-8 rounded-full transition-all ${
                                     viewType === 'pie'
-                                        ? 'bg-[#75F16A] text-[#0a0a0a] shadow-[0_0_14px_rgba(117,241,106,0.35)]'
+                                        ? 'bg-primary text-black shadow-[0_0_14px_rgba(117,241,106,0.35)]'
                                         : 'text-white/30 hover:text-white/70 hover:bg-white/[0.06]'
                                 }`}
                                 aria-label={locale === 'ru' ? 'Круговая диаграмма' : 'Pie view'}
@@ -164,7 +165,7 @@ export const StatsTopWidget: React.FC<StatsTopWidgetProps> = ({
                     )}
                 </CardHeader>
             )}
-            <CardBody className="px-8 pb-8 pt-2 h-[400px] overflow-hidden">
+            <CardBody className="h-[330px] overflow-hidden px-4 pb-4 pt-2 sm:h-[400px] sm:px-8 sm:pb-8">
                 <AnimatePresence mode="wait">
                     {viewType === 'list' ? (
                         <motion.div
@@ -180,7 +181,7 @@ export const StatsTopWidget: React.FC<StatsTopWidgetProps> = ({
                                 </div>
                             ) : (
                                 data.map((item, index) => (
-                                    <div key={item.id} className="flex items-center justify-between p-2 md:p-3 rounded-2xl bg-white/[0.02] border border-white/[0.02] hover:bg-white/[0.04] transition-colors">
+                                    <div key={item.id} className="flex items-center justify-between rounded-xl border border-white/[0.02] bg-white/[0.02] p-2 transition-colors hover:bg-white/[0.04] sm:rounded-2xl md:p-3">
                                         <div className="flex items-center gap-2 md:gap-3 overflow-hidden flex-1 min-w-0">
                                             <div className="flex-shrink-0 w-6 md:w-8 text-center text-white/30 font-medium text-sm">#{index + 1}</div>
                                             {isChannel ? (
@@ -244,11 +245,11 @@ export const StatsTopWidget: React.FC<StatsTopWidgetProps> = ({
                             <div className="flex-1 min-h-0 relative">
                                 {/* Center Info Overlay */}
                                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                    <div className={`${largeText ? 'w-[180px]' : 'w-[100px]'} text-center px-1`}>
-                                        <div className={`text-default-500 ${largeText ? 'text-xs mb-2' : 'text-[10px] mb-1'} font-bold uppercase tracking-widest leading-tight break-words whitespace-normal line-clamp-2`}>
+                                    <div className={`${largeText ? 'w-[150px] sm:w-[180px]' : 'w-[92px] sm:w-[100px]'} text-center px-1`}>
+                                        <div className={`text-default-500 ${largeText ? 'mb-2 text-[11px] sm:text-xs' : 'mb-1 text-[10px]'} line-clamp-2 break-words whitespace-normal font-bold uppercase leading-tight tracking-widest`}>
                                             {centerInfo.label}
                                         </div>
-                                        <div className={`${largeText ? 'text-3xl' : 'text-xl'} font-bold text-white font-mono tracking-tight transition-all`}>
+                                        <div className={`${largeText ? 'text-2xl sm:text-3xl' : 'text-lg sm:text-xl'} font-mono font-bold tracking-normal text-white transition-all`}>
                                             {centerInfo.value}
                                         </div>
                                         {centerInfo.sub && (
@@ -296,7 +297,7 @@ export const StatsTopWidget: React.FC<StatsTopWidgetProps> = ({
 
                             {/* Legend Grid - Conditionally rendered */}
                             {!hideLegend && (
-                                <div className="mt-4 overflow-y-auto max-h-[140px] pr-2 custom-scrollbar grid grid-cols-2 gap-2">
+                                <div className="custom-scrollbar mt-4 grid max-h-[120px] grid-cols-1 gap-2 overflow-y-auto pr-1 sm:max-h-[140px] sm:grid-cols-2 sm:pr-2">
                                     {pieData.map((item, index) => (
                                         <div
                                             key={item.id}
@@ -329,5 +330,4 @@ export const StatsTopWidget: React.FC<StatsTopWidgetProps> = ({
         </Card>
     );
 };
-
 

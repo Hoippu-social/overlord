@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
+import { getAppCookieOptions, LOCAL_SESSION_COOKIE_NAME } from '@/lib/authCookies';
 
 export async function POST(request: Request) {
     const body = await request.json();
@@ -9,16 +9,9 @@ export async function POST(request: Request) {
         // Generate a simple session token with timestamp for uniqueness
         const sessionToken = `session_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
 
-        // Set session cookie with unique token
-        (await cookies()).set('session', sessionToken, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict',
-            maxAge: 60 * 60 * 24 * 7, // 1 week
-            path: '/',
-        });
-
-        return NextResponse.json({ success: true });
+        const response = NextResponse.json({ success: true });
+        response.cookies.set(LOCAL_SESSION_COOKIE_NAME, sessionToken, getAppCookieOptions(60 * 60 * 24 * 7));
+        return response;
     }
 
     return NextResponse.json({ success: false }, { status: 401 });

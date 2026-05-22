@@ -31,10 +31,10 @@ function AutoFitValue({ value, subValue }: { value: string | number; subValue?: 
         const text = textRef.current;
         if (!container || !text) return;
 
-        const maxSize = 36;
-        const minSize = 20;
         const containerWidth = container.clientWidth;
         if (containerWidth <= 0) return;
+        const maxSize = containerWidth < 180 ? 30 : 36;
+        const minSize = containerWidth < 180 ? 18 : 20;
 
         // First try single-line, shrinking font
         text.style.whiteSpace = 'nowrap';
@@ -53,20 +53,20 @@ function AutoFitValue({ value, subValue }: { value: string | number; subValue?: 
 
         setShouldWrap(needsWrap);
         setFontSize(size);
-    }, [value, subValue]);
+    }, []);
 
     useEffect(() => {
         fit();
         const observer = new ResizeObserver(() => requestAnimationFrame(fit));
         if (containerRef.current) observer.observe(containerRef.current);
         return () => observer.disconnect();
-    }, [fit]);
+    }, [fit, value, subValue]);
 
     return (
         <div ref={containerRef} className="w-full">
             <span
                 ref={textRef}
-                className={`font-akony text-[var(--text-primary)] tracking-tight leading-[1.2] inline-block ${
+                className={`inline-block font-akony leading-[1.2] tracking-normal text-[var(--text-primary)] ${
                     shouldWrap ? 'break-words whitespace-normal' : 'whitespace-nowrap'
                 }`}
                 style={{ fontSize: `${fontSize}px` }}
@@ -87,10 +87,10 @@ function AutoFitValue({ value, subValue }: { value: string | number; subValue?: 
 
 export function StatsCard({
     title, value, subValue, icon, trend,
-    loading = false, description, accentColor = '#75F16A', className = '',
+    loading = false, description, accentColor = 'var(--color-primary-1)', className = '',
 }: StatsCardProps) {
     return (
-        <div className={`relative bg-[var(--surface-card)] rounded-[24px] p-5 border border-[var(--border-subtle)] shadow-sm shadow-black/20 overflow-hidden group hover:border-[var(--border-divider)] hover:bg-[var(--surface-hover)] transition-colors duration-300 flex flex-col justify-between min-h-[140px] gap-3 ${className}`}>
+        <div className={`group relative flex min-h-[124px] flex-col justify-between gap-3 overflow-hidden rounded-[22px] border border-[var(--border-subtle)] bg-[var(--surface-card)] p-4 shadow-sm shadow-black/20 transition-colors duration-300 hover:border-[var(--border-divider)] hover:bg-[var(--surface-hover)] sm:min-h-[140px] sm:rounded-[24px] sm:p-5 ${className}`}>
             <div className="flex items-start justify-between">
                 <div className="flex flex-col gap-0.5 min-w-0 flex-1">
                     <p className="text-xs font-semibold text-[var(--text-secondary)] tracking-wide leading-tight">{title}</p>
@@ -98,8 +98,11 @@ export function StatsCard({
                 </div>
                 {icon && (
                     <div
-                        className="w-10 h-10 rounded-[12px] flex items-center justify-center flex-shrink-0 ml-2"
-                        style={{ backgroundColor: accentColor + '15', color: accentColor }}
+                        className="ml-2 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-[12px] sm:h-10 sm:w-10"
+                        style={{
+                            backgroundColor: `color-mix(in srgb, ${accentColor} 14%, transparent)`,
+                            color: accentColor,
+                        }}
                     >
                         {icon}
                     </div>
@@ -117,8 +120,8 @@ export function StatsCard({
 
                 {trend && (
                     <div className={`flex items-center gap-1 text-[11px] font-bold px-2 py-1 rounded-full flex-shrink-0 ${trend.isPositive !== false
-                        ? 'bg-emerald-500/10 text-emerald-400'
-                        : 'bg-rose-500/10 text-rose-400'
+                        ? 'bg-success/10 text-success'
+                        : 'bg-danger/10 text-danger'
                         }`}>
                         {trend.isPositive !== false
                             ? <TrendUp size={12} weight="bold" />

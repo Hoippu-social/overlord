@@ -1,14 +1,11 @@
-﻿'use client';
+'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import { useParams } from 'next/navigation';
-import { Button, Select, SelectItem } from "@nextui-org/react";
 import {
     UsersThree,
     UserPlus,
     UserMinus,
-    ArrowsClockwise,
-    CalendarCheck,
     TrendUp,
     TrendDown
 } from "@phosphor-icons/react";
@@ -19,6 +16,7 @@ import { formatLocaleNumber, formatYAxis } from "@/lib/utils";
 import { StatsCard } from "@/components/stats/StatsCard";
 import { ChartContainer } from "@/components/stats/ChartContainer";
 import { ChartTooltip } from "@/components/stats/ChartTooltip";
+import { StatsPageHeader, StatsPageShell } from "@/components/stats/StatsPageScaffold";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts';
 
 
@@ -72,30 +70,8 @@ export default function MembersPage() {
     const text = strings[locale];
 
     // Default to 30d for trends
-    const [period, setPeriod] = usePersistentPeriod('7d');
-    const { data, loading, refresh } = useStats({ guildId, type: 'members', period });
-    const [syncing, setSyncing] = useState(false);
-
-    const handleSync = async () => {
-        setSyncing(true);
-        try {
-            let days = 90;
-            if (period === 'all') days = 365;
-            else if (period.endsWith('d')) days = parseInt(period);
-
-            await fetch(`/api/guilds/${guildId}/stats/sync`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ days })
-            });
-            await new Promise(r => setTimeout(r, 1000));
-            refresh();
-        } catch (error) {
-            console.error(error);
-        } finally {
-            setSyncing(false);
-        }
-    };
+    const [period] = usePersistentPeriod('7d');
+    const { data, loading } = useStats({ guildId, type: 'members', period });
 
     const growthData = data?.growthChart || [];
     const joinLeaveData = data?.joinLeaveChart || [];
@@ -109,20 +85,16 @@ export default function MembersPage() {
     const netTrend = (stats as any).netTrend ?? 0;
 
     return (
-        <div className="p-6 space-y-6 min-h-screen">
-            {/* Header */}
-            <div className="flex items-center gap-4 mb-2">
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500/20 to-teal-500/20 border border-emerald-500/10 flex items-center justify-center backdrop-blur-sm shadow-xl flex-shrink-0">
-                    <UsersThree size={32} weight="fill" className="text-emerald-500 drop-shadow-lg" />
-                </div>
-                <div>
-                    <h1 className="text-3xl font-black text-white tracking-tight">{text.title}</h1>
-                    <p className="text-default-400 font-medium">{text.subtitle}</p>
-                </div>
-            </div>
+        <StatsPageShell>
+            <StatsPageHeader
+                title={text.title}
+                subtitle={text.subtitle}
+                icon={<UsersThree size={26} weight="fill" />}
+                iconClassName="text-success"
+            />
 
             {/* Summary Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 sm:gap-4 lg:gap-6">
                 <StatsCard
                     title={text.totalMembers}
                     value={formatLocaleNumber(stats.total, locale)}
@@ -147,15 +119,15 @@ export default function MembersPage() {
                     title={text.netChange}
                     value={`${isNetPositive ? '+' : ''}${netChange}`}
                     icon={isNetPositive ? <TrendUp size={24} weight="bold" /> : <TrendDown size={24} weight="bold" />}
-                    className={isNetPositive ? "border-emerald-500/20" : "border-rose-500/20"}
+                    className={isNetPositive ? "border-success/20" : "border-danger/20"}
                     loading={loading}
                     trend={{ value: Math.abs(netTrend), isPositive: isNetPositive }}
                 />
             </div>
 
             {/* Growth & Activity Charts */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <ChartContainer title={text.memberGrowth} loading={loading} height={400}>
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 sm:gap-6">
+                <ChartContainer title={text.memberGrowth} loading={loading} height={380}>
                     <ResponsiveContainer width="100%" height="100%">
                         <AreaChart data={growthData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
                             <defs>
@@ -196,7 +168,7 @@ export default function MembersPage() {
                     </ResponsiveContainer>
                 </ChartContainer>
 
-                <ChartContainer title={text.joinLeave} loading={loading} height={400}>
+                <ChartContainer title={text.joinLeave} loading={loading} height={380}>
                     <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={joinLeaveData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
                             <CartesianGrid strokeDasharray="3 3" stroke="#ffffff08" vertical={false} />
@@ -220,7 +192,7 @@ export default function MembersPage() {
                     </ResponsiveContainer>
                 </ChartContainer>
             </div>
-        </div>
+        </StatsPageShell>
     );
 }
 

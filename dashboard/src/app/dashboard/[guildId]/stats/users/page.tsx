@@ -3,12 +3,12 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import {
-    Button, Input, Card, CardBody, Chip, Skeleton, Avatar, Select, SelectItem,
+    Button, Input, Card, CardBody, Chip, Skeleton, Avatar,
     Tabs, Tab, ButtonGroup
 } from "@nextui-org/react";
 import {
     MagnifyingGlass, Hash, SpeakerHigh, MessengerLogo, UserCircle,
-    CalendarCheck, Clock, ChartBar, ArrowRight, MicrophoneStage, ArrowsClockwise
+    Clock, ChartBar, ArrowRight, MicrophoneStage
 } from "@phosphor-icons/react";
 
 import { useGuildLocale, useGuildTimezone } from "@/lib/i18n";
@@ -17,9 +17,10 @@ import { formatDateInTimezone, formatLocaleNumber, formatYAxis } from "@/lib/uti
 import { StatsCard } from "@/components/stats/StatsCard";
 import { ChartContainer } from "@/components/stats/ChartContainer";
 import { ChartTooltip } from "@/components/stats/ChartTooltip";
+import { StatsPageHeader, StatsPageShell } from "@/components/stats/StatsPageScaffold";
 import {
     BarChart, Bar, AreaChart, Area, XAxis, YAxis, CartesianGrid,
-    Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend
+    Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell
 } from 'recharts';
 
 const strings = {
@@ -143,17 +144,7 @@ export default function UserDrilldownPage() {
     const [selectedUserName, setSelectedUserName] = useState('');
     const [selectedUserAvatar, setSelectedUserAvatar] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState('overview');
-    const [period, setPeriod] = usePersistentPeriod('7d');
-    const [refreshKey, setRefreshKey] = useState(0);
-    const [syncing, setSyncing] = useState(false);
-
-    const handleSync = async () => {
-        setSyncing(true);
-        setUsersFetched(false);
-        setAllUsers([]);
-        setTimeout(() => setSyncing(false), 800);
-        setRefreshKey(k => k + 1);
-    };
+    const [period] = usePersistentPeriod('7d');
 
     const [drilldownData, setDrilldownData] = useState<any>(null);
     const [loadingDrilldown, setLoadingDrilldown] = useState(false);
@@ -252,17 +243,13 @@ export default function UserDrilldownPage() {
 
     // --- RENDER ---
     return (
-        <div className="p-6 space-y-6 min-h-screen">
-            {/* Header */}
-            <div className="flex items-center gap-4 mb-2">
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-500/20 to-purple-500/20 border border-violet-500/10 flex items-center justify-center backdrop-blur-sm shadow-xl flex-shrink-0">
-                    <UserCircle size={32} weight="fill" className="text-violet-500 drop-shadow-lg" />
-                </div>
-                <div>
-                    <h1 className="text-3xl font-black text-white tracking-tight">{text.title}</h1>
-                    <p className="text-default-400 font-medium">{text.subtitle}</p>
-                </div>
-            </div>
+        <StatsPageShell>
+            <StatsPageHeader
+                title={text.title}
+                subtitle={text.subtitle}
+                icon={<UserCircle size={26} weight="fill" />}
+                iconClassName="text-[var(--color-primary-2)]"
+            />
 
             {/* Search */}
             <div className="relative">
@@ -276,7 +263,7 @@ export default function UserDrilldownPage() {
                     }}
                     startContent={<MagnifyingGlass size={20} className="text-default-400" />}
                     classNames={{
-                        inputWrapper: "bg-[#18181b]/60 border border-white/5 hover:border-white/10 data-[focused=true]:border-primary/50 backdrop-blur-md h-12",
+                        inputWrapper: "h-12 rounded-2xl border border-divider bg-surface hover:border-white/10 data-[focused=true]:border-primary/50",
                         input: "text-white"
                     }}
                     isClearable
@@ -302,7 +289,7 @@ export default function UserDrilldownPage() {
                                 <button
                                     key={u.userId}
                                     onClick={() => selectUser(u)}
-                                    className="w-full flex items-center justify-between gap-4 px-4 py-3 hover:bg-violet-500/10 transition-colors cursor-pointer border-b border-white/[0.03] last:border-b-0"
+                                    className="flex w-full cursor-pointer flex-col gap-2 border-b border-white/[0.03] px-4 py-3 text-left transition-colors hover:bg-primary/10 last:border-b-0 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
                                 >
                                     <div className="flex items-center gap-3 min-w-0">
                                         <Avatar
@@ -316,7 +303,7 @@ export default function UserDrilldownPage() {
                                             <p className="text-xs text-default-400 font-mono">{u.tag || u.userId}</p>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-3 flex-shrink-0">
+                                    <div className="flex flex-shrink-0 flex-wrap items-center gap-3 pl-11 sm:pl-0">
                                         {u.messages > 0 && (
                                             <div className="flex items-center gap-1 text-default-400">
                                                 <MessengerLogo size={14} weight="fill" className="text-violet-400" />
@@ -345,8 +332,8 @@ export default function UserDrilldownPage() {
                         size="lg"
                         variant="flat"
                         classNames={{
-                            base: "bg-violet-500/10 border border-violet-500/20 px-4 py-5",
-                            content: "text-white font-bold text-base"
+                            base: "max-w-full border border-primary/20 bg-primary/10 px-3 py-4 sm:px-4 sm:py-5",
+                            content: "truncate text-sm font-bold text-white sm:text-base"
                         }}
                         avatar={
                             <Avatar
@@ -364,13 +351,14 @@ export default function UserDrilldownPage() {
 
             {/* DRILLDOWN VIEW */}
             {selectedUser ? (
-                <div className="space-y-6">
+                <div className="space-y-4 sm:space-y-6">
                     {/* Tabs */}
                     <Tabs
                         selectedKey={activeTab}
                         onSelectionChange={(key) => setActiveTab(key as string)}
                         classNames={{
-                            tabList: "bg-[#18181b]/60 border border-white/5 p-1 rounded-2xl backdrop-blur-md",
+                            base: "w-full overflow-x-auto",
+                            tabList: "w-full min-w-max rounded-2xl border border-divider bg-surface p-1",
                             cursor: "bg-primary shadow-lg",
                             tab: "h-10 font-semibold",
                             tabContent: "group-data-[selected=true]:text-white text-default-400"
@@ -409,8 +397,8 @@ export default function UserDrilldownPage() {
 
                     {/* TAB: Overview */}
                     {activeTab === 'overview' && (
-                        <div className="space-y-6">
-                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div className="space-y-4 sm:space-y-6">
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 sm:gap-4">
                                 <StatsCard
                                     title={text.totalMessages}
                                     value={drilldownData?.overview?.totalMessages != null ? formatLocaleNumber(drilldownData.overview.totalMessages, locale) : '—'}
@@ -441,9 +429,9 @@ export default function UserDrilldownPage() {
                             </div>
 
                             {/* Bottom info cards */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 sm:gap-4">
                                 {/* Top Message Channel */}
-                                <Card className="bg-[#18181b]/60 border border-white/5 backdrop-blur-md">
+                                <Card className="border border-divider bg-surface">
                                     <CardBody className="p-5">
                                         <p className="text-xs text-default-400 font-semibold uppercase tracking-wider mb-3">{text.topChannelMsgs}</p>
                                         {loadingDrilldown ? <Skeleton className="h-8 w-full rounded-lg" /> : (
@@ -463,7 +451,7 @@ export default function UserDrilldownPage() {
                                 </Card>
 
                                 {/* Top Voice Channel */}
-                                <Card className="bg-[#18181b]/60 border border-white/5 backdrop-blur-md">
+                                <Card className="border border-divider bg-surface">
                                     <CardBody className="p-5">
                                         <p className="text-xs text-default-400 font-semibold uppercase tracking-wider mb-3">{text.topChannelVoice}</p>
                                         {loadingDrilldown ? <Skeleton className="h-8 w-full rounded-lg" /> : (
@@ -483,7 +471,7 @@ export default function UserDrilldownPage() {
                                 </Card>
 
                                 {/* Most Recent Message */}
-                                <Card className="bg-[#18181b]/60 border border-white/5 backdrop-blur-md">
+                                <Card className="border border-divider bg-surface">
                                     <CardBody className="p-5">
                                         <p className="text-xs text-default-400 font-semibold uppercase tracking-wider mb-3">{text.mostRecentMsg}</p>
                                         {loadingDrilldown ? <Skeleton className="h-8 w-full rounded-lg" /> : (
@@ -498,7 +486,7 @@ export default function UserDrilldownPage() {
                                 </Card>
 
                                 {/* Most Recent Voice */}
-                                <Card className="bg-[#18181b]/60 border border-white/5 backdrop-blur-md">
+                                <Card className="border border-divider bg-surface">
                                     <CardBody className="p-5">
                                         <p className="text-xs text-default-400 font-semibold uppercase tracking-wider mb-3">{text.mostRecentVoice}</p>
                                         {loadingDrilldown ? <Skeleton className="h-8 w-full rounded-lg" /> : (
@@ -621,17 +609,17 @@ export default function UserDrilldownPage() {
             ) : (
                 /* Empty state — no user selected */
                 !showResults && (
-                    <Card className="bg-[#18181b]/60 border border-white/5 backdrop-blur-md">
-                        <CardBody className="p-16 text-center">
-                            <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-violet-500/10 to-purple-500/10 border border-violet-500/10 flex items-center justify-center mx-auto mb-6">
-                                <MagnifyingGlass size={40} className="text-violet-500/50" />
+                    <Card className="border border-divider bg-surface">
+                        <CardBody className="p-8 text-center sm:p-16">
+                            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-3xl border border-primary/10 bg-primary/10 sm:mb-6 sm:h-20 sm:w-20">
+                                <MagnifyingGlass size={36} className="text-primary/60" />
                             </div>
-                            <p className="text-default-400 font-medium text-lg">{text.selectUser}</p>
+                            <p className="text-base font-medium text-default-400 sm:text-lg">{text.selectUser}</p>
                         </CardBody>
                     </Card>
                 )
             )}
-        </div>
+        </StatsPageShell>
     );
 }
 
@@ -672,7 +660,7 @@ function ChannelBreakdownSection({
             result.push({ name: otherLabel, value: otherValue });
         }
         return result;
-    }, [channels, pieTopN, valueKey]);
+    }, [channels, pieTopN, valueKey, otherLabel]);
 
     if (loading) {
         return <Skeleton className="h-80 w-full rounded-2xl" />;
@@ -681,18 +669,18 @@ function ChannelBreakdownSection({
     if (!channels.length) return null;
 
     return (
-        <Card className="bg-[#18181b]/60 border border-white/5 backdrop-blur-md">
-            <CardBody className="p-6">
-                <div className="flex items-center justify-between mb-6">
-                    <div className="flex items-center gap-2">
+        <Card className="border border-divider bg-surface">
+            <CardBody className="p-4 sm:p-6">
+                <div className="mb-4 flex items-center justify-between sm:mb-6">
+                    <div className="flex min-w-0 items-center gap-2">
                         <Hash size={22} weight="bold" className="text-primary" />
-                        <h2 className="text-lg font-bold text-white">{title}</h2>
+                        <h2 className="truncate text-base font-bold text-white sm:text-lg">{title}</h2>
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-8">
                     {/* List */}
-                    <div className="h-[350px] overflow-y-auto pr-2 custom-scrollbar space-y-3">
+                    <div className="custom-scrollbar h-[300px] space-y-2 overflow-y-auto pr-1 sm:h-[350px] sm:space-y-3 sm:pr-2">
                         {channels.length === 0 ? (
                             <div className="flex h-full items-center justify-center text-default-500">
                                 {noDataLabel}
@@ -720,7 +708,7 @@ function ChannelBreakdownSection({
                     </div>
 
                     {/* Pie Chart */}
-                    <div className="flex flex-col h-[350px]">
+                    <div className="flex h-[300px] flex-col sm:h-[350px]">
                         <div className="flex justify-end mb-2">
                             <ButtonGroup size="sm">
                                 {[3, 5, 10].map(n => (
@@ -767,7 +755,7 @@ function ChannelBreakdownSection({
                             </ResponsiveContainer>
                         </div>
                         {/* Custom Legend */}
-                        <div className="mt-4 overflow-y-auto max-h-[120px] pr-2 custom-scrollbar grid grid-cols-2 gap-2">
+                        <div className="custom-scrollbar mt-4 grid max-h-[110px] grid-cols-1 gap-2 overflow-y-auto pr-1 sm:max-h-[120px] sm:grid-cols-2 sm:pr-2">
                             {pieData.map((item: any, index: number) => (
                                 <div key={`legend-${index}`} className="flex items-center gap-2 p-2 rounded-lg bg-transparent border border-white/5">
                                     <div className="w-3 h-3 rounded-full flex-shrink-0 shadow-[0_0_8px_rgba(0,0,0,0.5)]" style={{ backgroundColor: PIE_COLORS[index % PIE_COLORS.length] }} />

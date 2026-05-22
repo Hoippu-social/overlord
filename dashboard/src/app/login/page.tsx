@@ -6,6 +6,7 @@ import Link from "next/link";
 import { signIn, signOut } from "next-auth/react";
 import { useState } from "react";
 import { Footer } from "@/components/landing/Footer";
+import { getBrowserPublicHost, getDashboardHomePath } from "@/lib/publicDashboard";
 
 type LoginMode = "discord" | "password" | null;
 
@@ -29,7 +30,7 @@ export default function LoginPage() {
       });
 
       if (response.ok) {
-        window.location.assign("/dashboard");
+        window.location.assign(getDashboardHomePath(getBrowserPublicHost()));
         return;
       }
 
@@ -47,7 +48,7 @@ export default function LoginPage() {
 
     try {
       await fetch("/api/logout", { method: "POST" });
-      await signIn("discord", { callbackUrl: "/dashboard" });
+      await signIn("discord", { callbackUrl: getDashboardHomePath(getBrowserPublicHost()) });
     } catch {
       setErrorMessage("Не удалось начать вход через Discord.");
       setLoadingMode(null);

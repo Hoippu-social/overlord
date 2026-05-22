@@ -13,7 +13,7 @@ type SegmentedTabsProps = {
 
 export function SegmentedTabs({ active, onChange, labels, tabs, icons, className = '' }: SegmentedTabsProps) {
     return (
-        <div className={`flex w-full min-w-0 flex-wrap items-stretch gap-1 rounded-2xl border border-divider bg-surface p-1.5 shadow-sm shadow-black/20 ${className}`}>
+        <div className={`no-scrollbar flex w-full min-w-0 flex-nowrap items-stretch gap-1 overflow-x-auto rounded-[20px] border border-divider bg-surface p-1.5 shadow-sm shadow-black/20 md:flex-wrap md:overflow-visible ${className}`}>
             {tabs.map((tab) => {
                 const isActive = active === tab;
 
@@ -24,8 +24,8 @@ export function SegmentedTabs({ active, onChange, labels, tabs, icons, className
                         title={labels[tab]}
                         aria-pressed={isActive}
                         onClick={() => onChange(tab)}
-                        className={`flex h-10 min-h-10 min-w-[calc(50%-0.125rem)] flex-1 basis-[calc(50%-0.125rem)] items-center justify-center gap-2 rounded-xl border px-3 text-[13px] font-bold leading-tight transition-all sm:min-w-[140px] sm:px-4 sm:text-sm md:min-w-0 md:basis-auto ${isActive
-                            ? 'border-[#7AAA7A] bg-[#7AAA7A]/15 text-white shadow-[0_0_18px_rgba(122,170,122,0.16)]'
+                        className={`flex h-10 min-h-10 min-w-[7.25rem] flex-none items-center justify-center gap-2 rounded-xl border px-3 text-[13px] font-bold leading-tight transition-all sm:min-w-[8.5rem] sm:px-4 sm:text-sm md:min-w-[7rem] md:flex-1 lg:min-w-0 ${isActive
+                            ? 'border-[var(--border-focus)] bg-primary/10 text-white shadow-[0_0_18px_rgba(117,241,106,0.14)]'
                             : 'border-transparent text-white/40 hover:bg-white/[0.04] hover:text-white/80'
                             }`}
                     >

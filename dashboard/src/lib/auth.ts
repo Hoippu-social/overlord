@@ -6,6 +6,7 @@ import type { NextRequest } from 'next/server';
 import { resolveAllowedGuildIds } from '@/lib/discordAccess';
 import { BOT_OWNER_ID, MASTER_MODE_COOKIE } from '@/lib/constants';
 import { fetchWithTimeout } from '@/lib/requestTimeout';
+import { createSharedNextAuthCookies, getNextAuthSessionCookieName } from '@/lib/authCookies';
 
 type DiscordToken = JWT & {
     accessToken?: string;
@@ -19,6 +20,7 @@ type DiscordToken = JWT & {
 const DISCORD_AUTH_URL = 'https://discord.com/api/oauth2/authorize';
 const DISCORD_TOKEN_URL = 'https://discord.com/api/oauth2/token';
 const DISCORD_SCOPES = ['identify', 'guilds', 'guilds.members.read', 'applications.commands.permissions.update'];
+const sharedNextAuthCookies = createSharedNextAuthCookies();
 
 async function refreshAccessToken(token: DiscordToken): Promise<DiscordToken> {
     try {
@@ -68,6 +70,7 @@ export const authOptions: NextAuthOptions = {
         strategy: 'jwt'
     },
     secret: process.env.NEXTAUTH_SECRET,
+    ...(sharedNextAuthCookies ? { cookies: sharedNextAuthCookies } : {}),
     pages: {
         signIn: '/login'
     },
@@ -131,7 +134,11 @@ export async function getAuthToken(request: NextRequest) {
         };
     }
 
-    const token = (await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET })) as DiscordToken | null;
+    const token = (await getToken({
+        req: request,
+        secret: process.env.NEXTAUTH_SECRET,
+        cookieName: getNextAuthSessionCookieName(),
+    })) as DiscordToken | null;
     if (!token) {
         return null;
     }

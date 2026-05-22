@@ -27,7 +27,7 @@ if (!globalForStatsAutoSync.__statsAutoSyncState__) {
 }
 
 const getDashboardBaseUrl = () => {
-    const baseUrl = process.env.NEXTAUTH_URL || 'http://127.0.0.1:3001';
+    const baseUrl = process.env.DASHBOARD_INTERNAL_URL || 'http://127.0.0.1:3001';
     return baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
 };
 
