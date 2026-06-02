@@ -12,7 +12,7 @@
     },
     "keywords": [],
     "author": "",
-    "license": "ISC",
+    "license": "AGPL-3.0-or-later",
     "dependencies": {
         "@discord-player/extractor": "^7.1.0",
         "@discordjs/opus": "^0.10.0",
