@@ -206,9 +206,9 @@ function NavBar({
   return (
     <>
       <nav className="fixed inset-x-0 top-0 z-50 px-3 pt-3 sm:px-5 lg:px-8">
-        <div className="mx-auto flex max-w-[1540px] items-center justify-between gap-3 rounded-full border border-divider bg-[rgba(6,6,6,0.72)] px-3 py-2.5 shadow-[0_18px_60px_rgba(0,0,0,0.34)] backdrop-blur-2xl sm:px-4">
+        <div className="mx-auto flex max-w-[1540px] items-center justify-between gap-3 rounded-full border border-divider bg-[rgba(6,6,6,0.72)] px-3 py-2.5 shadow-[0_18px_60px_rgba(14,14,14,0.34)] backdrop-blur-2xl sm:px-4">
           <Link href="#top" className="flex min-w-0 items-center gap-3" onClick={closeMenu}>
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-divider bg-[rgba(255,255,255,0.04)]">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-divider bg-[rgba(244,241,238,0.04)]">
               <Image src="/logos/logo-white.svg" alt="Overlord" width={24} height={24} className="h-6 w-6 opacity-90" priority />
             </span>
             <span className="min-w-0">
@@ -237,7 +237,7 @@ function NavBar({
               type="button"
               aria-label={mobileOpen ? c.nav.close : c.nav.menu}
               onClick={() => setMobileOpen(!mobileOpen)}
-              className="flex h-11 w-11 items-center justify-center rounded-full border border-divider bg-[rgba(255,255,255,0.04)] text-foreground lg:hidden"
+              className="flex h-11 w-11 items-center justify-center rounded-full border border-divider bg-[rgba(244,241,238,0.04)] text-foreground lg:hidden"
             >
               {mobileOpen ? <X size={20} weight="bold" /> : <List size={20} weight="bold" />}
             </button>
@@ -255,7 +255,7 @@ function NavBar({
           >
             <div className="flex items-center justify-between rounded-full border border-divider bg-[rgba(6,6,6,0.82)] px-3 py-2.5">
               <Link href="#top" onClick={closeMenu} className="flex items-center gap-3">
-                <span className="flex h-11 w-11 items-center justify-center rounded-full border border-divider bg-[rgba(255,255,255,0.04)]">
+                <span className="flex h-11 w-11 items-center justify-center rounded-full border border-divider bg-[rgba(244,241,238,0.04)]">
                   <Image src="/logos/logo-white.svg" alt="Overlord" width={24} height={24} className="h-6 w-6 opacity-90" />
                 </span>
                 <span className="font-akony text-[0.88rem] tracking-[0.24em]">OVERLORD</span>
@@ -302,7 +302,7 @@ function LanguageToggle({
   className?: string;
 }) {
   return (
-    <div className={`items-center rounded-full border border-divider bg-[rgba(255,255,255,0.03)] p-1 ${className ?? ""}`}>
+    <div className={`items-center rounded-full border border-divider bg-[rgba(244,241,238,0.03)] p-1 ${className ?? ""}`}>
       <span className="flex h-9 w-9 items-center justify-center text-[var(--text-secondary)]">
         <GlobeHemisphereWest size={15} weight="bold" />
       </span>
@@ -364,7 +364,7 @@ function Hero({ c }: { c: (typeof copy)[Language] }) {
                 {c.hero.primary}
                 <ArrowUpRight size={16} weight="bold" />
               </Link>
-              <Link href="#control" className="inline-flex min-h-14 w-full items-center justify-center rounded-full border border-[rgba(255,255,255,0.14)] bg-[rgba(255,255,255,0.03)] px-5 text-[0.66rem] font-bold uppercase tracking-[0.16em] text-foreground transition-colors hover:border-[rgba(117,241,106,0.38)] hover:text-primary sm:w-auto sm:px-7 sm:text-[0.72rem] sm:tracking-[0.24em]">
+              <Link href="#control" className="inline-flex min-h-14 w-full items-center justify-center rounded-full border border-[rgba(244,241,238,0.14)] bg-[rgba(244,241,238,0.03)] px-5 text-[0.66rem] font-bold uppercase tracking-[0.16em] text-foreground transition-colors hover:border-[rgba(117,241,106,0.38)] hover:text-primary sm:w-auto sm:px-7 sm:text-[0.72rem] sm:tracking-[0.24em]">
                 {c.hero.secondary}
               </Link>
             </div>
@@ -386,8 +386,8 @@ function OpsCanvas({ c }: { c: (typeof copy)[Language] }) {
 
   return (
     <div className="pointer-events-none absolute inset-0">
-      <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.045)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.045)_1px,transparent_1px)] bg-[size:76px_76px] [mask-image:linear-gradient(90deg,transparent,black_18%,black_88%,transparent)]" />
-      <div className="absolute inset-y-24 right-[-8rem] hidden w-[58rem] rotate-[-7deg] rounded-[3rem] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(17,17,17,0.84),rgba(6,6,6,0.92))] shadow-[0_40px_140px_rgba(0,0,0,0.48)] lg:block" />
+      <div className="absolute inset-0 bg-[linear-gradient(rgba(244,241,238,0.045)_1px,transparent_1px),linear-gradient(90deg,rgba(244,241,238,0.045)_1px,transparent_1px)] bg-[size:76px_76px] [mask-image:linear-gradient(90deg,transparent,#0e0e0e_18%,#0e0e0e_88%,transparent)]" />
+      <div className="absolute inset-y-24 right-[-8rem] hidden w-[58rem] rotate-[-7deg] rounded-[3rem] border border-[rgba(244,241,238,0.08)] bg-[linear-gradient(180deg,rgba(17,17,17,0.84),rgba(6,6,6,0.92))] shadow-[0_40px_140px_rgba(14,14,14,0.48)] lg:block" />
       <div className="absolute right-8 top-32 hidden w-[45rem] rotate-[-7deg] lg:block xl:right-20">
         <div className="flex items-center justify-between border-b border-divider pb-5">
           <div className="flex items-center gap-3">
@@ -406,7 +406,7 @@ function OpsCanvas({ c }: { c: (typeof copy)[Language] }) {
 
         <div className="grid grid-cols-3 gap-3 py-5">
           {c.metrics.map((metric) => (
-            <div key={metric.value} className="rounded-[1.3rem] border border-divider bg-[rgba(255,255,255,0.025)] p-4">
+            <div key={metric.value} className="rounded-[1.3rem] border border-divider bg-[rgba(244,241,238,0.025)] p-4">
               <div className="tabular text-2xl font-bold text-primary">{metric.value}</div>
               <div className="mt-3 text-[0.62rem] uppercase leading-[1.55] tracking-[0.18em] text-[var(--text-muted)]">{metric.label}</div>
             </div>
@@ -418,7 +418,7 @@ function OpsCanvas({ c }: { c: (typeof copy)[Language] }) {
             <div className="mb-5 text-[0.62rem] uppercase tracking-[0.26em] text-[var(--text-muted)]">system map</div>
             <div className="space-y-3">
               {["moderation", "analytics", "tickets", "voice"].map((label, index) => (
-                <div key={label} className="flex items-center justify-between gap-3 rounded-2xl border border-divider bg-[rgba(255,255,255,0.025)] px-3 py-3">
+                <div key={label} className="flex items-center justify-between gap-3 rounded-2xl border border-divider bg-[rgba(244,241,238,0.025)] px-3 py-3">
                   <span className="text-[0.68rem] font-bold uppercase tracking-[0.16em] text-foreground">{label}</span>
                   <span className={`h-2 w-8 rounded-full ${index === 2 ? "bg-[var(--color-primary-2)]" : "bg-primary"}`} />
                 </div>
@@ -432,7 +432,7 @@ function OpsCanvas({ c }: { c: (typeof copy)[Language] }) {
             </div>
             <div className="space-y-2">
               {signals.map((signal) => (
-                <div key={signal.name} className="grid grid-cols-[1fr_auto] items-center gap-3 rounded-2xl border border-divider bg-[rgba(255,255,255,0.025)] px-3 py-3">
+                <div key={signal.name} className="grid grid-cols-[1fr_auto] items-center gap-3 rounded-2xl border border-divider bg-[rgba(244,241,238,0.025)] px-3 py-3">
                   <span className="text-sm font-bold uppercase tracking-[0.1em] text-foreground">{signal.name}</span>
                   <span className={signal.tone === "violet" ? "text-[0.62rem] font-bold uppercase tracking-[0.16em] text-[var(--color-primary-2)]" : "text-[0.62rem] font-bold uppercase tracking-[0.16em] text-primary"}>
                     {signal.value}
@@ -450,7 +450,7 @@ function OpsCanvas({ c }: { c: (typeof copy)[Language] }) {
 
 function MobilePosturePanel({ c }: { c: (typeof copy)[Language] }) {
   return (
-    <div className="mt-8 overflow-hidden rounded-[1.75rem] border border-divider bg-[rgba(17,17,17,0.72)] p-4 shadow-[0_24px_70px_rgba(0,0,0,0.32)] backdrop-blur-xl lg:hidden">
+    <div className="mt-8 overflow-hidden rounded-[1.75rem] border border-divider bg-[rgba(17,17,17,0.72)] p-4 shadow-[0_24px_70px_rgba(14,14,14,0.32)] backdrop-blur-xl lg:hidden">
       <div className="flex items-center justify-between gap-4">
         <div className="flex min-w-0 items-center gap-3">
           <Image src="/logos/logo-color.svg" alt="" width={28} height={28} className="h-7 w-7 shrink-0" />
@@ -463,7 +463,7 @@ function MobilePosturePanel({ c }: { c: (typeof copy)[Language] }) {
       </div>
       <div className="mt-4 grid grid-cols-3 gap-2">
         {c.metrics.map((metric) => (
-          <div key={metric.value} className="min-w-0 rounded-2xl border border-divider bg-[rgba(255,255,255,0.025)] p-3">
+          <div key={metric.value} className="min-w-0 rounded-2xl border border-divider bg-[rgba(244,241,238,0.025)] p-3">
             <div className="tabular text-lg font-bold text-primary">{metric.value}</div>
             <div className="mt-2 truncate text-[0.56rem] uppercase tracking-[0.14em] text-[var(--text-muted)]">{metric.label}</div>
           </div>
@@ -516,7 +516,7 @@ function SystemsSection({ c }: { c: (typeof copy)[Language] }) {
             return (
               <Reveal key={item.title} delay={index * 0.08}>
                 <article className="group grid gap-6 border-b border-divider py-9 md:grid-cols-[4.5rem_minmax(0,0.36fr)_minmax(0,0.64fr)] md:py-11">
-                  <div className="flex h-14 w-14 items-center justify-center rounded-[1.25rem] border border-divider bg-[rgba(255,255,255,0.025)] text-primary transition-colors group-hover:border-[rgba(117,241,106,0.28)] group-hover:bg-[rgba(117,241,106,0.08)]">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-[1.25rem] border border-divider bg-[rgba(244,241,238,0.025)] text-primary transition-colors group-hover:border-[rgba(117,241,106,0.28)] group-hover:bg-[rgba(117,241,106,0.08)]">
                     <Icon size={24} weight="bold" />
                   </div>
                   <div>

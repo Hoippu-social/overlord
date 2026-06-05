@@ -13,18 +13,20 @@ const config: Config = {
     theme: {
         extend: {
             colors: {
+                black: "#0e0e0e",
+                white: "#f4f1ee",
                 background: "var(--bg-base)",
                 foreground: "var(--text-primary)",
                 primary: {
                     DEFAULT: "var(--color-primary)",
-                    foreground: "#FFFFFF",
+                    foreground: "#f4f1ee",
                 },
                 success: "var(--color-success)",
                 warning: "var(--color-warning)",
                 danger: "var(--color-destructive)",
                 secondary: {
                     DEFAULT: "#9333ea", // Purple for secondary actions
-                    foreground: "#FFFFFF",
+                    foreground: "#f4f1ee",
                 },
                 surface: {
                     DEFAULT: "var(--surface-card)",
@@ -35,7 +37,13 @@ const config: Config = {
                 content2: "var(--surface-hover)",
             },
             fontFamily: {
-                sans: ["Outfit", "sans-serif"],
+                sans: [
+                    "var(--font-futura)",
+                    "\"Segoe UI Variable Text\"",
+                    "\"Segoe UI\"",
+                    "system-ui",
+                    "sans-serif",
+                ],
             },
             borderRadius: {
                 lg: "24px",

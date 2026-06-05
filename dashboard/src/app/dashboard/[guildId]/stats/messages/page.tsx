@@ -206,7 +206,7 @@ export default function MessagesPage() {
                             <XAxis dataKey="date" stroke="#52525b" fontSize={12} tickLine={false} axisLine={false} dy={10} />
                             <YAxis stroke="#52525b" fontSize={12} tickLine={false} axisLine={false} width={50} tickFormatter={(value) => formatYAxis(value, locale as 'ru' | 'en')} />
                             <RechartsTooltip
-                                cursor={{ stroke: 'rgba(255,255,255,0.1)', strokeWidth: 2 }}
+                                cursor={{ stroke: 'rgba(244,241,238,0.1)', strokeWidth: 2 }}
                                 content={(props) => (
                                     <ChartTooltip
                                         {...props}
@@ -223,7 +223,7 @@ export default function MessagesPage() {
                                 stroke="url(#lineColor)"
                                 strokeWidth={4}
                                 dot={{ fill: '#8B5CF6', strokeWidth: 0, r: 4 }}
-                                activeDot={{ r: 6, stroke: '#fff', strokeWidth: 2 }}
+                                activeDot={{ r: 6, stroke: '#f4f1ee', strokeWidth: 2 }}
                             />
                             <Line
                                 type="monotone"

@@ -46,9 +46,9 @@ export function Navbar({ language, setLanguage, copy }: NavbarProps) {
   return (
     <>
       <nav className="fixed inset-x-0 top-0 z-50 px-3 pt-3 sm:px-5 lg:px-8">
-        <div className="mx-auto flex max-w-[1500px] items-center justify-between gap-3 rounded-full border border-[var(--landing-line)] bg-[rgba(6,6,6,0.78)] px-3 py-2.5 shadow-[0_18px_70px_rgba(0,0,0,0.34)] backdrop-blur-2xl sm:px-4">
+        <div className="mx-auto flex max-w-[1500px] items-center justify-between gap-3 rounded-full border border-[var(--landing-line)] bg-[rgba(6,6,6,0.78)] px-3 py-2.5 shadow-[0_18px_70px_rgba(14,14,14,0.34)] backdrop-blur-2xl sm:px-4">
           <Link href="#top" onClick={closeMenu} className="flex min-w-0 items-center gap-3">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[var(--landing-line)] bg-[rgba(255,255,255,0.03)]">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[var(--landing-line)] bg-[rgba(244,241,238,0.03)]">
               <Image src="/logos/logo-white.svg" alt="Overlord" width={24} height={24} className="h-6 w-6 opacity-90" priority />
             </span>
             <span className="min-w-0">
@@ -70,7 +70,7 @@ export function Navbar({ language, setLanguage, copy }: NavbarProps) {
           </div>
 
           <div className="flex shrink-0 items-center gap-2">
-            <div className="hidden items-center rounded-full border border-[var(--landing-line)] bg-[rgba(255,255,255,0.02)] p-1 lg:flex">
+            <div className="hidden items-center rounded-full border border-[var(--landing-line)] bg-[rgba(244,241,238,0.02)] p-1 lg:flex">
               <span className="flex h-9 w-9 items-center justify-center text-[var(--landing-soft)]">
                 <GlobeHemisphereWest size={15} weight="bold" />
               </span>
@@ -102,7 +102,7 @@ export function Navbar({ language, setLanguage, copy }: NavbarProps) {
               type="button"
               aria-label={mobileMenuOpen ? copy.close : copy.menu}
               onClick={() => setMobileMenuOpen((open) => !open)}
-              className="flex h-11 w-11 items-center justify-center rounded-full border border-[var(--landing-line)] bg-[rgba(255,255,255,0.03)] text-[var(--landing-text)] lg:hidden"
+              className="flex h-11 w-11 items-center justify-center rounded-full border border-[var(--landing-line)] bg-[rgba(244,241,238,0.03)] text-[var(--landing-text)] lg:hidden"
             >
               {mobileMenuOpen ? <X size={20} weight="bold" /> : <List size={20} weight="bold" />}
             </button>
@@ -132,7 +132,7 @@ export function Navbar({ language, setLanguage, copy }: NavbarProps) {
             >
               <div className="flex items-center justify-between rounded-full border border-[var(--landing-line)] bg-[rgba(6,6,6,0.82)] px-3 py-2.5">
                 <Link href="#top" onClick={closeMenu} className="flex items-center gap-3">
-                  <span className="flex h-11 w-11 items-center justify-center rounded-full border border-[var(--landing-line)] bg-[rgba(255,255,255,0.03)]">
+                  <span className="flex h-11 w-11 items-center justify-center rounded-full border border-[var(--landing-line)] bg-[rgba(244,241,238,0.03)]">
                     <Image src="/logos/logo-white.svg" alt="Overlord" width={24} height={24} className="h-6 w-6 opacity-90" />
                   </span>
                   <span>
@@ -141,7 +141,7 @@ export function Navbar({ language, setLanguage, copy }: NavbarProps) {
                   </span>
                 </Link>
 
-                <button type="button" aria-label={copy.close} onClick={closeMenu} className="flex h-11 w-11 items-center justify-center rounded-full border border-[var(--landing-line)] bg-[rgba(255,255,255,0.03)] text-[var(--landing-text)]">
+                <button type="button" aria-label={copy.close} onClick={closeMenu} className="flex h-11 w-11 items-center justify-center rounded-full border border-[var(--landing-line)] bg-[rgba(244,241,238,0.03)] text-[var(--landing-text)]">
                   <X size={20} weight="bold" />
                 </button>
               </div>
@@ -156,7 +156,7 @@ export function Navbar({ language, setLanguage, copy }: NavbarProps) {
                 </div>
 
                 <div className="space-y-5 border-t border-[var(--landing-line)] pt-7">
-                  <div className="flex items-center gap-2 rounded-[1.5rem] border border-[var(--landing-line)] bg-[rgba(255,255,255,0.02)] p-2">
+                  <div className="flex items-center gap-2 rounded-[1.5rem] border border-[var(--landing-line)] bg-[rgba(244,241,238,0.02)] p-2">
                     <span className="flex h-11 w-11 shrink-0 items-center justify-center text-[var(--landing-soft)]">
                       <GlobeHemisphereWest size={16} weight="bold" />
                     </span>

@@ -10,7 +10,7 @@ const normalizeColor = (color: any) => {
     if (typeof color === 'string') {
         return color.startsWith('#') ? color : `#${color}`;
     }
-    return '#000000';
+    return '#0e0e0e';
 };
 
 export async function GET(

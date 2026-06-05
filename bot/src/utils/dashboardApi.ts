@@ -61,6 +61,191 @@ function buildQueueState(player: any) {
     };
 }
 
+function normalizeSearchValue(value: string) {
+    return value
+        .normalize('NFKD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/ё/g, 'е')
+        .replace(/Ё/g, 'е')
+        .replace(/[<@#!>]/g, ' ')
+        .toLowerCase()
+        .replace(/[^a-zа-я0-9]+/giu, ' ')
+        .trim();
+}
+
+function extractSnowflake(value: string) {
+    return value.match(/\d{15,25}/)?.[0] || '';
+}
+
+function levenshtein(left: string, right: string) {
+    if (left === right) return 0;
+    if (!left.length) return right.length;
+    if (!right.length) return left.length;
+
+    const previous = Array.from({ length: right.length + 1 }, (_, index) => index);
+    const current = new Array<number>(right.length + 1);
+
+    for (let i = 1; i <= left.length; i += 1) {
+        current[0] = i;
+        for (let j = 1; j <= right.length; j += 1) {
+            const cost = left[i - 1] === right[j - 1] ? 0 : 1;
+            current[j] = Math.min(
+                current[j - 1] + 1,
+                previous[j] + 1,
+                previous[j - 1] + cost,
+            );
+        }
+
+        for (let j = 0; j <= right.length; j += 1) {
+            previous[j] = current[j];
+        }
+    }
+
+    return previous[right.length];
+}
+
+function scoreSearchCandidate(rawQuery: string, candidate: string) {
+    const query = normalizeSearchValue(rawQuery);
+    const normalized = normalizeSearchValue(candidate);
+    if (!query || !normalized) return 0;
+    if (normalized === query) return 1;
+    if (normalized.startsWith(query)) return 0.94;
+    if (normalized.includes(query)) return 0.88;
+
+    let best = 0;
+    const queryWords = query.split(' ').filter(Boolean);
+    const candidateWords = normalized.split(' ').filter(Boolean);
+    for (const queryWord of queryWords.length ? queryWords : [query]) {
+        for (const candidateWord of candidateWords.length ? candidateWords : [normalized]) {
+            const longest = Math.max(queryWord.length, candidateWord.length);
+            if (!longest) continue;
+            const score = 1 - levenshtein(queryWord, candidateWord) / longest;
+            if (score > best) best = score;
+        }
+    }
+
+    return best * 0.8;
+}
+
+function bestSearchScore(rawQuery: string, candidates: Array<string | null | undefined>) {
+    const queryId = extractSnowflake(rawQuery);
+    let best = 0;
+
+    for (const candidate of candidates) {
+        if (!candidate) continue;
+        if (queryId && candidate === queryId) {
+            return 1.2;
+        }
+        best = Math.max(best, scoreSearchCandidate(rawQuery, candidate));
+    }
+
+    return best;
+}
+
+function serializeSearchMember(member: any) {
+    const user = member.user;
+    const topRole = member.roles.highest.id !== member.guild.id
+        ? member.roles.highest
+        : member.roles.cache
+            .filter((role: any) => role.id !== member.guild.id)
+            .sort((left: any, right: any) => right.position - left.position)
+            .first() ?? null;
+
+    return {
+        id: user.id,
+        name: member.displayName,
+        username: user.username,
+        discriminator: user.discriminator,
+        tag: user.discriminator !== '0' ? `${user.username}#${user.discriminator}` : `@${user.username}`,
+        avatar: member.displayAvatarURL({ size: 64, extension: 'webp' }),
+        globalName: user.globalName || user.username,
+        roleName: topRole?.name ?? null,
+        roleColor: topRole?.color || null,
+    };
+}
+
+function serializeSearchChannel(guild: any, channel: any) {
+    const parent = channel.parentId ? guild.channels.cache.get(channel.parentId) : null;
+    return {
+        id: channel.id,
+        name: channel.name,
+        type: channel.type,
+        categoryName: parent && 'name' in parent ? parent.name : null,
+    };
+}
+
+async function searchGuildMembers(guild: any, rawQuery: string, limit: number) {
+    const matches = new Map<string, { score: number; member: any }>();
+    const queryId = extractSnowflake(rawQuery);
+
+    const addMember = (member: any, score: number) => {
+        if (!member?.user?.id) return;
+        const current = matches.get(member.user.id);
+        if (!current || score > current.score) {
+            matches.set(member.user.id, { score, member });
+        }
+    };
+
+    if (queryId) {
+        const cached = guild.members.cache.get(queryId);
+        if (cached) {
+            addMember(cached, 1.2);
+        } else {
+            const fetched = await guild.members.fetch(queryId).catch(() => null);
+            if (fetched) addMember(fetched, 1.2);
+        }
+    }
+
+    guild.members.cache.forEach((member: any) => {
+        const score = bestSearchScore(rawQuery, [
+            member.id,
+            member.displayName,
+            member.nickname,
+            member.user.username,
+            member.user.globalName,
+            member.user.tag,
+        ]);
+
+        if (score >= 0.44) {
+            addMember(member, score);
+        }
+    });
+
+    if (!queryId && rawQuery.trim().length >= 2) {
+        const searched = await guild.members.search({ query: rawQuery.trim(), limit: Math.max(limit, 10), cache: true }).catch(() => null);
+        searched?.forEach((member: any) => addMember(member, Math.max(0.9, bestSearchScore(rawQuery, [
+            member.displayName,
+            member.user.username,
+            member.user.globalName,
+            member.user.tag,
+        ]))));
+    }
+
+    return Array.from(matches.values())
+        .sort((left, right) => right.score - left.score || left.member.displayName.localeCompare(right.member.displayName))
+        .slice(0, limit)
+        .map(({ member }) => serializeSearchMember(member));
+}
+
+function searchGuildChannels(guild: any, rawQuery: string, limit: number) {
+    return guild.channels.cache
+        .filter((channel: any) => 'name' in channel)
+        .map((channel: any) => {
+            const parent = channel.parentId ? guild.channels.cache.get(channel.parentId) : null;
+            const score = bestSearchScore(rawQuery, [
+                channel.id,
+                channel.name,
+                parent && 'name' in parent ? parent.name : null,
+            ]);
+
+            return { channel, score };
+        })
+        .filter(({ score }: { score: number }) => score >= 0.44)
+        .sort((left: any, right: any) => right.score - left.score || left.channel.position - right.channel.position)
+        .slice(0, limit)
+        .map(({ channel }: { channel: any }) => serializeSearchChannel(guild, channel));
+}
+
 export function startDashboardApi(client: Client): http.Server {
     const server = http.createServer(async (req, res) => {
         try {
@@ -253,10 +438,18 @@ export function startDashboardApi(client: Client): http.Server {
                 const tag = url.searchParams.get('tag') || undefined;
                 const limit = Math.min(Number(url.searchParams.get('limit') || 50), 200);
                 const beforeId = Number(url.searchParams.get('beforeId') || 0);
+                const userId = url.searchParams.get('userId') || undefined;
+                const actorId = url.searchParams.get('actorId') || undefined;
+                const targetId = url.searchParams.get('targetId') || undefined;
+                const channelId = url.searchParams.get('channelId') || undefined;
 
                 const where: any = { guildId };
                 if (tag) where.tag = tag;
                 if (beforeId) where.id = { lt: beforeId };
+                if (userId) where.OR = [{ actorId: userId }, { targetId: userId }];
+                if (actorId) where.actorId = actorId;
+                if (targetId) where.targetId = targetId;
+                if (channelId) where.channelId = channelId;
 
                 const rows = await statsPrisma.auditLogEvent.findMany({
                     where,
@@ -623,7 +816,7 @@ export function startDashboardApi(client: Client): http.Server {
                 return;
             }
 
-            // /api/search — search guild members by nickname, username or tag
+            // /api/search — search guild members/channels by id, nickname, username, global name, tag, or channel name.
             if (url.pathname === '/api/search') {
                 if (req.method !== 'GET') {
                     res.writeHead(405);
@@ -632,8 +825,9 @@ export function startDashboardApi(client: Client): http.Server {
                 }
 
                 const guildId = url.searchParams.get('guildId') || '';
-                const query = (url.searchParams.get('q') || '').toLowerCase().trim();
-                const type = url.searchParams.get('type') || 'users'; // users | channels
+                const query = (url.searchParams.get('q') || '').trim();
+                const type = url.searchParams.get('type') || 'users'; // users | channels | all
+                const limit = Math.min(Math.max(Number(url.searchParams.get('limit') || 25) || 25, 1), 50);
 
                 if (!guildId || !query) {
                     res.writeHead(400);
@@ -649,42 +843,29 @@ export function startDashboardApi(client: Client): http.Server {
                 }
 
                 if (type === 'users') {
-                    // Search in cache first
-                    const results = guild.members.cache
-                        .filter(m => {
-                            const nick = m.displayName.toLowerCase();
-                            const username = m.user.username.toLowerCase();
-                            const tag = m.user.tag.toLowerCase();
-                            return nick.includes(query) || username.includes(query) || tag.includes(query);
-                        })
-                        .map(m => ({
-                            id: m.user.id,
-                            name: m.displayName,
-                            username: m.user.username,
-                            tag: m.user.discriminator !== '0'
-                                ? `${m.user.username}#${m.user.discriminator}`
-                                : `@${m.user.username}`,
-                            avatar: m.displayAvatarURL({ size: 64, extension: 'webp' }),
-                        }))
-                        .slice(0, 25);
+                    const results = await searchGuildMembers(guild, query, limit);
 
                     res.writeHead(200, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ ok: true, results: Array.from(results.values()) }));
+                    res.end(JSON.stringify({ ok: true, results }));
                     return;
                 }
 
                 if (type === 'channels') {
-                    const results = guild.channels.cache
-                        .filter(c => 'name' in c && c.name!.toLowerCase().includes(query))
-                        .map(c => ({
-                            id: c.id,
-                            name: (c as any).name,
-                            type: c.type,
-                        }))
-                        .slice(0, 25);
+                    const results = searchGuildChannels(guild, query, limit);
 
                     res.writeHead(200, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ ok: true, results: Array.from(results.values()) }));
+                    res.end(JSON.stringify({ ok: true, results }));
+                    return;
+                }
+
+                if (type === 'all') {
+                    const [users, channels] = await Promise.all([
+                        searchGuildMembers(guild, query, limit),
+                        Promise.resolve(searchGuildChannels(guild, query, limit)),
+                    ]);
+
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ ok: true, users, channels }));
                     return;
                 }
 

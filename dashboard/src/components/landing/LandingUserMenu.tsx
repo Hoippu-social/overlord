@@ -121,9 +121,9 @@ export function LandingUserMenu({ language, children, className = "", variant = 
 
   if (checking) {
     return variant === "mobile" ? (
-      <div className="h-12 w-full rounded-full border border-[var(--landing-line)] bg-[rgba(255,255,255,0.03)]" />
+      <div className="h-12 w-full rounded-full border border-[var(--landing-line)] bg-[rgba(244,241,238,0.03)]" />
     ) : (
-      <div className={`${className} h-11 w-11 rounded-full border border-[var(--landing-line)] bg-[rgba(255,255,255,0.06)]`} />
+      <div className={`${className} h-11 w-11 rounded-full border border-[var(--landing-line)] bg-[rgba(244,241,238,0.06)]`} />
     );
   }
 
@@ -136,7 +136,7 @@ export function LandingUserMenu({ language, children, className = "", variant = 
       src={user.image}
       name={getInitials(user.name)}
       showFallback
-      className="h-full w-full rounded-full border border-[rgba(255,255,255,0.18)] bg-[var(--surface-hover)] text-[0.72rem] font-bold text-white"
+      className="h-full w-full rounded-full border border-[rgba(244,241,238,0.18)] bg-[var(--surface-hover)] text-[0.72rem] font-bold text-white"
       imgProps={{ referrerPolicy: "no-referrer" }}
     />
   );
@@ -161,7 +161,7 @@ export function LandingUserMenu({ language, children, className = "", variant = 
 
   if (variant === "mobile") {
     return (
-      <div className="rounded-[0.9rem] border border-[var(--landing-line)] bg-[rgba(17,17,17,0.94)] shadow-[0_24px_70px_rgba(0,0,0,0.28)]">
+      <div className="rounded-[0.9rem] border border-[var(--landing-line)] bg-[rgba(17,17,17,0.94)] shadow-[0_24px_70px_rgba(14,14,14,0.28)]">
         <div className="flex items-center gap-3 border-b border-[var(--landing-line)] p-3">
           <div className="h-10 w-10 shrink-0 rounded-full">{avatar}</div>
           <div className="min-w-0">
@@ -180,12 +180,12 @@ export function LandingUserMenu({ language, children, className = "", variant = 
         <button
           type="button"
           aria-label={text.avatar}
-          className={`${className} h-11 w-11 items-center justify-center rounded-full border border-[var(--landing-line)] bg-[rgba(255,255,255,0.04)] p-[3px] shadow-[0_14px_34px_rgba(0,0,0,0.28)] transition-transform hover:-translate-y-0.5 hover:border-[rgba(117,241,106,0.28)]`}
+          className={`${className} h-11 w-11 items-center justify-center rounded-full border border-[var(--landing-line)] bg-[rgba(244,241,238,0.04)] p-[3px] shadow-[0_14px_34px_rgba(14,14,14,0.28)] transition-transform hover:-translate-y-0.5 hover:border-[rgba(117,241,106,0.28)]`}
         >
           {avatar}
         </button>
       </PopoverTrigger>
-      <PopoverContent className="w-[230px] rounded-[10px] border border-[var(--landing-line)] bg-[rgba(18,18,18,0.98)] p-0 shadow-[0_24px_70px_rgba(0,0,0,0.44)] backdrop-blur-xl">
+      <PopoverContent className="w-[230px] rounded-[10px] border border-[var(--landing-line)] bg-[rgba(18,18,18,0.98)] p-0 shadow-[0_24px_70px_rgba(14,14,14,0.44)] backdrop-blur-xl">
         {items}
       </PopoverContent>
     </Popover>

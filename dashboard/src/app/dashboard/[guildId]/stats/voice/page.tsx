@@ -251,7 +251,7 @@ export default function VoicePage() {
                                 strokeWidth={4}
                                 fillOpacity={1}
                                 fill="url(#voiceColor)"
-                                activeDot={{ r: 6, stroke: '#fff', strokeWidth: 2 }}
+                                activeDot={{ r: 6, stroke: '#f4f1ee', strokeWidth: 2 }}
                             />
                             <Line
                                 type="monotone"

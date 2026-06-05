@@ -9,9 +9,22 @@ type SegmentedTabsProps = {
     tabs: readonly string[];
     icons?: Record<string, React.ReactNode>;
     className?: string;
+    density?: 'default' | 'compact';
 };
 
-export function SegmentedTabs({ active, onChange, labels, tabs, icons, className = '' }: SegmentedTabsProps) {
+export function SegmentedTabs({ active, onChange, labels, tabs, icons, className = '', density = 'default' }: SegmentedTabsProps) {
+    const activeButtonRef = React.useRef<HTMLButtonElement | null>(null);
+    const buttonSizing = density === 'compact'
+        ? 'min-w-[4.75rem] px-2 text-[12px] sm:min-w-[7rem] sm:px-3 sm:text-[13px] md:min-w-[7rem] md:flex-1 lg:min-w-0'
+        : 'min-w-[7.25rem] px-3 text-[13px] sm:min-w-[8.5rem] sm:px-4 sm:text-sm md:min-w-[7rem] md:flex-1 lg:min-w-0';
+
+    React.useEffect(() => {
+        activeButtonRef.current?.scrollIntoView({
+            block: 'nearest',
+            inline: 'nearest',
+        });
+    }, [active]);
+
     return (
         <div className={`no-scrollbar flex w-full min-w-0 flex-nowrap items-stretch gap-1 overflow-x-auto rounded-[20px] border border-divider bg-surface p-1.5 shadow-sm shadow-black/20 md:flex-wrap md:overflow-visible ${className}`}>
             {tabs.map((tab) => {
@@ -20,11 +33,12 @@ export function SegmentedTabs({ active, onChange, labels, tabs, icons, className
                 return (
                     <button
                         key={tab}
+                        ref={isActive ? activeButtonRef : null}
                         type="button"
                         title={labels[tab]}
                         aria-pressed={isActive}
                         onClick={() => onChange(tab)}
-                        className={`flex h-10 min-h-10 min-w-[7.25rem] flex-none items-center justify-center gap-2 rounded-xl border px-3 text-[13px] font-bold leading-tight transition-all sm:min-w-[8.5rem] sm:px-4 sm:text-sm md:min-w-[7rem] md:flex-1 lg:min-w-0 ${isActive
+                        className={`flex h-10 min-h-10 flex-none items-center justify-center gap-2 rounded-xl border font-bold leading-tight transition-all ${buttonSizing} ${isActive
                             ? 'border-[var(--border-focus)] bg-primary/10 text-white shadow-[0_0_18px_rgba(117,241,106,0.14)]'
                             : 'border-transparent text-white/40 hover:bg-white/[0.04] hover:text-white/80'
                             }`}

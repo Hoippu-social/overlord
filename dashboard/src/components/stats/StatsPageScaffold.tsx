@@ -38,7 +38,7 @@ export function StatsPageHeader({ title, subtitle, icon, className = '', iconCla
                 {icon}
             </div>
             <div className="min-w-0 flex-1">
-                <h1 className="truncate text-2xl font-black leading-none tracking-normal text-foreground sm:text-3xl">
+                <h1 className="dashboard-title-clamp-2 text-2xl font-black leading-tight tracking-normal text-foreground sm:text-3xl">
                     {title}
                 </h1>
                 {subtitle ? (

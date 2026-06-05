@@ -341,7 +341,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         const roles = parseGuildPayload(guild?.roles ?? null).map((role) => ({
             id: String(role.id ?? ''),
             name: String(role.name ?? 'Unknown role'),
-            color: role.color ?? '#000000',
+            color: role.color ?? '#0e0e0e',
             position: Number(role.position ?? 0),
         }));
 

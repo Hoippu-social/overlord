@@ -200,7 +200,7 @@ export default function StatsOverview() {
                                 }}
                             />
                             <Tooltip 
-                                cursor={{ stroke: 'rgba(255,255,255,0.1)', strokeWidth: 2 }}
+                                cursor={{ stroke: 'rgba(244,241,238,0.1)', strokeWidth: 2 }}
                                 content={(props: any) => (
                                     <ChartTooltip
                                         {...props}
