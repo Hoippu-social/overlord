@@ -280,7 +280,7 @@ export const StatsTopWidget: React.FC<StatsTopWidgetProps> = ({
                                                     fill={entry.color || COLORS[0]}
                                                     stroke="none"
                                                     style={{
-                                                        filter: activeIndex === index ? 'drop-shadow(0 0 10px rgba(255,255,255,0.4))' : 'none',
+                                                        filter: activeIndex === index ? 'drop-shadow(0 0 10px rgba(244,241,238,0.4))' : 'none',
                                                         transform: activeIndex === index ? 'scale(1.02)' : 'scale(1)',
                                                         transformOrigin: 'center center',
                                                         transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
@@ -310,7 +310,7 @@ export const StatsTopWidget: React.FC<StatsTopWidgetProps> = ({
                                             onClick={() => toggleSegment(item.id)}
                                         >
                                             <div
-                                                className="w-3 h-3 rounded-full flex-shrink-0 shadow-[0_0_8px_rgba(0,0,0,0.5)]"
+                                                className="w-3 h-3 rounded-full flex-shrink-0 shadow-[0_0_8px_rgba(14,14,14,0.5)]"
                                                 style={{ backgroundColor: item.color }}
                                             />
                                             <span className={`text-xs truncate flex-1 font-medium ${item.id === 'others' ? 'italic text-default-400' : 'text-default-300'}`}>

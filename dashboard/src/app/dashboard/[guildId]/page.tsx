@@ -10,6 +10,8 @@ import {
 import { useGuildLocale } from '@/lib/i18n';
 import { DashboardAudioPlayer } from '@/components/music/DashboardAudioPlayer';
 import { fetchWithTimeout, withTimeout } from '@/lib/requestTimeout';
+import { FitSingleLineText } from '@/components/common/FitSingleLineText';
+import { hyphenateServerName } from '@/lib/textHyphenation';
 
 /* ─── Types ─────────────────────────────────────────────────────── */
 interface GuildSummary {
@@ -238,9 +240,18 @@ function HealthRow({ label, value, status = 'neutral' }: { label: string, value:
 
 function SectionHeader({ title, icon: Icon }: { title: string, icon: any }) {
     return (
-        <div className="flex items-center gap-2 mb-4">
-            <Icon size={16} className="text-[var(--text-muted)]" />
-            <h2 className="text-xs font-akony tracking-widest uppercase text-[var(--text-muted)]">{title}</h2>
+        <div className="flex min-w-0 items-center gap-2 mb-4">
+            <Icon size={16} className="shrink-0 text-[var(--text-muted)]" />
+            <h2 className="min-w-0 max-w-full flex-1 overflow-hidden text-[var(--text-muted)]">
+                <FitSingleLineText
+                    className="font-akony uppercase tracking-widest"
+                    minFontSize={7}
+                    maxFontSize={12}
+                    mobileOnly
+                >
+                    {title}
+                </FitSingleLineText>
+            </h2>
         </div>
     );
 }
@@ -400,34 +411,34 @@ export default function HubPage({ params }: { params: Promise<{ guildId: string 
     return (
         <div className="animate-fade-in pb-12 w-full">
             {/* 110% Scale wrapper for better visibility on large monitors */}
-            <div style={{ zoom: 1.1 }} className="origin-top-left">
-                <div className="flex flex-col gap-8">
+            <div className="dashboard-hub-scale origin-top-left">
+                <div className="flex min-w-0 flex-col gap-8">
 
                     {/* ─── HEADER ROW (Green Block) ─── */}
                     <div className="flex flex-col min-w-0">
-                        <div className="bg-[var(--surface-card)] rounded-[24px] border border-[var(--border-subtle)] px-8 py-5 flex flex-col md:flex-row items-center justify-between gap-6">
-                            <div className="flex items-center gap-4">
+                        <div className="bg-[var(--surface-card)] rounded-[24px] border border-[var(--border-subtle)] px-5 py-5 sm:px-8 flex flex-col md:flex-row items-center justify-between gap-6 min-w-0">
+                            <div className="flex w-full min-w-0 items-center gap-4 md:w-auto">
                                 {guild?.guild.icon ? (
                                     <img
                                         src={`https://cdn.discordapp.com/icons/${guildId}/${guild.guild.icon}.png?size=128`}
                                         alt="Server Icon"
-                                        className="w-14 h-14 rounded-[14px] object-cover border border-[var(--border-divider)]"
+                                        className="w-14 h-14 shrink-0 rounded-[14px] object-cover border border-[var(--border-divider)]"
                                     />
                                 ) : (
-                                    <div className="w-14 h-14 rounded-[14px] bg-[var(--surface-hover)] border border-[var(--border-divider)] flex items-center justify-center">
+                                    <div className="w-14 h-14 shrink-0 rounded-[14px] bg-[var(--surface-hover)] border border-[var(--border-divider)] flex items-center justify-center">
                                         <span className="text-[var(--text-muted)] font-akony text-2xl">{guild?.guild.name?.charAt(0) ?? '?'}</span>
                                     </div>
                                 )}
-                                <div>
-                                    <h1 className="text-xl font-bold text-white truncate max-w-[300px] leading-tight">{guild?.guild.name}</h1>
-                                    <div className="flex items-center gap-2 mt-1">
+                                <div className="min-w-0 flex-1">
+                                    <h1 className="dashboard-title-clamp-2 dashboard-title-hyphenate-2 max-w-full text-[clamp(1rem,5.4vw,1.25rem)] font-bold leading-tight text-white">{hyphenateServerName(guild?.guild.name)}</h1>
+                                    <div className="flex min-w-0 items-center gap-2 mt-1">
                                         <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-[var(--surface-hover)] border border-[var(--border-divider)]">
                                             <div className="w-1.5 h-1.5 rounded-full bg-[var(--color-primary-1)] animate-pulse shadow-[0_0_10px_rgba(117,241,106,0.4)]"></div>
                                             <span className="text-[10px] tabular-nums font-bold text-[var(--color-primary-1)]">
                                                 {guild?.counts.onlineMembers || 0}
                                             </span>
                                         </div>
-                                        <span className="text-xs text-[var(--text-muted)] font-medium">/ {guild?.counts.members || 0} {t.members.toLowerCase()}</span>
+                                        <span className="min-w-0 truncate text-xs text-[var(--text-muted)] font-medium">/ {guild?.counts.members || 0} {t.members.toLowerCase()}</span>
                                     </div>
                                 </div>
                             </div>

@@ -58,9 +58,9 @@ export default function LoginPage() {
   return (
     <div className="landing-shell min-h-screen text-[var(--landing-text)]">
       <div className="mx-auto flex min-h-screen max-w-[1480px] flex-col px-4 pt-3 sm:px-6 sm:pt-4 lg:px-10">
-        <header className="relative z-10 flex items-center justify-between gap-4 rounded-full border border-[var(--landing-line)] bg-[rgba(8,10,13,0.82)] px-4 py-3 shadow-[0_24px_80px_rgba(0,0,0,0.24)] backdrop-blur-xl sm:px-6">
+        <header className="relative z-10 flex items-center justify-between gap-4 rounded-full border border-[var(--landing-line)] bg-[rgba(8,10,13,0.82)] px-4 py-3 shadow-[0_24px_80px_rgba(14,14,14,0.24)] backdrop-blur-xl sm:px-6">
           <Link href="/" className="flex min-w-0 items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-full border border-[var(--landing-line)] bg-[rgba(255,255,255,0.03)]">
+            <div className="flex h-11 w-11 items-center justify-center rounded-full border border-[var(--landing-line)] bg-[rgba(244,241,238,0.03)]">
               <Image src="/logos/logo-white.svg" alt="Overlord" width={24} height={24} className="h-6 w-6 opacity-90" priority />
             </div>
             <div className="min-w-0">

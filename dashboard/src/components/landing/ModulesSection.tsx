@@ -45,7 +45,7 @@ export function ModulesSection({ copy }: ModulesSectionProps) {
                 className="group grid min-w-0 gap-5 border-b border-[var(--landing-line)] py-8 md:grid-cols-[86px_minmax(220px,0.45fr)_minmax(0,0.55fr)] md:gap-7 md:py-10"
               >
                 <div className="flex items-start gap-4 md:block">
-                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[1.25rem] border border-[var(--landing-line)] bg-[rgba(255,255,255,0.025)] text-[var(--landing-accent)] transition-colors group-hover:border-[rgba(117,241,106,0.28)] group-hover:bg-[rgba(117,241,106,0.08)]">
+                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[1.25rem] border border-[var(--landing-line)] bg-[rgba(244,241,238,0.025)] text-[var(--landing-accent)] transition-colors group-hover:border-[rgba(117,241,106,0.28)] group-hover:bg-[rgba(117,241,106,0.08)]">
                     <Icon size={24} weight="bold" />
                   </div>
                   <div className="tabular pt-1 text-[1.15rem] font-bold uppercase tracking-[0.18em] text-[var(--landing-accent-strong)] md:mt-6 md:pt-0">{item.id}</div>

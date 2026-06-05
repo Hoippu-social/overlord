@@ -266,7 +266,7 @@ export function CommandOverridesPanel({
                     const sliderValue = typeof rule.requiredAccessLevel === 'number' ? rule.requiredAccessLevel : 0;
 
                     return (
-                        <div key={command.commandKey} className={`rounded-[26px] border bg-[linear-gradient(90deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01))] px-5 py-4 shadow-inner transition-all duration-300 ${rule.enabled ? 'border-[#7AAA7A] bg-black/30 shadow-[0_0_22px_rgba(122,170,122,0.12)]' : 'border-white/8 bg-black/18 hover:border-white/12 hover:bg-black/24'}`}>
+                        <div key={command.commandKey} className={`rounded-[26px] border bg-[linear-gradient(90deg,rgba(244,241,238,0.02),rgba(244,241,238,0.01))] px-5 py-4 shadow-inner transition-all duration-300 ${rule.enabled ? 'border-[#7AAA7A] bg-black/30 shadow-[0_0_22px_rgba(122,170,122,0.12)]' : 'border-white/8 bg-black/18 hover:border-white/12 hover:bg-black/24'}`}>
                             <div className="flex items-center gap-4">
                                 <div className="flex w-[42px] shrink-0 justify-start pl-1">
                                     <button

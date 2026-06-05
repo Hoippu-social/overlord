@@ -412,7 +412,7 @@ export function AccessControlTab({ config, setConfig, locale, tr }: AccessContro
                 placement="center"
                 classNames={{
                     base: "bg-[#111111] border border-[var(--border-subtle)] shadow-2xl rounded-[28px] overflow-hidden m-4",
-                    backdrop: "bg-[#000]/60 backdrop-blur-sm",
+                    backdrop: "bg-[#0e0e0e]/60 backdrop-blur-sm",
                     header: "border-b border-[var(--border-divider)]",
                     body: "py-5",
                     footer: "border-t border-[var(--border-divider)]",
@@ -477,7 +477,7 @@ export function AccessControlTab({ config, setConfig, locale, tr }: AccessContro
                                             key={color}
                                             type="button"
                                             onClick={() => setNewPresetColor(color)}
-                                            className={`h-8 rounded-lg border transition-all ${newPresetColor.toUpperCase() === color.toUpperCase() ? 'border-white shadow-[0_0_0_1px_rgba(255,255,255,0.5)]' : 'border-white/10 hover:border-white/30'}`}
+                                            className={`h-8 rounded-lg border transition-all ${newPresetColor.toUpperCase() === color.toUpperCase() ? 'border-white shadow-[0_0_0_1px_rgba(244,241,238,0.5)]' : 'border-white/10 hover:border-white/30'}`}
                                             style={{ backgroundColor: color }}
                                             aria-label={`${tr('Выбрать цвет', 'Select color')} ${color}`}
                                         />

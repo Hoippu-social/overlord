@@ -145,7 +145,7 @@ export default function MembersPage() {
                                     : ['auto', 'auto']}
                             />
                             <RechartsTooltip
-                                cursor={{ stroke: 'rgba(255,255,255,0.1)', strokeWidth: 2 }}
+                                cursor={{ stroke: 'rgba(244,241,238,0.1)', strokeWidth: 2 }}
                                 content={(props: any) => (
                                     <ChartTooltip
                                         {...props}
@@ -162,7 +162,7 @@ export default function MembersPage() {
                                 strokeWidth={4}
                                 fillOpacity={1}
                                 fill="url(#growthColor)"
-                                activeDot={{ r: 6, stroke: '#fff', strokeWidth: 2 }}
+                                activeDot={{ r: 6, stroke: '#f4f1ee', strokeWidth: 2 }}
                             />
                         </AreaChart>
                     </ResponsiveContainer>
@@ -175,7 +175,7 @@ export default function MembersPage() {
                             <XAxis dataKey="date" stroke="#52525b" fontSize={12} tickLine={false} axisLine={false} dy={10} />
                             <YAxis stroke="#52525b" fontSize={12} tickLine={false} axisLine={false} width={50} tickFormatter={(v) => formatYAxis(v, locale as 'ru' | 'en')} />
                             <RechartsTooltip
-                                cursor={{ fill: 'rgba(255,255,255,0.05)' }}
+                                cursor={{ fill: 'rgba(244,241,238,0.05)' }}
                                 content={(props: any) => (
                                     <ChartTooltip
                                         {...props}

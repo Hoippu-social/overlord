@@ -191,7 +191,7 @@ const SwitchToggle = ({ isSelected, onValueChange, disabled, color = 'blue' }: {
             onClick={() => onValueChange(!isSelected)}
             className={`w-12 h-6 rounded-full transition-colors relative flex items-center px-1 border border-[var(--border-subtle)] focus:outline-none focus:ring-2 focus:ring-[#3b82f6]/50 shrink-0 ${isSelected ? bgColor : 'bg-[var(--surface-hover)]'} ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
         >
-            <div className={`w-4 h-4 rounded-full bg-white transition-transform flex-shrink-0 ${isSelected ? 'translate-x-[22px] shadow-[0_0_10px_rgba(255,255,255,0.5)]' : 'translate-x-0'}`} />
+            <div className={`w-4 h-4 rounded-full bg-white transition-transform flex-shrink-0 ${isSelected ? 'translate-x-[22px] shadow-[0_0_10px_rgba(244,241,238,0.5)]' : 'translate-x-0'}`} />
         </button>
     );
 };

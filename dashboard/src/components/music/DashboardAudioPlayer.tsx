@@ -195,25 +195,25 @@ export function DashboardAudioPlayer({ guildId }: { guildId: string }) {
     const VolumeIcon = localVolume === 0 ? SpeakerNone : localVolume < 50 ? SpeakerLow : SpeakerHigh;
 
     return (
-        <div className="bg-[var(--surface-card)] rounded-[24px] border border-[var(--border-subtle)] flex flex-col relative overflow-hidden group min-h-[160px] shadow-sm">
+        <div className="bg-[var(--surface-card)] rounded-[24px] border border-[var(--border-subtle)] flex w-full min-w-0 flex-col relative overflow-hidden group min-h-[160px] shadow-sm">
             {/* Background Glow */}
             <div className={`absolute -top-12 -right-12 w-32 h-32 ${currentTrack && !queueState.paused ? 'bg-[var(--color-primary-1)]/20 animate-pulse' : 'bg-[var(--color-primary-1)]/10'} rounded-full blur-3xl transition-colors pointer-events-none`}></div>
 
-            <div className="p-6 flex flex-col z-10 gap-4">
-                <div className="flex items-start justify-between gap-4">
-                    <div className="flex items-center gap-4 min-w-0">
+            <div className="p-5 sm:p-6 flex min-w-0 flex-col z-10 gap-4">
+                <div className="flex min-w-0 items-start justify-between gap-3 sm:gap-4">
+                    <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-4">
                         {currentTrack?.artworkUrl ? (
-                            <img src={currentTrack.artworkUrl} alt={currentTrack.title} className="w-16 h-16 rounded-[14px] object-cover ring-1 ring-[var(--border-divider)] shadow-sm" />
+                            <img src={currentTrack.artworkUrl} alt={currentTrack.title} className="w-14 h-14 shrink-0 rounded-[14px] object-cover ring-1 ring-[var(--border-divider)] shadow-sm sm:w-16 sm:h-16" />
                         ) : (
-                            <div className="w-16 h-16 rounded-[14px] bg-[var(--surface-hover)] border border-[var(--border-divider)] flex items-center justify-center shrink-0 shadow-sm text-[var(--text-muted)]">
+                            <div className="w-14 h-14 rounded-[14px] bg-[var(--surface-hover)] border border-[var(--border-divider)] flex items-center justify-center shrink-0 shadow-sm text-[var(--text-muted)] sm:w-16 sm:h-16">
                                 <MusicNotesSimple size={28} weight="duotone" />
                             </div>
                         )}
-                        <div className="min-w-0 flex flex-col">
-                            <h3 className="text-base font-bold text-white leading-tight truncate">
+                        <div className="min-w-0 flex-1 flex flex-col">
+                            <h3 className="dashboard-title-clamp-2 max-w-full text-[clamp(0.9rem,4.5vw,1rem)] font-bold leading-tight text-white">
                                 {currentTrack ? currentTrack.title : 'Not Playing'}
                             </h3>
-                            <p className="text-xs text-[var(--text-muted)] mt-1 truncate">
+                            <p className="max-w-full truncate text-xs text-[var(--text-muted)] mt-1">
                                 {currentTrack ? (currentTrack.author || 'Unknown Artist') : 'Queue is empty'}
                             </p>
                             {currentTrack && (
@@ -227,7 +227,7 @@ export function DashboardAudioPlayer({ guildId }: { guildId: string }) {
 
                     <button
                         onClick={() => setShowQueue(!showQueue)}
-                        className={`p-2 rounded-xl border transition-colors ${showQueue ? 'bg-[var(--surface-hover)] border-[var(--border-divider)] text-white' : 'border-transparent text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-white'}`}
+                        className={`shrink-0 p-2 rounded-xl border transition-colors ${showQueue ? 'bg-[var(--surface-hover)] border-[var(--border-divider)] text-white' : 'border-transparent text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-white'}`}
                         title="Toggle Queue"
                     >
                         <List size={22} weight="duotone" />
@@ -274,19 +274,19 @@ export function DashboardAudioPlayer({ guildId }: { guildId: string }) {
                     </div>
 
                     {/* Controls Row */}
-                    <div className="flex items-center justify-between">
+                    <div className="flex min-w-0 items-center justify-between gap-2">
                         {/* Empty spacer for flex alignment */}
                         <div className="hidden sm:flex items-center gap-2 w-28"></div>
 
                         {/* Main Buttons */}
-                        <div className="flex items-center justify-center gap-4 pr-12 sm:pr-0">
+                        <div className="flex min-w-0 items-center justify-center gap-2 pr-0 sm:gap-4">
                             <button className="p-2 text-[var(--text-secondary)] hover:text-white transition-colors disabled:opacity-30 disabled:hover:text-[var(--text-secondary)]" disabled={!currentTrack}>
                                 <SkipBack size={20} weight="fill" />
                             </button>
                             <button
                                 onClick={handlePlayPause}
                                 disabled={!currentTrack}
-                                className="w-12 h-12 rounded-full bg-white text-black flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-[0_0_20px_rgba(255,255,255,0.1)] hover:shadow-[0_0_20px_rgba(255,255,255,0.3)] disabled:opacity-50 disabled:hover:scale-100"
+                                className="w-12 h-12 rounded-full bg-white text-black flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-[0_0_20px_rgba(244,241,238,0.1)] hover:shadow-[0_0_20px_rgba(244,241,238,0.3)] disabled:opacity-50 disabled:hover:scale-100"
                             >
                                 {queueState.paused ? <Play size={22} weight="fill" className="ml-1" /> : <Pause size={22} weight="fill" />}
                             </button>
@@ -300,7 +300,7 @@ export function DashboardAudioPlayer({ guildId }: { guildId: string }) {
                         </div>
 
                         {/* Volume Control */}
-                        <div className="flex items-center gap-2 w-28 group/vol relative">
+                        <div className="flex items-center gap-2 w-20 shrink-0 group/vol relative sm:w-28">
                             <VolumeIcon size={18} className="text-[var(--text-secondary)] shrink-0" weight="duotone" />
                             <div className="relative flex-1 h-3 flex items-center">
                                 <input

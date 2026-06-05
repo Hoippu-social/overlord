@@ -18,7 +18,7 @@ interface AppealsTabProps {
 
 function SummaryCard({ title, value, tone, icon }: { title: string; value: number; tone: string; icon: React.ReactNode }) {
     return (
-        <div className="rounded-[24px] border border-white/10 bg-white/[0.03] p-5 shadow-[0_12px_40px_rgba(0,0,0,0.25)]">
+        <div className="rounded-[24px] border border-white/10 bg-white/[0.03] p-5 shadow-[0_12px_40px_rgba(14,14,14,0.25)]">
             <div className="mb-4 flex items-center justify-between">
                 <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-white/40">{title}</span>
                 <span className={tone}>{icon}</span>

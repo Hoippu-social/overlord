@@ -47,7 +47,7 @@ export const SectionBlock: React.FC<SectionBlockProps> = ({
 
                 <div className="flex-1 min-w-0 flex flex-col justify-center">
                     <div className="flex items-center gap-2 flex-wrap mb-0.5">
-                        <h2 className="text-base font-bold text-[#e5e5e5] leading-tight">{title}</h2>
+                        <h2 className="dashboard-title-clamp-2 text-base font-bold text-[#e5e5e5] leading-tight">{title}</h2>
                         {badge}
                     </div>
                     {description && (

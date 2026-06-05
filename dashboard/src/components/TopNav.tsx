@@ -2,10 +2,12 @@
 
 import React, { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
-import { Bell, MagnifyingGlass, Question } from '@phosphor-icons/react';
+import { Bell, Question } from '@phosphor-icons/react';
 import { useGuildLocale } from '@/lib/i18n';
 import { Avatar, Button } from '@nextui-org/react';
 import { useSession } from 'next-auth/react';
+import { DashboardSearch } from '@/components/common/DashboardSearch';
+import { FitSingleLineText } from '@/components/common/FitSingleLineText';
 
 interface TopNavProps {
     guildId: string;
@@ -112,22 +114,22 @@ export const TopNav: React.FC<TopNavProps> = ({ guildId }) => {
     if (pathname.includes('/audit')) pageTitle = text.audit;
 
     return (
-        <header className="relative z-10 mt-16 flex min-h-[5.5rem] w-full flex-shrink-0 items-center justify-between gap-4 px-4 py-3 md:mt-0 md:h-24 md:px-8 md:py-0">
+        <header className="relative z-30 mt-16 flex min-h-[5.5rem] w-full flex-shrink-0 items-center justify-between gap-4 px-4 py-3 md:mt-0 md:h-24 md:px-8 md:py-0">
             <div className="min-w-0 flex-1">
-                <h1 className="max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-[clamp(1.55rem,7.2vw,2.35rem)] font-akony leading-none tracking-tight text-[var(--text-primary)] drop-shadow-sm md:text-3xl">
-                    {pageTitle}
+                <h1 className="max-w-full overflow-hidden whitespace-nowrap text-[var(--text-primary)] drop-shadow-sm">
+                    <FitSingleLineText
+                        className="font-akony leading-none tracking-tight"
+                        minFontSize={15}
+                        maxFontSize={38}
+                        mobileOnly
+                    >
+                        {pageTitle}
+                    </FitSingleLineText>
                 </h1>
             </div>
 
             <div className="flex flex-shrink-0 items-center gap-3 md:gap-4">
-                <div className="hidden h-11 w-72 items-center rounded-full border border-[var(--border-divider)] bg-[var(--surface-card)] px-4 shadow-inner transition-colors focus-within:border-[var(--color-primary-1)]/50 lg:flex">
-                    <MagnifyingGlass size={18} className="text-[var(--text-muted)]" />
-                    <input
-                        type="text"
-                        placeholder={text.search}
-                        className="w-full border-none bg-transparent px-3 text-sm font-medium text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)]"
-                    />
-                </div>
+                <DashboardSearch guildId={guildId} locale={locale} sessionUserId={sessionUserId} />
 
                 <div className="mx-1 hidden h-6 w-px bg-[var(--border-subtle)] sm:block" />
 

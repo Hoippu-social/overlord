@@ -151,7 +151,7 @@ const parseColor = (col?: string | number) => {
         return '#' + col.toString(16).padStart(6, '0');
     }
     if (typeof col === 'string') {
-        if (col === '#000000' || col === '0') return null;
+        if (col === '#0e0e0e' || col === '0') return null;
         if (!col.startsWith('#') && !col.startsWith('rgb')) return `#${col}`;
         return col;
     }
@@ -521,7 +521,7 @@ export function SliderField({ label, value, min = 0, max = 100, onChange, valueL
                 </div>
                 {/* Thumb pseudo-element simulator */}
                 <div
-                    className="absolute h-4 w-4 bg-white rounded-full shadow-[0_0_10px_rgba(255,255,255,0.5)] border-2 border-[var(--color-primary-1)] pointer-events-none transition-all duration-200 ease-out"
+                    className="absolute h-4 w-4 bg-white rounded-full shadow-[0_0_10px_rgba(244,241,238,0.5)] border-2 border-[var(--color-primary-1)] pointer-events-none transition-all duration-200 ease-out"
                     style={{ left: `calc(${percentage}% - 8px)` }}
                 />
             </div>

@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
@@ -145,48 +145,48 @@ const MESSAGES = {
         searchCategories: "Filter categories..."
     },
     ru: {
-        title: "Ð¡Ð»ÑƒÐ¶Ð±Ð° ÐŸÐ¾Ð´Ð´ÐµÑ€Ð¶ÐºÐ¸",
-        subtitle: "Ð£Ð¿Ñ€Ð°Ð²Ð»ÐµÐ½Ð¸Ðµ Ð¾Ð±Ñ€Ð°Ñ‰ÐµÐ½Ð¸ÑÐ¼Ð¸, Ð¼Ð°Ñ€ÑˆÑ€ÑƒÑ‚Ð¸Ð·Ð°Ñ†Ð¸Ñ Ð¸ Ð°Ð½Ð°Ð»Ð¸Ñ‚Ð¸ÐºÐ°.",
-        overview: "Ð”Ð°ÑˆÐ±Ð¾Ñ€Ð´",
-        settings: "ÐÐ°ÑÑ‚Ñ€Ð¾Ð¹ÐºÐ¸ ÐŸÑ€Ð¾ÐµÐºÑ‚Ð°",
-        loggingTitle: "ÐÑƒÐ´Ð¸Ñ‚ Ð¸ Ð›Ð¾Ð³Ð¸",
-        loggingDesc: "Ð¡Ð¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð¸Ðµ Ñ‚Ñ€Ð°Ð½ÑÐºÑ€Ð¸Ð¿Ñ‚Ð¾Ð² Ð¸ ÑÐ¾Ð±Ñ‹Ñ‚Ð¸Ð¹ Ñ‚Ð¸ÐºÐµÑ‚Ð¾Ð² Ð² Ð±ÐµÐ·Ð¾Ð¿Ð°ÑÐ½Ñ‹Ð¹ ÐºÐ°Ð½Ð°Ð».",
-        logChannelLabel: "ÐšÐ°Ð½Ð°Ð» Ð°Ñ€Ñ…Ð¸Ð²Ð° Ñ‚Ñ€Ð°Ð½ÑÐºÑ€Ð¸Ð¿Ñ‚Ð¾Ð²",
-        logChannelPlaceholder: "Ð’Ñ‹Ð±ÐµÑ€Ð¸Ñ‚Ðµ ÐºÐ°Ð½Ð°Ð»...",
-        adminToolsTitle: "Ð‘Ñ‹ÑÑ‚Ñ€Ñ‹Ðµ Ð¡ÑÑ‹Ð»ÐºÐ¸",
-        transcripts: "ÐÑ€Ñ…Ð¸Ð² Ð¢Ð¸ÐºÐµÑ‚Ð¾Ð²",
-        transcriptsDesc: "Ð˜ÑÑ‚Ð¾Ñ€Ð¸Ñ Ð·Ð°ÐºÑ€Ñ‹Ñ‚Ñ‹Ñ… Ð¾Ð±Ñ€Ð°Ñ‰ÐµÐ½Ð¸Ð¹.",
-        statistics: "Ð­Ñ„Ñ„ÐµÐºÑ‚Ð¸Ð²Ð½Ð¾ÑÑ‚ÑŒ ÐÐ³ÐµÐ½Ñ‚Ð¾Ð²",
-        statisticsDesc: "Ð’Ñ€ÐµÐ¼Ñ Ñ€ÐµÑˆÐµÐ½Ð¸Ñ Ð¸ Ð°Ð½Ð°Ð»Ð¸Ñ‚Ð¸ÐºÐ°.",
-        categoriesTitle: "ÐšÐ°Ñ‚ÐµÐ³Ð¾Ñ€Ð¸Ð¸ ÐžÐ±Ñ€Ð°Ñ‰ÐµÐ½Ð¸Ð¹",
-        categoriesDesc: "Ð¢ÐµÐ¼Ñ‹ Ð¿Ð¾Ð´Ð´ÐµÑ€Ð¶ÐºÐ¸ Ð¸ Ð¿Ñ€Ð°Ð²Ð¸Ð»Ð° Ð¼Ð°Ñ€ÑˆÑ€ÑƒÑ‚Ð¸Ð·Ð°Ñ†Ð¸Ð¸.",
-        createCategory: "ÐÐ¾Ð²Ð°Ñ ÐšÐ°Ñ‚ÐµÐ³Ð¾Ñ€Ð¸Ñ",
-        activeTickets: "ÐžÑ‚ÐºÑ€Ñ‹Ñ‚Ð¾",
-        totalTickets: "Ð’ÑÐµÐ³Ð¾",
-        edit: "ÐÐ°ÑÑ‚Ñ€Ð¾Ð¸Ñ‚ÑŒ",
-        save: "Ð¡Ð¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚ÑŒ",
-        saved: "Ð¡Ð¾Ñ…Ñ€Ð°Ð½ÐµÐ½Ð¾",
-        auditLogWarn: "Ð’Ñ‹Ð±ÐµÑ€Ð¸Ñ‚Ðµ ÐºÐ°Ð½Ð°Ð» Ð´Ð»Ñ Ð²ÐºÐ»ÑŽÑ‡ÐµÐ½Ð¸Ñ Ð»Ð¾Ð³Ð¾Ð².",
-        soon: "Ð¡ÐºÐ¾Ñ€Ð¾",
-        openTickets: "Ð¡Ð¾Ð·Ð´Ð°Ð½Ð¾ Ñ‚Ð¸ÐºÐµÑ‚Ð¾Ð²",
-        unsolvedTickets: "ÐÐµÑ€ÐµÑˆÐµÐ½Ð½Ñ‹Ðµ",
-        resolvedTickets: "Ð ÐµÑˆÐµÐ½Ð½Ñ‹Ðµ",
-        avgResolution: "Ð¡Ñ€ÐµÐ´Ð½ÐµÐµ Ð²Ñ€ÐµÐ¼Ñ Ñ€ÐµÑˆÐµÐ½Ð¸Ñ",
-        ticketsActivity: "ÐžÐ±ÑŠÐµÐ¼ Ð¢Ð¸ÐºÐµÑ‚Ð¾Ð²",
-        ticketsByCategory: "ÐŸÐ¾ ÐšÐ°Ñ‚ÐµÐ³Ð¾Ñ€Ð¸ÑÐ¼",
-        customerSatisfaction: "Ð˜Ð½Ð´ÐµÐºÑ CSAT",
-        dateDay1: "Ð—Ð° 24 Ñ‡Ð°ÑÐ°",
-        dateDay3: "Ð—Ð° 3 Ð´Ð½Ñ",
-        dateDay7: "Ð—Ð° 7 Ð´Ð½ÐµÐ¹",
-        dateDay14: "Ð—Ð° 14 Ð´Ð½ÐµÐ¹",
-        dateDay30: "Ð—Ð° 30 Ð´Ð½ÐµÐ¹",
-        dateMonth3: "Ð—Ð° 90 Ð´Ð½ÐµÐ¹",
-        dateYear1: "Ð—Ð° Ð³Ð¾Ð´",
-        positive: "Ð”Ð¾Ð²Ð¾Ð»ÑŒÐ½Ñ‹",
-        neutral: "ÐÐµÐ¹Ñ‚Ñ€Ð°Ð»ÑŒÐ½Ð¾",
-        negative: "ÐÐµÐ´Ð¾Ð²Ð¾Ð»ÑŒÐ½Ñ‹",
-        noData: "ÐÐµÐ´Ð¾ÑÑ‚Ð°Ñ‚Ð¾Ñ‡Ð½Ð¾ Ð´Ð°Ð½Ð½Ñ‹Ñ…",
-        searchCategories: "Ð¤Ð¸Ð»ÑŒÑ‚Ñ€ ÐºÐ°Ñ‚ÐµÐ³Ð¾Ñ€Ð¸Ð¹..."
+        title: "Служба Поддержки",
+        subtitle: "Управление обращениями, маршрутизация и аналитика.",
+        overview: "Дашборд",
+        settings: "Настройки Проекта",
+        loggingTitle: "Аудит и Логи",
+        loggingDesc: "Сохранение транскриптов и событий тикетов в безопасный канал.",
+        logChannelLabel: "Канал архива транскриптов",
+        logChannelPlaceholder: "Выберите канал...",
+        adminToolsTitle: "Быстрые Ссылки",
+        transcripts: "Архив Тикетов",
+        transcriptsDesc: "История закрытых обращений.",
+        statistics: "Эффективность Агентов",
+        statisticsDesc: "Время решения и аналитика.",
+        categoriesTitle: "Категории Обращений",
+        categoriesDesc: "Темы поддержки и правила маршрутизации.",
+        createCategory: "Новая Категория",
+        activeTickets: "Открыто",
+        totalTickets: "Всего",
+        edit: "Настроить",
+        save: "Сохранить",
+        saved: "Сохранено",
+        auditLogWarn: "Выберите канал для включения логов.",
+        soon: "Скоро",
+        openTickets: "Создано тикетов",
+        unsolvedTickets: "Нерешенные",
+        resolvedTickets: "Решенные",
+        avgResolution: "Среднее время решения",
+        ticketsActivity: "Объем Тикетов",
+        ticketsByCategory: "По Категориям",
+        customerSatisfaction: "Индекс CSAT",
+        dateDay1: "За 24 часа",
+        dateDay3: "За 3 дня",
+        dateDay7: "За 7 дней",
+        dateDay14: "За 14 дней",
+        dateDay30: "За 30 дней",
+        dateMonth3: "За 90 дней",
+        dateYear1: "За год",
+        positive: "Довольны",
+        neutral: "Нейтрально",
+        negative: "Недовольны",
+        noData: "Недостаточно данных",
+        searchCategories: "Фильтр категорий..."
     }
 } as const;
 
@@ -203,7 +203,7 @@ const StatCard = ({ title, value, icon, trend }: { title: string, value: string 
             <span className="text-4xl font-black font-akony text-white tracking-tight">{value}</span>
             {trend && (
                 <span className={`text-xs font-bold pb-1.5 ${trend.isPositive ? 'text-emerald-500' : 'text-rose-500'}`}>
-                    {trend.isPositive ? 'â†‘' : 'â†“'} {Math.abs(trend.value)}%
+                    {trend.isPositive ? '↑' : '↓'} {Math.abs(trend.value)}%
                 </span>
             )}
         </div>
@@ -454,7 +454,7 @@ export default function TicketsPage() {
                                     ) : (
                                         <ResponsiveContainer width="100%" height="100%">
                                             <BarChart data={activityData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" vertical={false} />
+                                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(244,241,238,0.03)" vertical={false} />
                                                 <XAxis
                                                     dataKey="date"
                                                     stroke="#52525b"
@@ -471,16 +471,16 @@ export default function TicketsPage() {
                                                     tickFormatter={(val) => val === 0 ? '' : val}
                                                 />
                                                 <RechartsTooltip
-                                                    cursor={{ fill: 'rgba(255,255,255,0.02)' }}
+                                                    cursor={{ fill: 'rgba(244,241,238,0.02)' }}
                                                     contentStyle={{
                                                         backgroundColor: '#111',
-                                                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                                                        border: '1px solid rgba(244,241,238, 0.1)',
                                                         borderRadius: '12px',
-                                                        boxShadow: '0 10px 30px -10px rgba(0,0,0,0.5)',
+                                                        boxShadow: '0 10px 30px -10px rgba(14,14,14,0.5)',
                                                         fontSize: '12px',
                                                         fontWeight: 'bold'
                                                     }}
-                                                    itemStyle={{ color: '#fff' }}
+                                                    itemStyle={{ color: '#f4f1ee' }}
                                                     labelStyle={{ color: '#a1a1aa', marginBottom: '8px' }}
                                                 />
                                                 <Bar dataKey="created" name={t.openTickets} fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={12} />
@@ -524,12 +524,12 @@ export default function TicketsPage() {
                                                         <RechartsTooltip
                                                             contentStyle={{
                                                                 backgroundColor: '#111',
-                                                                border: '1px solid rgba(255, 255, 255, 0.1)',
+                                                                border: '1px solid rgba(244,241,238, 0.1)',
                                                                 borderRadius: '12px',
                                                                 fontSize: '12px',
                                                                 fontWeight: 'bold'
                                                             }}
-                                                            itemStyle={{ color: '#fff' }}
+                                                            itemStyle={{ color: '#f4f1ee' }}
                                                         />
                                                     </PieChart>
                                                 </ResponsiveContainer>
@@ -671,7 +671,7 @@ export default function TicketsPage() {
                                         <div key={`${cat.systemManagedBy || 'ticket'}-${cat.id}`} className={`group flex cursor-pointer items-center justify-between rounded-[24px] p-5 shadow-sm transition-all duration-200 hover:shadow-md ${cat.systemManagedBy === 'appeals' ? 'border border-[#7AAA7A]/30 bg-[linear-gradient(135deg,rgba(122,170,122,0.12),rgba(16,24,16,0.62))] hover:border-[#7AAA7A]/45' : 'bg-[var(--surface-card)] border border-[var(--border-subtle)] hover:border-[#3b82f6]/30'}`} onClick={() => openCategory(cat)}>
                                             <div className="flex items-center gap-4">
                                                 <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${cat.systemManagedBy === 'appeals' ? 'border border-[#7AAA7A]/20 bg-[#7AAA7A]/10' : 'bg-[var(--surface-hover)] border border-[var(--border-divider)]'}`}>
-                                                    <span className="text-xl">{cat.buttonEmoji || '📝'}</span>
+                                                    <span className="text-xl">{cat.buttonEmoji || '??'}</span>
                                                 </div>
                                                 <div>
                                                     <div className="mb-1 flex items-center gap-2">

@@ -256,8 +256,8 @@ export default function ContactsPage() {
             ctx.beginPath();
             ctx.arc(cx, cy, r, 0, Math.PI * 2);
             ctx.shadowBlur = 15;
-            ctx.shadowColor = isSelected ? '#75F16A' : 'rgba(255,255,255,0.6)';
-            ctx.fillStyle = isSelected ? 'rgba(117,241,106,0.3)' : 'rgba(255,255,255,0.2)';
+            ctx.shadowColor = isSelected ? '#75F16A' : 'rgba(244,241,238,0.6)';
+            ctx.fillStyle = isSelected ? 'rgba(117,241,106,0.3)' : 'rgba(244,241,238,0.2)';
             ctx.fill();
             ctx.shadowBlur = 0;
             ctx.shadowColor = 'transparent';
@@ -282,7 +282,7 @@ export default function ContactsPage() {
             ctx.fillStyle = g;
             ctx.fill();
 
-            ctx.fillStyle = 'rgba(255,255,255,0.55)';
+            ctx.fillStyle = 'rgba(244,241,238,0.55)';
             ctx.font = `bold ${r * 0.8}px Inter, sans-serif`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
@@ -294,7 +294,7 @@ export default function ContactsPage() {
         // Ring
         ctx.beginPath();
         ctx.arc(cx, cy, r, 0, Math.PI * 2);
-        ctx.strokeStyle = isSelected ? '#75F16A' : isHovered ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.07)';
+        ctx.strokeStyle = isSelected ? '#75F16A' : isHovered ? 'rgba(244,241,238,0.4)' : 'rgba(244,241,238,0.07)';
         ctx.lineWidth = isSelected || isHovered ? 4 : 2;
         ctx.stroke();
 
@@ -302,11 +302,11 @@ export default function ContactsPage() {
         if (isHovered || isSelected || _size >= 6) {
             const textY = cy + r + 24;
             ctx.font = `500 24px Inter, sans-serif`;
-            ctx.fillStyle = 'rgba(255,255,255,0.95)';
+            ctx.fillStyle = 'rgba(244,241,238,0.95)';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.shadowBlur = 8;
-            ctx.shadowColor = 'rgba(0,0,0,0.8)';
+            ctx.shadowColor = 'rgba(14,14,14,0.8)';
             ctx.fillText(name || id, cx, textY);
             ctx.shadowBlur = 0;
         }
@@ -338,7 +338,7 @@ export default function ContactsPage() {
         // Glow
         if (isHovered || isSelected) {
             ctx.shadowBlur = 24;
-            ctx.shadowColor = isSelected ? '#75F16A' : 'rgba(255,255,255,0.4)';
+            ctx.shadowColor = isSelected ? '#75F16A' : 'rgba(244,241,238,0.4)';
         }
 
         // Clip to circle
@@ -360,7 +360,7 @@ export default function ContactsPage() {
             g.addColorStop(1, '#151515');
             ctx.fillStyle = g;
             ctx.fill();
-            ctx.fillStyle = 'rgba(255,255,255,0.55)';
+            ctx.fillStyle = 'rgba(244,241,238,0.55)';
             ctx.font = `bold ${radius * 0.8}px Inter, sans-serif`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
@@ -372,7 +372,7 @@ export default function ContactsPage() {
         // Ring
         ctx.beginPath();
         ctx.arc(x, y, radius, 0, Math.PI * 2);
-        ctx.strokeStyle = isSelected ? '#75F16A' : isHovered ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.07)';
+        ctx.strokeStyle = isSelected ? '#75F16A' : isHovered ? 'rgba(244,241,238,0.4)' : 'rgba(244,241,238,0.07)';
         ctx.lineWidth = isSelected || isHovered ? 2 : 0.8;
         ctx.stroke();
 
@@ -383,9 +383,9 @@ export default function ContactsPage() {
             ctx.font = `${fs}px Inter, sans-serif`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'top';
-            ctx.fillStyle = 'rgba(255,255,255,0.85)';
+            ctx.fillStyle = 'rgba(244,241,238,0.85)';
             ctx.shadowBlur = 4;
-            ctx.shadowColor = 'rgba(0,0,0,0.8)';
+            ctx.shadowColor = 'rgba(14,14,14,0.8)';
             ctx.fillText(name || id, x, y + radius + 2 / globalScale);
             ctx.restore();
         }
@@ -410,7 +410,7 @@ export default function ContactsPage() {
         if (hasVoice) return EDGE_COLORS.voice;
         if (types.includes('reply')) return EDGE_COLORS.reply;
         if (types.includes('mention')) return EDGE_COLORS.mention;
-        return 'rgba(255,255,255,0.15)';
+        return 'rgba(244,241,238,0.15)';
     }, []);
 
     const getLinkWidth = useCallback((link: any) => link._width || 1, []);
@@ -597,7 +597,7 @@ export default function ContactsPage() {
                             graphData={graphData}
                             width={dimensions.w}
                             height={dimensions.h}
-                            backgroundColor="rgba(0,0,0,0)"
+                            backgroundColor="rgba(14,14,14,0)"
                             nodeThreeObject={createNodeThreeObject}
                             linkColor={getLinkColor}
                             linkWidth={getLinkWidth}

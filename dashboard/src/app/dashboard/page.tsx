@@ -11,6 +11,7 @@ import { getStoredLocale } from '@/lib/i18n';
 import { BOT_OWNER_ID } from '@/lib/constants';
 import { fetchWithTimeout } from '@/lib/requestTimeout';
 import { getBrowserPublicHost, toPublicDashboardPath } from '@/lib/publicDashboard';
+import { hyphenateServerName } from '@/lib/textHyphenation';
 
 interface Guild {
     id: string;
@@ -111,10 +112,10 @@ function AutoFitServerName({ name }: { name: string }) {
         >
             <span
                 ref={textRef}
-                className="block max-w-full overflow-wrap-anywhere break-words hyphens-auto"
+                className="dashboard-title-hyphenate-2 block max-w-full"
                 style={{ fontSize: `${fontSize}px` }}
             >
-                {name}
+                {hyphenateServerName(name)}
             </span>
         </h2>
     );
@@ -180,7 +181,7 @@ function ServerTile({
         >
             <Link href={toPublicDashboardPath(`/dashboard/${guild.id}`, getBrowserPublicHost())} className="group block h-full focus:outline-none">
                 <article
-                    className="relative flex h-full min-h-[20rem] flex-col overflow-hidden rounded-[30px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(13,16,20,0.96),rgba(8,10,14,0.98))] p-5 shadow-[0_22px_60px_-28px_rgba(0,0,0,0.9)] transition-all duration-500 group-hover:-translate-y-1.5 group-hover:border-[color:var(--guild-accent-line)] group-hover:shadow-[0_32px_80px_-28px_var(--guild-accent-glow)] group-focus-visible:-translate-y-1.5 group-focus-visible:border-[color:var(--guild-accent-line)] group-focus-visible:shadow-[0_32px_80px_-28px_var(--guild-accent-glow)]"
+                    className="relative flex h-full min-h-[20rem] flex-col overflow-hidden rounded-[30px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(13,16,20,0.96),rgba(8,10,14,0.98))] p-5 shadow-[0_22px_60px_-28px_rgba(14,14,14,0.9)] transition-all duration-500 group-hover:-translate-y-1.5 group-hover:border-[color:var(--guild-accent-line)] group-hover:shadow-[0_32px_80px_-28px_var(--guild-accent-glow)] group-focus-visible:-translate-y-1.5 group-focus-visible:border-[color:var(--guild-accent-line)] group-focus-visible:shadow-[0_32px_80px_-28px_var(--guild-accent-glow)]"
                     style={styles}
                 >
                     <div
@@ -205,8 +206,8 @@ function ServerTile({
                                 className="inline-flex rounded-[30px] border p-3 transition-transform duration-500 group-hover:scale-[1.03] group-focus-visible:scale-[1.03]"
                                 style={{
                                     borderColor: withAlpha(accent, '2a'),
-                                    background: `linear-gradient(180deg, ${withAlpha(accent, '12')}, rgba(255,255,255,0.02))`,
-                                    boxShadow: `inset 0 1px 0 rgba(255,255,255,0.06), 0 18px 40px -22px ${withAlpha(accent, '44')}`,
+                                    background: `linear-gradient(180deg, ${withAlpha(accent, '12')}, rgba(244,241,238,0.02))`,
+                                    boxShadow: `inset 0 1px 0 rgba(244,241,238,0.06), 0 18px 40px -22px ${withAlpha(accent, '44')}`,
                                 }}
                             >
                                 {guild.icon ? (
@@ -214,7 +215,7 @@ function ServerTile({
                                         src={`https://cdn.discordapp.com/icons/${guild.id}/${guild.icon}.png?size=256`}
                                         alt={guild.name || text.unknownServer}
                                         crossOrigin="anonymous"
-                                        className="h-[88px] w-[88px] rounded-[22px] object-cover shadow-[0_12px_24px_rgba(0,0,0,0.45)]"
+                                        className="h-[88px] w-[88px] rounded-[22px] object-cover shadow-[0_12px_24px_rgba(14,14,14,0.45)]"
                                         radius="none"
                                         removeWrapper
                                     />
@@ -234,7 +235,7 @@ function ServerTile({
                         <div className="mt-8 flex items-center justify-between border-t border-white/[0.08] pt-4">
                             <span
                                 className="text-[0.68rem] font-semibold uppercase tracking-[0.26em] transition-colors duration-300 group-hover:text-[color:var(--guild-accent)] group-focus-visible:text-[color:var(--guild-accent)]"
-                                style={{ color: 'rgba(255,255,255,0.44)' }}
+                                style={{ color: 'rgba(244,241,238,0.44)' }}
                             >
                                 {text.manageSettings}
                             </span>
@@ -414,11 +415,11 @@ export default function Dashboard() {
     return (
         <div className="relative min-h-screen overflow-hidden bg-[#06080b] text-[var(--text-primary)]">
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_12%,rgba(117,241,106,0.1),transparent_24%),radial-gradient(circle_at_86%_10%,rgba(143,94,255,0.1),transparent_28%),linear-gradient(180deg,#0a0c0f_0%,#06080b_55%,#050608_100%)]" />
-            <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[size:100%_144px,144px_100%] opacity-[0.06]" />
+            <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(244,241,238,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(244,241,238,0.035)_1px,transparent_1px)] bg-[size:100%_144px,144px_100%] opacity-[0.06]" />
 
             <main className="relative mx-auto max-w-[1520px] px-4 py-8 pb-20 sm:px-6 lg:px-8">
-                <section className="overflow-hidden rounded-[36px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(14,18,23,0.96),rgba(8,10,14,0.98))] p-6 shadow-[0_32px_90px_-45px_rgba(0,0,0,0.95)] sm:p-8 lg:p-10">
-                    <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.18),transparent)] opacity-60" />
+                <section className="overflow-hidden rounded-[36px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(14,18,23,0.96),rgba(8,10,14,0.98))] p-6 shadow-[0_32px_90px_-45px_rgba(14,14,14,0.95)] sm:p-8 lg:p-10">
+                    <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,transparent,rgba(244,241,238,0.18),transparent)] opacity-60" />
 
                     <div className="flex flex-col gap-8 xl:flex-row xl:items-end xl:justify-between">
                         <div className="max-w-[46rem]">

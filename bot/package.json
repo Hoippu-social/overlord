@@ -15,7 +15,7 @@
     },
     "keywords": [],
     "author": "",
-    "license": "ISC",
+    "license": "AGPL-3.0-or-later",
     "dependencies": {
         "@discord-player/downloader": "^3.0.2",
         "@discord-player/extractor": "^7.2.0",

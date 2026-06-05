@@ -23,6 +23,7 @@ import {
 import { useGuildLocale } from '@/lib/i18n';
 import { Popover, PopoverContent, PopoverTrigger } from '@nextui-org/react';
 import { getBrowserPublicHost, getDashboardHomePath } from '@/lib/publicDashboard';
+import { hyphenateServerName } from '@/lib/textHyphenation';
 
 interface SidebarProps {
     guildId: string;
@@ -248,7 +249,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ guildId, guildName, guildIcon 
                     </div>
                 )}
                 <div className="min-w-0 flex-1">
-                    <div className={`truncate text-sm font-bold ${active ? 'text-white' : 'text-inherit'}`}>{guild.name}</div>
+                    <div className={`truncate text-sm font-bold ${active ? 'text-white' : 'text-inherit'}`}>{hyphenateServerName(guild.name)}</div>
                     {active ? (
                         <div className="mt-0.5 text-[10px] font-medium uppercase tracking-[0.18em] text-[var(--color-primary-1)]">
                             {guildMenuText.current}
@@ -284,7 +285,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ guildId, guildName, guildIcon 
                                 <span className="text-[11px] font-akony">{guildName?.charAt(0) ?? '?'}</span>
                             </div>
                         )}
-                        <span className="truncate text-sm font-bold text-white/90">{guildName || text.loading}</span>
+                        <span className="truncate text-sm font-bold text-white/90">{guildName ? hyphenateServerName(guildName) : text.loading}</span>
                     </div>
                     <CaretDown
                         size={16}
@@ -293,7 +294,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ guildId, guildName, guildIcon 
                     />
                 </button>
             </PopoverTrigger>
-            <PopoverContent className="w-[min(320px,calc(100vw-2rem))] rounded-[28px] border border-[var(--border-subtle)] bg-[var(--surface-card)] p-0 shadow-[0_24px_60px_rgba(0,0,0,0.45)]">
+            <PopoverContent className="w-[min(320px,calc(100vw-2rem))] rounded-[28px] border border-[var(--border-subtle)] bg-[var(--surface-card)] p-0 shadow-[0_24px_60px_rgba(14,14,14,0.45)]">
                 <div className="w-full p-3">
                     <div className="px-2 pb-2 pt-1 text-[10px] font-akony uppercase tracking-[0.22em] text-white/30">
                         {guildMenuText.servers}

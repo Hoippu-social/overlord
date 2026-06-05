@@ -121,7 +121,7 @@ function CommandSurface({ copy }: HeroSectionProps) {
           const Icon = item.icon;
 
           return (
-            <div key={item.label} className="min-w-0 rounded-2xl border border-[var(--landing-line)] bg-[rgba(255,255,255,0.025)] p-3">
+            <div key={item.label} className="min-w-0 rounded-2xl border border-[var(--landing-line)] bg-[rgba(244,241,238,0.025)] p-3">
               <Icon size={18} weight="bold" className="text-[var(--landing-accent)]" />
               <div className="mt-4 truncate text-sm font-bold text-[var(--landing-text)]">{item.label}</div>
             </div>
@@ -130,7 +130,7 @@ function CommandSurface({ copy }: HeroSectionProps) {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
-        <div className="min-w-0 rounded-[1.4rem] border border-[var(--landing-line)] bg-[rgba(255,255,255,0.02)] p-4">
+        <div className="min-w-0 rounded-[1.4rem] border border-[var(--landing-line)] bg-[rgba(244,241,238,0.02)] p-4">
           <div className="mb-4 text-[0.62rem] uppercase tracking-[0.26em] text-[var(--landing-soft)]">system map</div>
           <div className="grid grid-cols-2 gap-2">
             {copy.rail.map((label, index) => {
@@ -154,7 +154,7 @@ function CommandSurface({ copy }: HeroSectionProps) {
 
           <div className="space-y-2">
             {copy.signals.map((signal) => (
-              <div key={signal.title} className="flex min-w-0 items-center justify-between gap-3 rounded-2xl border border-[var(--landing-line)] bg-[rgba(255,255,255,0.025)] px-3 py-3">
+              <div key={signal.title} className="flex min-w-0 items-center justify-between gap-3 rounded-2xl border border-[var(--landing-line)] bg-[rgba(244,241,238,0.025)] px-3 py-3">
                 <div className="min-w-0">
                   <div className="truncate text-sm font-bold text-[var(--landing-text)]">{signal.title}</div>
                   <div className="mt-1 truncate text-[0.62rem] uppercase tracking-[0.16em] text-[var(--landing-soft)]">{signal.meta}</div>

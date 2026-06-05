@@ -45,14 +45,14 @@ export function ChartTooltip({ active, payload, label, locale = 'en', formatters
         <div style={{
             backgroundColor: 'rgba(17,17,17,0.95)',
             backdropFilter: 'blur(12px)',
-            border: '1px solid rgba(255,255,255,0.04)',
+            border: '1px solid rgba(244,241,238,0.04)',
             borderRadius: '24px',
             padding: '12px 20px',
-            boxShadow: '0 4px 20px rgba(0,0,0,0.2)'
+            boxShadow: '0 4px 20px rgba(14,14,14,0.2)'
         }}>
             {label != null && label !== '' && (
                 <p style={{
-                    color: '#fff',
+                    color: '#f4f1ee',
                     fontSize: 14,
                     marginBottom: 12,
                     fontWeight: 700,
@@ -66,13 +66,13 @@ export function ChartTooltip({ active, payload, label, locale = 'en', formatters
                     const formattedValue = formatters && entry.dataKey && formatters[entry.dataKey] 
                         ? formatters[entry.dataKey](entry.value, entry) 
                         : formatLocaleNumber(Number(entry.value), locale);
-                    const dotColor = (entry.dataKey && colorOverrides?.[entry.dataKey]) || entry.color || '#fff';
+                    const dotColor = (entry.dataKey && colorOverrides?.[entry.dataKey]) || entry.color || '#f4f1ee';
                         
                     return (
                         <div key={index} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                             <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: dotColor }} />
-                            <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 14 }}>{entry.name}&nbsp;:&nbsp;</span>
-                            <span style={{ color: '#fff', fontWeight: 700, fontSize: 14 }}>{formattedValue}</span>
+                            <span style={{ color: 'rgba(244,241,238,0.6)', fontSize: 14 }}>{entry.name}&nbsp;:&nbsp;</span>
+                            <span style={{ color: '#f4f1ee', fontWeight: 700, fontSize: 14 }}>{formattedValue}</span>
                         </div>
                     );
                 })}

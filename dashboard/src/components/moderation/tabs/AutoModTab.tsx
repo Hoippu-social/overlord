@@ -2025,7 +2025,7 @@ export function AutoModTab({ config, setConfig, locale, tr }: AutoModTabProps) {
                 hideCloseButton
                 classNames={{
                     base: "bg-[#111111] border border-[var(--border-subtle)] shadow-2xl rounded-[32px] overflow-hidden m-4",
-                    backdrop: "bg-[#000]/60 backdrop-blur-sm",
+                    backdrop: "bg-[#0e0e0e]/60 backdrop-blur-sm",
                 }}
             >
                 <ModalContent>
@@ -2218,7 +2218,7 @@ export function AutoModTab({ config, setConfig, locale, tr }: AutoModTabProps) {
                 hideCloseButton
                 classNames={{
                     base: "bg-[#111111] border border-[var(--border-subtle)] shadow-2xl rounded-[32px] overflow-hidden m-4",
-                    backdrop: "bg-[#000]/60 backdrop-blur-sm",
+                    backdrop: "bg-[#0e0e0e]/60 backdrop-blur-sm",
                 }}
             >
                 <ModalContent>
@@ -2385,7 +2385,7 @@ export function AutoModTab({ config, setConfig, locale, tr }: AutoModTabProps) {
                 hideCloseButton
                 classNames={{
                     base: "bg-[#111111] border border-[var(--border-subtle)] shadow-2xl rounded-[32px] overflow-hidden m-4",
-                    backdrop: "bg-[#000]/60 backdrop-blur-sm",
+                    backdrop: "bg-[#0e0e0e]/60 backdrop-blur-sm",
                 }}
             >
                 <ModalContent>
@@ -2528,7 +2528,7 @@ export function AutoModTab({ config, setConfig, locale, tr }: AutoModTabProps) {
                 hideCloseButton
                 classNames={{
                     base: "bg-[#111111] border border-[var(--border-subtle)] shadow-2xl rounded-[32px] overflow-hidden m-4",
-                    backdrop: "bg-[#000]/60 backdrop-blur-sm",
+                    backdrop: "bg-[#0e0e0e]/60 backdrop-blur-sm",
                 }}
             >
                 <ModalContent>
@@ -2678,7 +2678,7 @@ export function AutoModTab({ config, setConfig, locale, tr }: AutoModTabProps) {
                 hideCloseButton
                 classNames={{
                     base: "bg-[#111111] border border-[var(--border-subtle)] shadow-2xl rounded-[32px] overflow-hidden m-4",
-                    backdrop: "bg-[#000]/60 backdrop-blur-sm",
+                    backdrop: "bg-[#0e0e0e]/60 backdrop-blur-sm",
                 }}
             >
                 <ModalContent>
@@ -2837,7 +2837,7 @@ export function AutoModTab({ config, setConfig, locale, tr }: AutoModTabProps) {
                 hideCloseButton
                 classNames={{
                     base: "bg-[#111111] border border-[var(--border-subtle)] shadow-2xl rounded-[32px] overflow-hidden m-4",
-                    backdrop: "bg-[#000]/60 backdrop-blur-sm",
+                    backdrop: "bg-[#0e0e0e]/60 backdrop-blur-sm",
                 }}
             >
                 <ModalContent>
@@ -2995,7 +2995,7 @@ export function AutoModTab({ config, setConfig, locale, tr }: AutoModTabProps) {
                 hideCloseButton
                 classNames={{
                     base: "bg-[#111111] border border-[var(--border-subtle)] shadow-2xl rounded-[32px] overflow-hidden m-4",
-                    backdrop: "bg-[#000]/60 backdrop-blur-sm",
+                    backdrop: "bg-[#0e0e0e]/60 backdrop-blur-sm",
                 }}
             >
                 <ModalContent>
@@ -3194,7 +3194,7 @@ export function AutoModTab({ config, setConfig, locale, tr }: AutoModTabProps) {
                 hideCloseButton
                 classNames={{
                     base: "bg-[#111111] border border-[var(--border-subtle)] shadow-2xl rounded-[32px] overflow-hidden m-4",
-                    backdrop: "bg-[#000]/60 backdrop-blur-sm",
+                    backdrop: "bg-[#0e0e0e]/60 backdrop-blur-sm",
                 }}
             >
                 <ModalContent>
@@ -3396,7 +3396,7 @@ export function AutoModTab({ config, setConfig, locale, tr }: AutoModTabProps) {
                 hideCloseButton
                 classNames={{
                     base: "bg-[#111111] border border-[var(--border-subtle)] shadow-2xl rounded-[32px] overflow-hidden m-4",
-                    backdrop: "bg-[#000]/60 backdrop-blur-sm",
+                    backdrop: "bg-[#0e0e0e]/60 backdrop-blur-sm",
                 }}
             >
                 <ModalContent>
@@ -3543,7 +3543,7 @@ export function AutoModTab({ config, setConfig, locale, tr }: AutoModTabProps) {
                 hideCloseButton
                 classNames={{
                     base: "bg-[#111111] border border-[var(--border-subtle)] shadow-2xl rounded-[32px] overflow-hidden m-4",
-                    backdrop: "bg-[#000]/60 backdrop-blur-sm",
+                    backdrop: "bg-[#0e0e0e]/60 backdrop-blur-sm",
                 }}
             >
                 <ModalContent>
@@ -3948,7 +3948,7 @@ export function AutoModTab({ config, setConfig, locale, tr }: AutoModTabProps) {
                 hideCloseButton
                 classNames={{
                     base: "bg-[#111111] border border-[var(--border-subtle)] shadow-2xl rounded-[32px] overflow-hidden m-4",
-                    backdrop: "bg-[#000]/60 backdrop-blur-sm",
+                    backdrop: "bg-[#0e0e0e]/60 backdrop-blur-sm",
                 }}
             >
                 <ModalContent>

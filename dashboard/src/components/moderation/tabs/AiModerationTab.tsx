@@ -193,7 +193,7 @@ export function AiModerationTab({ config, setConfig, incidentState, locale, tr }
                         {displayCategories.map(cat => {
                             const stateRecord = config.aiCategories.find(c => c.category === cat.category) || cat;
                             return (
-                                <div key={cat.category} className={`group flex flex-col gap-5 rounded-[24px] border border-white/10 p-5 transition-all duration-300 ${stateRecord.enabled ? 'bg-black/30 shadow-[0_5px_15px_rgba(0,0,0,0.5)] border-[var(--color-primary-1)]/30' : 'bg-black/10 opacity-60 hover:opacity-100'}`}>
+                                <div key={cat.category} className={`group flex flex-col gap-5 rounded-[24px] border border-white/10 p-5 transition-all duration-300 ${stateRecord.enabled ? 'bg-black/30 shadow-[0_5px_15px_rgba(14,14,14,0.5)] border-[var(--color-primary-1)]/30' : 'bg-black/10 opacity-60 hover:opacity-100'}`}>
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-3">
                                             <div className={`p-2 rounded-xl border transition-colors ${stateRecord.enabled ? 'bg-[var(--color-primary-1)]/20 text-[var(--color-primary-1)] border-[var(--color-primary-1)]/30' : 'bg-white/5 text-white/30 border-transparent group-hover:bg-white/10 group-hover:text-white/50'}`}>

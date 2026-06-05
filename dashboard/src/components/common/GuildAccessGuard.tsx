@@ -185,7 +185,7 @@ export function GuildAccessGuard({ guildId }: GuildAccessGuardProps) {
             isDismissable={false}
             isKeyboardDismissDisabled
             classNames={{
-                base: 'm-4 overflow-hidden rounded-[32px] border border-[var(--border-subtle)] bg-[var(--surface-card)] shadow-[0_40px_140px_rgba(0,0,0,0.78),0_0_0_1px_rgba(244,63,94,0.08)]',
+                base: 'm-4 overflow-hidden rounded-[32px] border border-[var(--border-subtle)] bg-[var(--surface-card)] shadow-[0_40px_140px_rgba(14,14,14,0.78),0_0_0_1px_rgba(244,63,94,0.08)]',
                 backdrop: 'bg-black/86 backdrop-blur-[10px]',
             }}
         >
@@ -205,10 +205,10 @@ export function GuildAccessGuard({ guildId }: GuildAccessGuardProps) {
                 >
                     <div className="pointer-events-none absolute inset-0">
                         <div className="absolute inset-x-0 top-0 h-28 bg-[radial-gradient(circle_at_top,rgba(244,63,94,0.2),transparent_68%)]" />
-                        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.03),transparent_26%,rgba(0,0,0,0.12)_100%)]" />
+                        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(244,241,238,0.03),transparent_26%,rgba(14,14,14,0.12)_100%)]" />
                     </div>
 
-                    <div className="relative border-b border-[var(--border-divider)] bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.015))] px-6 py-5">
+                    <div className="relative border-b border-[var(--border-divider)] bg-[linear-gradient(180deg,rgba(244,241,238,0.04),rgba(244,241,238,0.015))] px-6 py-5">
                         <div className="flex items-center gap-4">
                             <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-[var(--color-destructive)]/30 bg-[var(--color-destructive)]/14 text-[var(--color-destructive)] shadow-[0_0_32px_rgba(239,68,68,0.22)]">
                                 <WarningCircle size={24} weight="fill" />
@@ -225,13 +225,13 @@ export function GuildAccessGuard({ guildId }: GuildAccessGuardProps) {
                     </div>
 
                     <ModalBody className="relative px-6 py-6">
-                        <div className="rounded-[24px] border border-[var(--border-subtle)] bg-black/24 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+                        <div className="rounded-[24px] border border-[var(--border-subtle)] bg-black/24 p-5 shadow-[inset_0_1px_0_rgba(244,241,238,0.03)]">
                             <p className="text-sm leading-7 text-white/78">
                                 {text.description}
                             </p>
                         </div>
 
-                        <div className="mt-5 rounded-[24px] border border-[var(--border-subtle)] bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(0,0,0,0.12))] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                        <div className="mt-5 rounded-[24px] border border-[var(--border-subtle)] bg-[linear-gradient(180deg,rgba(244,241,238,0.03),rgba(14,14,14,0.12))] p-4 shadow-[inset_0_1px_0_rgba(244,241,238,0.04)]">
                             <div className="mb-3 flex items-center justify-between gap-4 text-sm">
                                 <span className="font-semibold text-white">
                                     {text.redirecting}
@@ -263,7 +263,7 @@ export function GuildAccessGuard({ guildId }: GuildAccessGuardProps) {
                         </div>
                     </ModalBody>
 
-                    <div className="relative flex justify-end border-t border-[var(--border-divider)] bg-[linear-gradient(180deg,rgba(255,255,255,0.02),rgba(0,0,0,0.14))] px-6 py-4">
+                    <div className="relative flex justify-end border-t border-[var(--border-divider)] bg-[linear-gradient(180deg,rgba(244,241,238,0.02),rgba(14,14,14,0.14))] px-6 py-4">
                         <Button
                             onPress={startRedirect}
                             className="h-11 rounded-xl bg-[var(--color-destructive)] px-5 text-sm font-bold text-white shadow-[0_14px_34px_rgba(239,68,68,0.26)] transition-transform hover:scale-[1.02] hover:bg-[var(--color-destructive)]/90"

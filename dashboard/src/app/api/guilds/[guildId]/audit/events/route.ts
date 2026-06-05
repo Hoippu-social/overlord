@@ -34,10 +34,18 @@ export async function GET(
     const tag = search.get('tag');
     const limit = search.get('limit');
     const beforeId = search.get('beforeId');
+    const userId = search.get('userId');
+    const actorId = search.get('actorId');
+    const targetId = search.get('targetId');
+    const channelId = search.get('channelId');
 
     if (tag) url.searchParams.set('tag', tag);
     if (limit) url.searchParams.set('limit', limit);
     if (beforeId) url.searchParams.set('beforeId', beforeId);
+    if (userId) url.searchParams.set('userId', userId);
+    if (actorId) url.searchParams.set('actorId', actorId);
+    if (targetId) url.searchParams.set('targetId', targetId);
+    if (channelId) url.searchParams.set('channelId', channelId);
 
     const headers: Record<string, string> = {};
     if (BOT_API_KEY) headers['x-dashboard-key'] = BOT_API_KEY;

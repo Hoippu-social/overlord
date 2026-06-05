@@ -180,7 +180,7 @@ export default function CategoryModal({ isOpen, onClose, category, onSave, chann
             hideCloseButton
             classNames={{
                 base: "bg-[var(--surface-modal)] border border-[var(--border-subtle)] shadow-2xl rounded-[32px] overflow-hidden m-4",
-                backdrop: "bg-[#000]/60 backdrop-blur-sm"
+                backdrop: "bg-[#0e0e0e]/60 backdrop-blur-sm"
             }}
         >
             <ModalContent>
