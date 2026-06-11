@@ -1,59 +1,59 @@
 # Overlord Discord Bot
 
-Overlord is a development workspace for a Discord bot and its web dashboard. The
-repository contains the bot runtime, a Next.js dashboard, Lavalink binaries for
-music playback, Prisma schemas, migration scripts, and operational notes for the
-statistics and ticket modules.
+Overlord - рабочее окружение для Discord-бота и веб-панели управления. В
+репозитории лежат runtime бота, Next.js dashboard, локальный Lavalink для музыки,
+Prisma-схемы, миграционные скрипты и документация по статистике, тикетам и
+эксплуатации проекта.
 
-## What is inside
+## Что внутри
 
-| Path | Purpose |
+| Путь | Назначение |
 | --- | --- |
-| `bot/` | Discord.js bot runtime: slash commands, moderation, music, audit logging, temporary voice, tickets, appeals, statistics, dashboard bridge API. |
-| `dashboard/` | Next.js 16 App Router dashboard on port `3001`: Discord auth, guild management UI, moderation settings, stats pages, tickets UI, music controls, system diagnostics. |
-| `lavalink/` | Local Lavalink server and plugins used by the music module. |
-| `docs/` | Runbooks, audits, specs, and implementation notes. |
-| `start*.bat` | Windows convenience scripts for local development. |
+| `bot/` | Discord.js бот: slash-команды, модерация, музыка, аудит, временные голосовые каналы, тикеты, appeals, статистика и bridge API для dashboard. |
+| `dashboard/` | Next.js 16 App Router dashboard на порту `3001`: Discord auth, управление серверами, модерация, статистика, тикеты, команды, музыка и системная диагностика. |
+| `lavalink/` | Локальный Lavalink-сервер и плагины для музыкального модуля. |
+| `docs/` | Runbook'и, аудиты, спецификации и технические заметки. |
+| `start*.bat` | Windows-скрипты для локального запуска. |
 
-## Main features
+## Основные возможности
 
-- Discord slash-command bot built on `discord.js`.
-- Moderation workflows: warnings, mutes, timeouts, bans, case history, appeals,
-  audit routes, retention settings, and optional AI moderation.
-- Music playback through Lavalink with queue, loop, shuffle, seek, volume, now
-  playing, and dashboard controls.
-- Temporary voice channels and invite/member activity tracking.
-- Statistics subsystem with SQLite by default and PostgreSQL migration tooling
-  for the stats workload.
-- Ticket/support module: configurable panels, categories, live ticket handling,
-  transcripts, dashboard pages, and a bot-to-dashboard bridge.
-- Web dashboard with Discord OAuth, guild-scoped layouts, global search,
-  moderation, stats, tickets, commands, music, and system control surfaces.
+- Discord-бот на `discord.js` со slash-командами.
+- Модерация: warnings, mutes, timeouts, bans, история кейсов, appeals,
+  audit routes, retention-настройки и опциональная AI-модерация.
+- Музыка через Lavalink: queue, loop, shuffle, seek, volume, now playing и
+  управление из dashboard.
+- Временные голосовые каналы, invite/member activity tracking.
+- Статистика с SQLite по умолчанию и инструментами миграции stats workload в
+  PostgreSQL.
+- Тикет-модуль: настраиваемые панели, категории, live tickets, transcripts,
+  dashboard-страницы и bridge между dashboard и ботом.
+- Web dashboard с Discord OAuth, guild-scoped layout, global search,
+  moderation, stats, tickets, commands, music и system control surfaces.
 
-## Tech stack
+## Технологии
 
 - Node.js / npm
 - TypeScript
 - Discord.js 14
 - Prisma 5
-- SQLite for local/default data
-- Optional PostgreSQL target for statistics data
+- SQLite для локальных данных по умолчанию
+- Опциональный PostgreSQL для статистики
 - Next.js 16, React 19, Tailwind CSS, NextUI
-- Lavalink 4 with YouTube/LavaSrc plugins
+- Lavalink 4 с YouTube/LavaSrc plugins
 
-## Prerequisites
+## Требования
 
-- Windows development environment. The included startup scripts are `.bat`
-  files and assume Windows paths.
-- Node.js 20 or newer is recommended.
-- Java 17 or newer for Lavalink.
-- A Discord application with bot token, client id, client secret, and configured
-  OAuth redirect URL.
-- npm dependencies installed in both `bot/` and `dashboard/`.
+- Windows-окружение для разработки. Встроенные startup-скрипты являются `.bat`
+  файлами и рассчитаны на Windows-пути.
+- Node.js 20 или новее.
+- Java 17 или новее для Lavalink.
+- Discord application с bot token, client id, client secret и настроенным OAuth
+  redirect URL.
+- Установленные npm-зависимости отдельно в `bot/` и `dashboard/`.
 
-## Installation
+## Установка
 
-Install dependencies separately for the bot and dashboard:
+Установите зависимости в двух приложениях:
 
 ```bash
 cd bot
@@ -63,12 +63,12 @@ cd ../dashboard
 npm install
 ```
 
-The repository root currently only carries shared metadata and does not replace
-the package installs inside the two applications.
+Корневой `package.json` сейчас не заменяет установку зависимостей внутри
+`bot/` и `dashboard/`.
 
-## Environment
+## Переменные окружения
 
-Create local `.env` files for the bot and dashboard. Do not commit secrets.
+Создайте локальные `.env` файлы для бота и dashboard. Секреты нельзя коммитить.
 
 ### `bot/.env`
 
@@ -119,24 +119,24 @@ LAVALINK_PORT=2333
 LAVALINK_PASSWORD=youshallnotpass
 ```
 
-Use the same `DASHBOARD_API_KEY` in both files so dashboard API routes can call
-the local bot bridge.
+`DASHBOARD_API_KEY` должен совпадать в обоих файлах, иначе dashboard API routes
+не смогут обращаться к локальному bridge API бота.
 
-## Local startup
+## Локальный запуск
 
-The usual local startup order is:
+Обычный порядок запуска:
 
 1. Lavalink
 2. Bot
 3. Dashboard
 
-Run everything with:
+Запуск всех компонентов:
 
 ```bat
 .\start.bat
 ```
 
-Or run components separately:
+Отдельный запуск:
 
 ```bat
 .\start_lavalink.bat
@@ -144,7 +144,7 @@ Or run components separately:
 .\start_dashboard.bat
 ```
 
-Manual commands:
+Ручной запуск:
 
 ```bash
 cd lavalink
@@ -157,10 +157,10 @@ cd ../dashboard
 npm run dev
 ```
 
-The dashboard is available at <http://localhost:3001>. The bot bridge listens on
-`127.0.0.1:3002` by default.
+Dashboard доступен на <http://localhost:3001>. Bridge API бота по умолчанию
+слушает `127.0.0.1:3002`.
 
-## Build and checks
+## Сборка и проверки
 
 Bot:
 
@@ -178,22 +178,24 @@ npm run build
 npm run lint
 ```
 
-Both build commands generate the dedicated stats PostgreSQL Prisma client before
-building. Make sure stats-related environment variables are set if you use the
-PostgreSQL tooling.
+Обе build-команды генерируют отдельный Prisma client для stats PostgreSQL перед
+сборкой. Если используете PostgreSQL-инструменты статистики, заранее настройте
+соответствующие переменные окружения.
 
-## Database notes
+## База данных
 
-- Main bot/dashboard data is managed by Prisma through `bot/prisma/schema.prisma`.
-- Local development commonly uses SQLite through `bot/prisma/development.db`.
-- Statistics can use SQLite by default or PostgreSQL through
+- Основные bot/dashboard данные управляются Prisma через
+  `bot/prisma/schema.prisma`.
+- В локальной разработке обычно используется SQLite:
+  `bot/prisma/development.db`.
+- Статистика может работать на SQLite по умолчанию или на PostgreSQL через
   `STATS_PG_DATABASE_URL`.
-- The dashboard has its own Prisma generation flow, but the main schema is shared
-  from the bot workspace.
-- Stats PostgreSQL migration helpers live in `dashboard/scripts/`; see
-  `docs/stats-postgres-migration-runbook.md`.
+- Dashboard имеет собственный generate-flow, но основная схема берётся из bot
+  workspace.
+- Скрипты миграции stats workload в PostgreSQL находятся в `dashboard/scripts/`;
+  подробный runbook: `docs/stats-postgres-migration-runbook.md`.
 
-Useful commands:
+Полезные команды:
 
 ```bash
 cd bot
@@ -208,12 +210,11 @@ npm run stats:pg:parity
 
 ## Discord setup checklist
 
-- Enable the bot token and required privileged intents in the Discord Developer
-  Portal.
-- Configure OAuth redirects for the dashboard, for example
+- Включите bot token и нужные privileged intents в Discord Developer Portal.
+- Настройте OAuth redirects для dashboard, например
   `http://localhost:3001/api/auth/callback/discord`.
-- Invite the bot with application command and bot scopes.
-- Give the bot permissions needed by active modules:
+- Пригласите бота со scopes `bot` и `applications.commands`.
+- Выдайте боту права, необходимые активным модулям:
   - `ViewChannel`
   - `SendMessages`
   - `EmbedLinks`
@@ -221,28 +222,28 @@ npm run stats:pg:parity
   - `ManageThreads`
   - `CreatePrivateThreads`
   - `SendMessagesInThreads`
-  - moderation permissions required by enabled moderation commands
+  - moderation permissions для включённых модераторских команд
 
-## Development workflow
+## Рабочий процесс
 
-- Keep bot and dashboard changes scoped to their folders.
-- Use `npm run build` in the affected workspace before publishing code changes.
-- Run `npm run lint` in `dashboard/` after dashboard UI edits.
-- Do not commit generated local databases or secrets.
-- For dashboard UI work, reuse the existing components and Tailwind token system
-  described in `AGENTS.md`.
-- For ticket-module work, keep the technical decisions aligned with
+- Держите изменения бота и dashboard в соответствующих папках.
+- Перед публикацией кода запускайте `npm run build` в затронутом workspace.
+- После dashboard UI-изменений запускайте `npm run lint` в `dashboard/`.
+- Не коммитьте локальные базы данных, generated clients и секреты.
+- Для dashboard UI переиспользуйте существующие компоненты и Tailwind token
+  system из `AGENTS.md`.
+- Для ticket-module изменений держите решения синхронизированными с
   `docs/tickets-module-tech-spec.md`.
 
-## Branches
+## Ветки
 
-The repository currently uses `Dev` for active development and `Stable` for the
-more stable line. Feature and assistant branches may exist on GitHub as needed.
-When backporting documentation-only updates, apply the same README to every
-published branch so newcomers see consistent setup instructions.
+`Dev` используется как активная ветка разработки, `Stable` - как более стабильная
+линия. На GitHub также могут существовать feature/assistant ветки. Для
+документационных backport'ов держите корневой README одинаковым во всех
+опубликованных ветках, чтобы новые участники видели актуальные инструкции.
 
-## Licensing
+## Лицензия
 
-The code is licensed under AGPL-3.0-or-later. Additional licensing and brand
-documents are available in `LICENSE`, `LICENSING.md`,
-`COMMERCIAL-LICENSE-AGREEMENT.md`, `BRAND-ASSETS-LICENSE.md`, and `NOTICE`.
+Код распространяется под AGPL-3.0-or-later. Дополнительные документы по лицензии
+и бренду находятся в `LICENSE`, `LICENSING.md`,
+`COMMERCIAL-LICENSE-AGREEMENT.md`, `BRAND-ASSETS-LICENSE.md` и `NOTICE`.
