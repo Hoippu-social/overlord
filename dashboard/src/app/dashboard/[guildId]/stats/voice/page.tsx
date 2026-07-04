@@ -19,6 +19,7 @@ import { ChartContainer } from "@/components/stats/ChartContainer";
 import { StatsTopWidget } from "@/components/stats/StatsTopWidget";
 import { ChartTooltip } from "@/components/stats/ChartTooltip";
 import { StatsHeatmap, StatsPageHeader, StatsPageShell } from "@/components/stats/StatsPageScaffold";
+import { StatsExportMenu } from "@/components/stats/StatsExportMenu";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Line } from 'recharts';
 
 
@@ -164,6 +165,23 @@ export default function VoicePage() {
                 subtitle={text.subtitle}
                 icon={<MicrophoneStage size={26} weight="fill" />}
                 iconClassName="text-warning"
+                actions={
+                    <StatsExportMenu
+                        locale={locale}
+                        period={period}
+                        filenamePrefix="voice"
+                        data={data}
+                        chart={{
+                            title: text.voiceActivity,
+                            labels: chartData.map((d: any) => d.date),
+                            series: [
+                                { name: text.activityTime, color: '#F97316', values: chartData.map((d: any) => d.voice) },
+                                { name: text.median, color: '#10b981', values: chartData.map((d: any) => d.weeklyMedian ?? 0), dashed: true },
+                            ],
+                            valueFormatter: (v) => autoFormatMinutes(v, text),
+                        }}
+                    />
+                }
             />
 
             {/* Summary Cards */}

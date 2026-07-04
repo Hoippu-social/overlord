@@ -18,6 +18,7 @@ import { ChartContainer } from "@/components/stats/ChartContainer";
 import { StatsTopWidget } from "@/components/stats/StatsTopWidget";
 import { ChartTooltip } from "@/components/stats/ChartTooltip";
 import { StatsHeatmap, StatsPageHeader, StatsPageShell } from "@/components/stats/StatsPageScaffold";
+import { StatsExportMenu } from "@/components/stats/StatsExportMenu";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
 
 const strings = {
@@ -156,6 +157,22 @@ export default function MessagesPage() {
                 subtitle={text.subtitle}
                 icon={<MessengerLogo size={26} weight="fill" />}
                 iconClassName="text-[var(--color-primary-2)]"
+                actions={
+                    <StatsExportMenu
+                        locale={locale}
+                        period={period}
+                        filenamePrefix="messages"
+                        data={data}
+                        chart={{
+                            title: text.messagesOverTime,
+                            labels: lineChartData.map((d: any) => d.date),
+                            series: [
+                                { name: text.messagesLabel, color: '#8B5CF6', values: lineChartData.map((d: any) => d.messages) },
+                                { name: text.median, color: '#10b981', values: lineChartData.map((d: any) => d.weeklyMedian ?? 0), dashed: true },
+                            ],
+                        }}
+                    />
+                }
             />
 
             {/* Summary Cards */}

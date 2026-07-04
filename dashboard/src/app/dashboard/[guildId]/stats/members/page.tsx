@@ -17,6 +17,7 @@ import { StatsCard } from "@/components/stats/StatsCard";
 import { ChartContainer } from "@/components/stats/ChartContainer";
 import { ChartTooltip } from "@/components/stats/ChartTooltip";
 import { StatsPageHeader, StatsPageShell } from "@/components/stats/StatsPageScaffold";
+import { StatsExportMenu } from "@/components/stats/StatsExportMenu";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts';
 
 
@@ -91,6 +92,21 @@ export default function MembersPage() {
                 subtitle={text.subtitle}
                 icon={<UsersThree size={26} weight="fill" />}
                 iconClassName="text-success"
+                actions={
+                    <StatsExportMenu
+                        locale={locale}
+                        period={period}
+                        filenamePrefix="members"
+                        data={data}
+                        chart={{
+                            title: text.memberGrowth,
+                            labels: growthData.map((d: any) => d.date),
+                            series: [
+                                { name: text.totalMembers, color: '#10B981', values: growthData.map((d: any) => d.count) },
+                            ],
+                        }}
+                    />
+                }
             />
 
             {/* Summary Cards */}

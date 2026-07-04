@@ -13,6 +13,7 @@ interface StatsPageHeaderProps {
     icon: React.ReactNode;
     className?: string;
     iconClassName?: string;
+    actions?: React.ReactNode;
 }
 
 interface StatsHeatmapProps {
@@ -31,7 +32,7 @@ export function StatsPageShell({ children, className = '' }: StatsPageShellProps
     );
 }
 
-export function StatsPageHeader({ title, subtitle, icon, className = '', iconClassName = '' }: StatsPageHeaderProps) {
+export function StatsPageHeader({ title, subtitle, icon, className = '', iconClassName = '', actions }: StatsPageHeaderProps) {
     return (
         <header className={`flex min-w-0 items-center gap-3 sm:gap-4 ${className}`}>
             <div className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-[18px] border border-divider bg-surface shadow-sm shadow-black/20 sm:h-14 sm:w-14 sm:rounded-2xl ${iconClassName}`}>
@@ -47,6 +48,7 @@ export function StatsPageHeader({ title, subtitle, icon, className = '', iconCla
                     </p>
                 ) : null}
             </div>
+            {actions ? <div className="flex flex-shrink-0 items-center gap-2">{actions}</div> : null}
         </header>
     );
 }

@@ -20,6 +20,7 @@ import { StatsCard } from "@/components/stats/StatsCard";
 import { ChartContainer } from "@/components/stats/ChartContainer";
 import { ChartTooltip } from "@/components/stats/ChartTooltip";
 import { StatsPageHeader, StatsPageShell } from "@/components/stats/StatsPageScaffold";
+import { StatsExportMenu } from "@/components/stats/StatsExportMenu";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 
@@ -119,6 +120,22 @@ export default function StatsOverview() {
                 subtitle={text.subtitle}
                 icon={<ChartBar size={26} weight="fill" />}
                 iconClassName="text-primary"
+                actions={
+                    <StatsExportMenu
+                        locale={locale}
+                        period={period}
+                        filenamePrefix="overview"
+                        data={data}
+                        chart={{
+                            title: text.activityChart,
+                            labels: activityData.map((d: any) => d.date),
+                            series: [
+                                { name: text.messages, color: 'var(--color-primary-2)', values: activityData.map((d: any) => d.messages) },
+                                { name: text.voice, color: 'var(--color-warning)', values: activityData.map((d: any) => d.voice) },
+                            ],
+                        }}
+                    />
+                }
             />
 
             {/* Key Metrics Cards */}

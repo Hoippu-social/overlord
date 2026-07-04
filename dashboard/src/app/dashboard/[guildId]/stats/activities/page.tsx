@@ -14,6 +14,7 @@ import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { StatsCard } from "@/components/stats/StatsCard";
 import { ChartContainer } from "@/components/stats/ChartContainer";
 import { StatsPageHeader, StatsPageShell } from "@/components/stats/StatsPageScaffold";
+import { StatsExportMenu } from "@/components/stats/StatsExportMenu";
 
 import { StatsTopWidget, COLORS } from "@/components/stats/StatsTopWidget";
 
@@ -93,6 +94,23 @@ export default function ActivitiesPage() {
                 subtitle={text.subtitle}
                 icon={<GameController size={26} weight="fill" />}
                 iconClassName="text-primary"
+                actions={
+                    <StatsExportMenu
+                        locale={locale}
+                        period={period}
+                        filenamePrefix="activities"
+                        data={data}
+                        chart={{
+                            title: text.topActivities,
+                            kind: 'bar',
+                            labels: topActivities.map((a: any) => a.name),
+                            series: [
+                                { name: text.totalPlaytime, color: COLORS[0], values: topActivities.map((a: any) => a.seconds) },
+                            ],
+                            valueFormatter: (v) => formatSeconds(v),
+                        }}
+                    />
+                }
             />
 
             {/* Summary Cards */}
