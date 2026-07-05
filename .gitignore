@@ -20,6 +20,10 @@ lavalink.session
 *.db-journal
 .postgres/
 
+# Generated Prisma clients (regenerated at build via `prisma generate`)
+bot/src/generated/
+dashboard/src/generated/
+
 # Backups
 backups/
 
@@ -33,4 +37,7 @@ check_db.js
 tmp/
 dashboard/tmp/
 dashboard/test-results/
+
+# Internal documentation (kept in a separate private repo, never committed here)
+docs-internal/
 
