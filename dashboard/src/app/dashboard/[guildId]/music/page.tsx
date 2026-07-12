@@ -217,7 +217,7 @@ export default function MusicSettingsPage({ params }: { params: Promise<{ guildI
     return (
         <div className="space-y-8 pb-32 animate-fade-in max-w-[1000px] w-full mx-auto">
             {/* Player Interface Component */}
-            <div className="w-full bg-[var(--surface-card)] border border-[var(--border-subtle)] rounded-[32px] overflow-hidden shadow-2xl shadow-black/50 p-8 flex flex-col md:flex-row gap-8 items-center bg-gradient-to-br from-[#111111] to-[#0a0a0a]">
+            <div className="w-full bg-[var(--surface-card)] border border-[var(--border-subtle)] rounded-[32px] overflow-hidden shadow-2xl shadow-black/50 p-8 flex flex-col md:flex-row gap-8 items-center bg-gradient-to-br from-[#111111] to-[#0a0a0a]" data-tour="music-player">
 
                 {/* Album Cover Area */}
                 <div className="w-48 h-48 md:w-64 md:h-64 rounded-2xl bg-[var(--surface-hover)] border border-[var(--border-subtle)] flex items-center justify-center shadow-lg shrink-0 relative overflow-hidden group">
@@ -273,7 +273,7 @@ export default function MusicSettingsPage({ params }: { params: Promise<{ guildI
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
                 {/* Volume & Configuration */}
-                <div className="bg-[var(--surface-card)] border border-[var(--border-subtle)] rounded-[24px] p-6 space-y-8">
+                <div className="bg-[var(--surface-card)] border border-[var(--border-subtle)] rounded-[24px] p-6 space-y-8" data-tour="music-volume">
                     <div className="flex items-center gap-3 border-b border-[var(--border-divider)] pb-4">
                         <FadersHorizontal size={24} className="text-[var(--color-primary-2)]" weight="duotone" />
                         <h3 className="font-bold text-lg text-[var(--text-primary)]">{text.volumeTitle} & Config</h3>
@@ -323,7 +323,7 @@ export default function MusicSettingsPage({ params }: { params: Promise<{ guildI
                 </div>
 
                 {/* Permissions & Channels */}
-                <div className="bg-[var(--surface-card)] border border-[var(--border-subtle)] rounded-[24px] p-6 space-y-8 flex flex-col h-full">
+                <div className="bg-[var(--surface-card)] border border-[var(--border-subtle)] rounded-[24px] p-6 space-y-8 flex flex-col h-full" data-tour="music-access">
                     <div className="flex items-center gap-3 border-b border-[var(--border-divider)] pb-4">
                         <Users size={24} className="text-[var(--color-primary-1)]" weight="duotone" />
                         <h3 className="font-bold text-lg text-[var(--text-primary)]">Access & Roles</h3>

@@ -232,8 +232,11 @@ async function sendAiAlert(message: Message, assessment: AiAssessment, triggered
         .setFooter({ text: `${provider}/${model}` })
         .setTimestamp();
 
+    const guild = message.guild;
+    if (!guild) return;
+
     for (const routeChannelId of routeChannelIds) {
-        const channel = await message.client.channels.fetch(routeChannelId).catch(() => null);
+        const channel = guild.channels.cache.get(routeChannelId) ?? await guild.channels.fetch(routeChannelId).catch(() => null);
         if (!channel || !channel.isTextBased() || !('send' in channel)) continue;
 
         await (channel as { send: (payload: unknown) => Promise<unknown> }).send({

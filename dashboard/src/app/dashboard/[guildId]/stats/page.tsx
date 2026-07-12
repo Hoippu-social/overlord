@@ -139,7 +139,7 @@ export default function StatsOverview() {
             />
 
             {/* Key Metrics Cards */}
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 sm:gap-4">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 sm:gap-4" data-tour="stats-cards">
                 <StatsCard
                     title={text.totalMessages}
                     value={formatLocaleNumber(cards.totalMessages, locale)}
@@ -173,7 +173,7 @@ export default function StatsOverview() {
             </div>
 
             {/* Activity Chart */}
-            <div>
+            <div data-tour="stats-chart">
                 <ChartContainer title={text.activityChart} subtitle={text.activityChartDesc} loading={loading} height={320}>
                     <ResponsiveContainer width="100%" height="100%">
                         <AreaChart data={activityData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>

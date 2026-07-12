@@ -6,6 +6,7 @@ import { ShieldCheck, WarningCircle } from '@phosphor-icons/react';
 
 import { useGuildLocale } from '@/lib/i18n';
 import { SegmentedTabs } from '@/components/common/SegmentedTabs';
+import { LoadingSkeleton } from '@/components/common/LoadingSkeleton';
 
 import { AiIncidentState, AnalyticsState, AppealTicketState, CasesState, ConfigState } from '@/app/dashboard/[guildId]/moderation/types';
 import { emptyAnalytics, emptyAppeals, emptyCases, emptyConfig, emptyIncidents } from '@/app/dashboard/[guildId]/moderation/constants';
@@ -241,9 +242,10 @@ export default function ModerationPage({ params }: { params: Promise<{ guildId: 
 
     if (loading) {
         return (
-            <div className="flex h-[400px] w-full animate-pulse flex-col items-center justify-center gap-4">
-                <ShieldCheck size={48} className="text-[var(--color-primary-1)] opacity-50" />
-                <p className="text-sm font-semibold tracking-wide text-[var(--text-muted)]">{text.loading}</p>
+            <div className="flex h-[400px] w-full flex-col items-center justify-center gap-4">
+                <LoadingSkeleton className="h-14 w-14 rounded-2xl" />
+                <LoadingSkeleton className="h-4 w-64 rounded-full" />
+                <p className="sr-only">{text.loading}</p>
             </div>
         );
     }
@@ -251,7 +253,7 @@ export default function ModerationPage({ params }: { params: Promise<{ guildId: 
     return (
         <div className="relative mx-auto flex w-full max-w-[1500px] flex-col gap-6 animate-fade-in pb-32">
             <div className="relative px-2 pt-6 md:px-6">
-                <SegmentedTabs active={currentTab} onChange={(value) => handleTabChange(value as typeof TAB_KEYS[number])} labels={text.tabs} tabs={TAB_KEYS} />
+                <SegmentedTabs active={currentTab} onChange={(value) => handleTabChange(value as typeof TAB_KEYS[number])} labels={text.tabs} tabs={TAB_KEYS} dataTour="mod-tabs" />
             </div>
 
             {notice ? (

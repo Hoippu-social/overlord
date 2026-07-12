@@ -11,6 +11,10 @@ import { RollupService } from '../services/RollupService';
 import { BackupService } from '../services/BackupService';
 import { ModerationLifecycleService } from '../services/ModerationLifecycleService';
 import { RetentionService } from '../services/RetentionService';
+import { syncAllTicketPanels } from '../services/TicketPanelService';
+import { TicketLifecycleService } from '../services/TicketLifecycleService';
+import { EconomyEarnService } from '../services/EconomyEarnService';
+import { EconomyLifecycleService } from '../services/EconomyLifecycleService';
 
 export default {
     name: Events.ClientReady,
@@ -59,6 +63,15 @@ export default {
         ModerationLifecycleService.init(client);
         RetentionService.init(client);
 
+        // Sync ticket panels for all enabled guilds
+        syncAllTicketPanels(client).catch((err) =>
+            logger.warn('[TicketPanelService] Startup panel sync failed:', err)
+        );
+
+        TicketLifecycleService.init(client);
+        EconomyEarnService.init(client);
+        EconomyLifecycleService.init(client);
+
         // Log Bot Start
         try {
             const auditLogData = client.guilds.cache.map(g => ({
@@ -68,7 +81,7 @@ export default {
             }));
             if (auditLogData.length > 0) {
                 await statsPrisma.auditLogEvent.createMany({ data: auditLogData });
-                logger.info(`Logged BOT_STARTED event for ${auditLogData.length} guilds to stats.db`);
+                logger.info(`Logged BOT_STARTED event for ${auditLogData.length} guilds to PostgreSQL stats storage`);
             }
         } catch (e) {
             logger.error('Failed to log BOT_STARTED events:', e);

@@ -176,7 +176,7 @@ export default function MessagesPage() {
             />
 
             {/* Summary Cards */}
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 sm:gap-4 lg:gap-6">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 sm:gap-4 lg:gap-6" data-tour="stats-messages-cards">
                 <StatsCard
                     title={text.totalMessages}
                     value={formatLocaleNumber(totalMessages, locale)}
@@ -204,7 +204,7 @@ export default function MessagesPage() {
             </div>
 
             {/* Line Chart & Heatmap - 50/50 layout */}
-            <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 sm:gap-6">
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 sm:gap-6" data-tour="stats-messages-chart">
                 <ChartContainer
                     title={text.messagesOverTime}
                     className="h-full"

@@ -6,7 +6,9 @@ import type { NextRequest } from 'next/server';
 import { resolveAllowedGuildIds } from '@/lib/discordAccess';
 import { BOT_OWNER_ID, MASTER_MODE_COOKIE } from '@/lib/constants';
 import { fetchWithTimeout } from '@/lib/requestTimeout';
-import { createSharedNextAuthCookies, getNextAuthSessionCookieName } from '@/lib/authCookies';
+import { createSharedNextAuthCookies, getNextAuthSessionCookieName, LOCAL_SESSION_COOKIE_NAME } from '@/lib/authCookies';
+import { verifyLocalSessionToken } from '@/lib/localSession';
+import { resolveAuthRedirectUrl } from '@/lib/publicDashboard';
 
 type DiscordToken = JWT & {
     accessToken?: string;
@@ -75,6 +77,9 @@ export const authOptions: NextAuthOptions = {
         signIn: '/login'
     },
     callbacks: {
+        async redirect({ url, baseUrl }) {
+            return resolveAuthRedirectUrl(url, baseUrl);
+        },
         async jwt({ token, account }) {
             if (account) {
                 const expiresAt = account.expires_at
@@ -122,11 +127,11 @@ export const authOptions: NextAuthOptions = {
 };
 
 export async function getAuthToken(request: NextRequest) {
-    const sessionToken = request.cookies.get('session');
+    const sessionToken = request.cookies.get(LOCAL_SESSION_COOKIE_NAME);
 
-    // If the admin password session is present, return a fake token with admin privileges.
-    // The accessToken is "admin" to bypass auth checks downstream if they check for string.
-    if (sessionToken && sessionToken.value) {
+    // Admin password session: only honoured when the cookie carries a valid HMAC
+    // signature (see lib/localSession). A bare/forged cookie value is rejected.
+    if (await verifyLocalSessionToken(sessionToken?.value)) {
         return {
             accessToken: 'admin',
             role: 'admin',
@@ -134,13 +139,32 @@ export async function getAuthToken(request: NextRequest) {
         };
     }
 
-    const token = (await getToken({
+    let token = (await getToken({
         req: request,
         secret: process.env.NEXTAUTH_SECRET,
         cookieName: getNextAuthSessionCookieName(),
     })) as DiscordToken | null;
     if (!token) {
         return null;
+    }
+
+    const hasExpiredAccessToken = token.accessToken
+        && token.accessTokenExpires
+        && Date.now() > token.accessTokenExpires - 60 * 1000;
+    const canRefreshAccessToken = hasExpiredAccessToken && token.refreshToken;
+    if (canRefreshAccessToken) {
+        token = await refreshAccessToken(token);
+        if (token.error === 'RefreshAccessTokenError') {
+            if (token.sub === BOT_OWNER_ID) {
+                return {
+                    ...token,
+                    accessToken: 'admin',
+                    role: 'owner',
+                    allowedGuilds: undefined,
+                };
+            }
+            return null;
+        }
     }
 
     if (token.sub === BOT_OWNER_ID) {
@@ -159,4 +183,25 @@ export async function getAuthToken(request: NextRequest) {
     }
 
     return token;
+}
+
+const SUPER_USER_ROLES = new Set(['admin', 'owner', 'master']);
+
+/**
+ * Authorises bot-process / system-level operations. Only the dashboard admin
+ * (password session), the bot owner, or master mode may pass. Returns true when
+ * the caller is a super-user.
+ */
+export async function isSuperUser(request: NextRequest): Promise<boolean> {
+    const token = await getAuthToken(request);
+    if (!token) {
+        return false;
+    }
+
+    const role = (token as { role?: string }).role;
+    if (role && SUPER_USER_ROLES.has(role)) {
+        return true;
+    }
+
+    return (token as { sub?: string }).sub === BOT_OWNER_ID;
 }

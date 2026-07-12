@@ -1,3 +1,4 @@
+import '@/lib/bigintJson';
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma, statsPrisma } from '@/lib/prisma';
 import { requireGuildStatsAccess } from '@/lib/statsAccess';
@@ -13,11 +14,6 @@ import {
 } from '@/lib/stats';
 
 const BOT_API_URL = process.env.BOT_API_URL || 'http://127.0.0.1:3002';
-
-// Patch BigInt serialization for JSON
-(BigInt.prototype as any).toJSON = function () {
-    return this.toString();
-};
 
 const isMissingTableError = (error: unknown) => {
     const err = error as { code?: string; message?: string };

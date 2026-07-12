@@ -1,6 +1,8 @@
 import { Events, Message } from 'discord.js';
 import { processMessageForAiModeration } from '../services/AiModerationService';
 import { processCustomRulesForAutomod, processMessageForAutomod } from '../services/AutomodService';
+import { EconomyEarnService } from '../services/EconomyEarnService';
+import { EconomyQuestService } from '../services/EconomyQuestService';
 import { StatsService } from '../services/StatsService';
 
 export default {
@@ -23,6 +25,11 @@ export default {
                 message.content.length,
                 message.id,
                 message.createdAt
+            );
+
+            await EconomyEarnService.handleMessage(message);
+            EconomyQuestService.incrementMetric(guildId, authorId, 'MESSAGES', 1).catch((err: unknown) =>
+                console.error('[Economy] Failed to increment MESSAGES quest metric', err)
             );
 
             // 2. Track REPLY — if this message is a reply to another message

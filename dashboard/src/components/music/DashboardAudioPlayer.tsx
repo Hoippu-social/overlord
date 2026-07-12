@@ -25,6 +25,19 @@ type QueueState = {
     repeatMode?: string | null;
 };
 
+async function readJsonResponse(res: Response): Promise<any | null> {
+    const contentType = res.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+        return null;
+    }
+
+    try {
+        return await res.json();
+    } catch {
+        return null;
+    }
+}
+
 export function DashboardAudioPlayer({ guildId }: { guildId: string }) {
     const [queueState, setQueueState] = useState<QueueState>({ current: null, tracks: [] });
     const [loading, setLoading] = useState(true);
@@ -42,10 +55,15 @@ export function DashboardAudioPlayer({ guildId }: { guildId: string }) {
     const [addingTrackId, setAddingTrackId] = useState<string | null>(null);
 
     const fetchQueue = useCallback(async () => {
+        if (typeof navigator !== 'undefined' && !navigator.onLine) {
+            setLoading(false);
+            return;
+        }
+
         try {
             const res = await fetch(`/api/guilds/${guildId}/music/queue`);
-            const data = await res.json();
-            if (data?.queue) {
+            const data = await readJsonResponse(res);
+            if (res.ok && data?.queue) {
                 setQueueState({
                     current: data.queue.current || null,
                     tracks: data.queue.tracks || [],
@@ -64,7 +82,9 @@ export function DashboardAudioPlayer({ guildId }: { guildId: string }) {
                 setQueueState({ current: null, tracks: [] });
             }
         } catch (error) {
-            console.error('Failed to fetch queue', error);
+            // Preserve the last queue during brief mobile network changes or
+            // dev-server reconnects without raising a Next.js error overlay.
+            console.warn('Music queue temporarily unavailable', error);
         } finally {
             setLoading(false);
         }
@@ -72,7 +92,11 @@ export function DashboardAudioPlayer({ guildId }: { guildId: string }) {
 
     useEffect(() => {
         fetchQueue();
-        const timer = setInterval(fetchQueue, 3000);
+        const timer = setInterval(() => {
+            if (document.visibilityState === 'visible') {
+                void fetchQueue();
+            }
+        }, 3000);
         return () => clearInterval(timer);
     }, [fetchQueue]);
 
@@ -154,10 +178,11 @@ export function DashboardAudioPlayer({ guildId }: { guildId: string }) {
         setSearching(true);
         try {
             const res = await fetch(`/api/guilds/${guildId}/music/search?platform=${searchPlatform}&query=${encodeURIComponent(searchQuery.trim())}`);
-            const data = await res.json();
-            setSearchResults(data.tracks || []);
+            const data = await readJsonResponse(res);
+            setSearchResults(res.ok ? data?.tracks || [] : []);
         } catch (error) {
             console.error('Failed to search', error);
+            setSearchResults([]);
         } finally {
             setSearching(false);
         }

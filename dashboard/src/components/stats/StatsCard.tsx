@@ -2,6 +2,7 @@
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { TrendUp, TrendDown } from '@phosphor-icons/react';
+import { LoadingSkeleton } from '@/components/common/LoadingSkeleton';
 
 interface StatsCardProps {
     title: string;
@@ -112,7 +113,7 @@ export function StatsCard({
             <div className="flex items-end justify-between mt-auto gap-2">
                 <div className="min-w-0 flex-1">
                     {loading ? (
-                        <div className="skeleton h-8 w-24 rounded-lg" />
+                        <LoadingSkeleton className="h-8 w-24 rounded-lg" />
                     ) : (
                         <AutoFitValue value={value} subValue={subValue} />
                     )}

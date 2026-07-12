@@ -29,7 +29,7 @@ interface ChartTooltipProps {
 export function ChartTooltip({ active, payload, label, locale = 'en', formatters, order, colorOverrides }: ChartTooltipProps) {
     if (!active || !payload || !payload.length) return null;
 
-    let displayPayload = [...payload];
+    const displayPayload = [...payload];
 
     if (order) {
         displayPayload.sort((a, b) => {

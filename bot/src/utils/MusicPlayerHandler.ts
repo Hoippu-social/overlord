@@ -109,7 +109,9 @@ export class MusicPlayerHandler {
         if (this.message) {
             try {
                 await this.message.delete();
-            } catch (e) { }
+            } catch {
+                // Best-effort: the now-playing message may already be deleted.
+            }
             this.message = null;
         }
     }

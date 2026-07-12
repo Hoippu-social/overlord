@@ -1,5 +1,7 @@
 import { Events, GuildBan, AuditLogEvent } from 'discord.js';
 import { logAuditEvent } from '../utils/auditLog';
+import { EconomyService } from '../services/EconomyService';
+import logger from '../utils/logger';
 
 export default {
     name: Events.GuildBanAdd,
@@ -38,5 +40,17 @@ export default {
             },
             severity: 'WARN',
         });
+
+        try {
+            const economyConfig = await EconomyService.getConfig(ban.guild.id);
+            if (economyConfig.confiscateOnBan) {
+                await EconomyService.confiscate(
+                    { guildId: ban.guild.id, userId: ban.user.id, reason: 'ban', actorId },
+                    ban.client
+                );
+            }
+        } catch (err) {
+            logger.error('[Economy] Failed to confiscate balance on ban', err);
+        }
     },
 };

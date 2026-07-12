@@ -1,5 +1,8 @@
 import { Events, GuildMember, AuditLogEvent } from 'discord.js';
 import { logAuditEvent } from '../utils/auditLog';
+import { EconomyService } from '../services/EconomyService';
+import { prisma } from '../utils/database';
+import logger from '../utils/logger';
 
 export default {
     name: Events.GuildMemberUpdate,
@@ -34,6 +37,10 @@ export default {
                 },
                 severity: 'INFO',
             });
+
+            applyBoosterOneTimeBonus(newMember).catch((err) =>
+                logger.error('[Economy] Failed to apply booster one-time bonus', err)
+            );
         }
 
         if (oldBoost && !newBoost) {
@@ -111,3 +118,35 @@ export default {
         }
     },
 };
+
+async function applyBoosterOneTimeBonus(member: GuildMember): Promise<void> {
+    const guildId = member.guild.id;
+    if (!(await EconomyService.isSourceEnabled(guildId, 'BOOSTER'))) return;
+
+    const row = await prisma.economyEarnSource.findUnique({
+        where: { guildId_source: { guildId, source: 'BOOSTER' } },
+    });
+    let oneTimeBonus = 0;
+    if (row?.settings) {
+        try {
+            const parsed = JSON.parse(row.settings);
+            if (Number.isFinite(parsed.oneTimeBonus)) oneTimeBonus = parsed.oneTimeBonus;
+        } catch {
+            // fall through with default
+        }
+    }
+    if (oneTimeBonus <= 0) return;
+
+    const premiumSince = member.premiumSinceTimestamp ?? Date.now();
+    await EconomyService.credit(
+        {
+            guildId,
+            userId: member.id,
+            account: 'WALLET',
+            amount: BigInt(oneTimeBonus),
+            type: 'BOOSTER_BONUS',
+            idempotencyKey: `booster_bonus:${guildId}:${member.id}:${premiumSince}`,
+        },
+        member.client
+    );
+}

@@ -70,7 +70,9 @@ function getToken() {
                 dotenv.config({ path: p, override: true });
                 if (process.env.DISCORD_TOKEN) return process.env.DISCORD_TOKEN;
             }
-        } catch { }
+        } catch {
+            // Best-effort: this candidate .env path is unreadable, try the next one.
+        }
     }
 
     throw new Error('DISCORD_TOKEN is not configured on dashboard');
@@ -96,6 +98,18 @@ async function discordRequest(method: string, path: string, token: string, body?
         return await res.json();
     } catch {
         return null;
+    }
+}
+
+async function fetchDiscordChannel(token: string, channelId: string) {
+    const channel = await discordRequest('GET', `/channels/${channelId}`, token);
+    return channel && typeof channel === 'object' ? channel as { guild_id?: string; type?: number } : null;
+}
+
+async function assertGuildChannel(token: string, guildId: string, channelId: string, allowedTypes: number[], label: string) {
+    const channel = await fetchDiscordChannel(token, channelId);
+    if (!channel || channel.guild_id !== guildId || !allowedTypes.includes(Number(channel.type))) {
+        throw new Error(`${label} must belong to the selected guild`);
     }
 }
 
@@ -204,6 +218,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
                 return NextResponse.json({ error: 'Укажите категорию, хаб и текстовый канал' }, { status: 400 });
             }
 
+            const botToken = getToken();
+            await assertGuildChannel(botToken, guildId, body.categoryId, [4], 'Category channel');
+            await assertGuildChannel(botToken, guildId, body.hubChannelId, [2], 'Hub voice channel');
+            await assertGuildChannel(botToken, guildId, body.interfaceChannelId, [0, 5], 'Interface text channel');
+
             const previous = await prisma.tempVoiceConfig.findUnique({ where: { guildId } });
 
             const config = await prisma.tempVoiceConfig.upsert({
@@ -226,7 +245,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             });
 
             if (body.sendPanel || !previous || previous.interfaceChannelId !== body.interfaceChannelId) {
-                const botToken = getToken();
                 await sendTempVoicePanel(botToken, body.interfaceChannelId, body.hubChannelId);
             }
 

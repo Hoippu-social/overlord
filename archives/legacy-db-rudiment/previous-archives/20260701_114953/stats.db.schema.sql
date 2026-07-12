@@ -1,0 +1,1 @@
+-- sqlite3 executable was not available; schema dump skipped.

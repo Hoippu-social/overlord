@@ -1,22 +1,18 @@
 const fs = require('fs');
-const path = require('path');
 const {
-    POSTGRES_CLIENT_PATH,
-    WORKLOAD_TABLES,
-    createTargetClient,
-    getTargetStatsPgUrl,
+    STATS_POSTGRES_CLIENT_PATH,
+    getStatsPostgresUrl,
     loadEnv,
-} = require('./lib/statsPgMigration.cjs');
+} = require('./lib/postgresOnly.cjs');
 
 async function main() {
     loadEnv();
 
-    const targetUrl = getTargetStatsPgUrl();
-    const clientGenerated = fs.existsSync(POSTGRES_CLIENT_PATH);
+    const targetUrl = getStatsPostgresUrl();
+    const clientGenerated = fs.existsSync(STATS_POSTGRES_CLIENT_PATH);
 
     console.log('[StatsPgDoctor] Target configured:', Boolean(targetUrl));
     console.log('[StatsPgDoctor] Postgres client generated:', clientGenerated);
-    console.log('[StatsPgDoctor] Expected schema:', path.resolve(__dirname, '../prisma/stats-postgres.schema.prisma'));
 
     if (!targetUrl) {
         console.log('[StatsPgDoctor] Missing STATS_PG_DATABASE_URL');
@@ -28,7 +24,12 @@ async function main() {
         process.exit(1);
     }
 
-    const target = createTargetClient(targetUrl);
+    const { Prisma, PrismaClient } = require(STATS_POSTGRES_CLIENT_PATH);
+    const target = new PrismaClient({
+        datasources: {
+            db: { url: targetUrl },
+        },
+    });
 
     try {
         await target.$connect();
@@ -36,14 +37,11 @@ async function main() {
 
         console.log('[StatsPgDoctor] Target connection: OK');
 
-        for (const table of WORKLOAD_TABLES) {
-            try {
-                const count = await target[table.targetModel].count();
-                console.log(`[StatsPgDoctor] ${table.label}: OK (${count} rows)`);
-            } catch (error) {
-                console.log(`[StatsPgDoctor] ${table.label}: MISSING_OR_INVALID`);
-                throw error;
-            }
+        for (const model of Prisma.dmmf.datamodel.models) {
+            const delegate = model.name[0].toLowerCase() + model.name.slice(1);
+            if (!target[delegate]?.count) continue;
+            const count = await target[delegate].count();
+            console.log(`[StatsPgDoctor] ${model.name}: OK (${count} rows)`);
         }
     } finally {
         await target.$disconnect();

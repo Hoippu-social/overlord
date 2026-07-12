@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { syncGuildCommandVisibility } from '@/lib/discordCommandPermissions';
 import { authorizeGuildApiRequest, isGuildApiAuthFailure } from '@/lib/guildApiAuth';
 import { normalizeAppealSettings, readAppealSettings, writeAppealSettings } from '@/lib/appealsConfig';
+import { fetchGuildChannels } from '@/lib/discord-api';
 
 const BOT_API_PORT = process.env.DASHBOARD_API_PORT || '3002';
 const BOT_API_URL = process.env.DASHBOARD_API_URL || `http://127.0.0.1:${BOT_API_PORT}`;
@@ -147,6 +148,17 @@ const normalizeNullableString = (value: unknown) => {
     const trimmed = value.trim();
     return trimmed.length ? trimmed : null;
 };
+
+async function validateGuildChannelIds(guildId: string, channelIds: Array<string | null>) {
+    const ids = channelIds.filter((channelId): channelId is string => Boolean(channelId));
+    if (!ids.length) return true;
+
+    const channels = await fetchGuildChannels(guildId);
+    if (!Array.isArray(channels)) return false;
+
+    const guildChannelIds = new Set(channels.map((channel: { id?: unknown }) => String(channel.id ?? '')));
+    return ids.every((channelId) => guildChannelIds.has(channelId));
+}
 
 const normalizeCommandRuleMode = (value: unknown) =>
     value === 'WHITELIST' ? 'WHITELIST' : 'BLACKLIST';
@@ -441,6 +453,19 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         const syncDiscordCommandPermissions = body?.syncDiscordCommandPermissions === true;
         const payloadGuildChannels = Array.isArray(body?.guildChannels) ? JSON.stringify(body.guildChannels) : null;
         const normalizedCommandRules = normalizeCommandRules(body?.commandRules);
+        const appealChannelId = normalizeNullableString(appealConfig.appealChannelId);
+        const pardonLogChannelId = normalizeNullableString(appealConfig.pardonLogChannelId);
+        const normalizedAppealSettings = normalizeAppealSettings(appealConfig);
+        if (!await validateGuildChannelIds(guildId, [
+            appealChannelId,
+            pardonLogChannelId,
+            normalizedAppealSettings.threadChannelId,
+            normalizedAppealSettings.logChannelId,
+            normalizedAppealSettings.dedicatedPanel.channelId,
+            normalizedAppealSettings.sharedPlacement.channelId,
+        ])) {
+            return NextResponse.json({ error: 'Appeal channels must belong to this guild.' }, { status: 400 });
+        }
 
         await prisma.$transaction(async (tx) => {
             await tx.moderationConfig.upsert({
@@ -497,16 +522,16 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
                 where: { guildId },
                 update: {
                     enabled: normalizeBoolean(appealConfig.enabled, false),
-                    appealChannelId: normalizeNullableString(appealConfig.appealChannelId),
-                    pardonLogChannelId: normalizeNullableString(appealConfig.pardonLogChannelId),
+                    appealChannelId,
+                    pardonLogChannelId,
                     allowUserAppeals: normalizeBoolean(appealConfig.allowUserAppeals, true),
                     allowDirectPardon: normalizeBoolean(appealConfig.allowDirectPardon, true),
                 },
                 create: {
                     guildId,
                     enabled: normalizeBoolean(appealConfig.enabled, false),
-                    appealChannelId: normalizeNullableString(appealConfig.appealChannelId),
-                    pardonLogChannelId: normalizeNullableString(appealConfig.pardonLogChannelId),
+                    appealChannelId,
+                    pardonLogChannelId,
                     allowUserAppeals: normalizeBoolean(appealConfig.allowUserAppeals, true),
                     allowDirectPardon: normalizeBoolean(appealConfig.allowDirectPardon, true),
                 },
@@ -681,7 +706,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             }
         });
 
-        await writeAppealSettings(guildId, normalizeAppealSettings(appealConfig));
+        await writeAppealSettings(guildId, normalizedAppealSettings);
 
         const appealSyncResponse = await fetch(`${BOT_API_URL}/api/appeals/sync-panel`, {
             method: 'POST',

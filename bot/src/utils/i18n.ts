@@ -817,6 +817,92 @@ Object.assign(translations.ru, {
     'general.commandChannelRestricted': 'Команды запрещены в этом канале.',
 });
 
+Object.assign(translations.en, {
+    // Tickets — general
+    'tickets.disabled': 'Ticket system is currently disabled.',
+    'tickets.blacklisted': 'You are not allowed to create tickets.',
+    'tickets.limitReached': 'You already have the maximum number of open tickets.',
+    'tickets.cooldown': 'Please wait {seconds} seconds before opening another ticket.',
+    'tickets.categoryNotFound': 'Ticket category not found.',
+    'tickets.notFound': 'Ticket not found.',
+    'tickets.alreadyClosed': 'This ticket is already closed.',
+    'tickets.notClosed': 'This ticket is not closed.',
+    'tickets.notOnHold': 'This ticket is not on hold.',
+    'tickets.staffOnly': 'Only staff can perform this action.',
+    'tickets.noPermission': 'You do not have permission to perform this action.',
+    'tickets.cannotRemoveAuthor': 'You cannot remove the ticket author.',
+    'tickets.notInTicket': 'This command can only be used inside a ticket thread.',
+    // Tickets — actions
+    'tickets.closed': 'Ticket #{number} closed.',
+    'tickets.reopened': 'Ticket #{number} reopened.',
+    'tickets.claimed': 'Ticket #{number} claimed by <@{userId}>.',
+    'tickets.unclaimed': 'Ticket #{number} unclaimed.',
+    'tickets.onHold': 'Ticket #{number} put on hold.',
+    'tickets.resumed': 'Ticket #{number} resumed.',
+    'tickets.userAdded': '<@{userId}> added to ticket #{number}.',
+    'tickets.userRemoved': '<@{userId}> removed from ticket #{number}.',
+    'tickets.renamed': 'Ticket #{number} renamed to **{name}**.',
+    // Tickets — blacklist
+    'tickets.blacklist.added': '<@{userId}> has been added to the ticket blacklist.',
+    'tickets.blacklist.removed': '<@{userId}> has been removed from the ticket blacklist.',
+    'tickets.blacklist.notFound': '<@{userId}> is not on the blacklist.',
+    'tickets.blacklist.list': 'Ticket blacklist ({count} entries):',
+    'tickets.blacklist.empty': 'The blacklist is empty.',
+    // Tickets — transcript
+    'tickets.transcript.notAvailable': 'No transcript available for this ticket.',
+    'tickets.transcript.link': 'Transcript for ticket #{number}',
+    // Tickets — panel
+    'tickets.panel.synced': 'Panel synced successfully.',
+    'tickets.panel.failed': 'Failed to sync panel.',
+    // Tickets — rating
+    'tickets.rating.alreadyRated': 'You have already rated this ticket.',
+    'tickets.rating.notAuthor': 'Only the ticket author can submit a rating.',
+    'tickets.rating.thanks': 'Thanks for your feedback!',
+});
+
+Object.assign(translations.ru, {
+    // Tickets — general
+    'tickets.disabled': 'Система тикетов сейчас отключена.',
+    'tickets.blacklisted': 'Вам запрещено создавать тикеты.',
+    'tickets.limitReached': 'У вас уже открыто максимальное количество тикетов.',
+    'tickets.cooldown': 'Подождите {seconds} сек. перед открытием нового тикета.',
+    'tickets.categoryNotFound': 'Категория тикета не найдена.',
+    'tickets.notFound': 'Тикет не найден.',
+    'tickets.alreadyClosed': 'Этот тикет уже закрыт.',
+    'tickets.notClosed': 'Этот тикет не закрыт.',
+    'tickets.notOnHold': 'Этот тикет не на удержании.',
+    'tickets.staffOnly': 'Это действие доступно только персоналу.',
+    'tickets.noPermission': 'У вас нет прав для этого действия.',
+    'tickets.cannotRemoveAuthor': 'Нельзя удалить автора тикета.',
+    'tickets.notInTicket': 'Эта команда доступна только внутри треда тикета.',
+    // Tickets — actions
+    'tickets.closed': 'Тикет #{number} закрыт.',
+    'tickets.reopened': 'Тикет #{number} переоткрыт.',
+    'tickets.claimed': 'Тикет #{number} взят в работу <@{userId}>.',
+    'tickets.unclaimed': 'Тикет #{number} освобождён.',
+    'tickets.onHold': 'Тикет #{number} переведён в ожидание.',
+    'tickets.resumed': 'Тикет #{number} возобновлён.',
+    'tickets.userAdded': '<@{userId}> добавлен в тикет #{number}.',
+    'tickets.userRemoved': '<@{userId}> удалён из тикета #{number}.',
+    'tickets.renamed': 'Тикет #{number} переименован в **{name}**.',
+    // Tickets — blacklist
+    'tickets.blacklist.added': '<@{userId}> добавлен в чёрный список тикетов.',
+    'tickets.blacklist.removed': '<@{userId}> убран из чёрного списка тикетов.',
+    'tickets.blacklist.notFound': '<@{userId}> не в чёрном списке.',
+    'tickets.blacklist.list': 'Чёрный список тикетов ({count} записей):',
+    'tickets.blacklist.empty': 'Чёрный список пуст.',
+    // Tickets — transcript
+    'tickets.transcript.notAvailable': 'Транскрипт для этого тикета недоступен.',
+    'tickets.transcript.link': 'Транскрипт тикета #{number}',
+    // Tickets — panel
+    'tickets.panel.synced': 'Панель синхронизирована.',
+    'tickets.panel.failed': 'Не удалось синхронизировать панель.',
+    // Tickets — rating
+    'tickets.rating.alreadyRated': 'Вы уже оценили этот тикет.',
+    'tickets.rating.notAuthor': 'Только автор тикета может оставить оценку.',
+    'tickets.rating.thanks': 'Спасибо за отзыв!',
+});
+
 type TranslationKey = keyof typeof translations.en;
 
 const localeCache = new Map<string, { locale: LocaleCode; expires: number }>();

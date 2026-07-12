@@ -1,0 +1,658 @@
+{
+  "createdAt": "2026-07-01T08:52:23.281Z",
+  "sourceUrl": "file:D:\\discord_bot\\Dev\\bot\\prisma\\development.db",
+  "targetConfigured": true,
+  "sqliteSourceClientGenerated": true,
+  "tables": [
+    {
+      "table": "User",
+      "exists": true,
+      "count": 0,
+      "maxId": null,
+      "minDate": null,
+      "maxDate": null,
+      "checksum": {
+        "rows": 0,
+        "chunks": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "table": "Guild",
+      "exists": true,
+      "count": 3,
+      "maxId": null,
+      "minDate": "2026-03-03T23:33:59.928Z",
+      "maxDate": "2026-03-03T23:35:17.181Z",
+      "checksum": {
+        "rows": 3,
+        "chunks": 1,
+        "sha256": "180224e351c81f49a36d1ee65f78f7bb09628720a82c7ef53c8f0b2d9c4a34e3"
+      }
+    },
+    {
+      "table": "BotSettings",
+      "exists": true,
+      "count": 2,
+      "maxId": 5,
+      "minDate": "2026-03-05T17:55:09.903Z",
+      "maxDate": "2026-03-15T23:46:30.575Z",
+      "checksum": {
+        "rows": 2,
+        "chunks": 1,
+        "sha256": "fee58341abf51d8c210544cf87073e58f92c6cd719281f75fa240419204c6cc3"
+      }
+    },
+    {
+      "table": "MusicConfig",
+      "exists": true,
+      "count": 3,
+      "maxId": 3,
+      "minDate": "2026-03-03T23:33:59.939Z",
+      "maxDate": "2026-03-03T23:35:17.194Z",
+      "checksum": {
+        "rows": 3,
+        "chunks": 1,
+        "sha256": "ad29e6decd8bddc5be05d89f3e04082b7458049fdf93b2c0625d076562e76584"
+      }
+    },
+    {
+      "table": "Warning",
+      "exists": true,
+      "count": 0,
+      "maxId": null,
+      "minDate": null,
+      "maxDate": null,
+      "checksum": {
+        "rows": 0,
+        "chunks": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "table": "ModerationConfig",
+      "exists": true,
+      "count": 3,
+      "maxId": 23,
+      "minDate": "2026-03-12T23:11:16.607Z",
+      "maxDate": "2026-03-22T12:24:38.062Z",
+      "checksum": {
+        "rows": 3,
+        "chunks": 1,
+        "sha256": "dff688d1b6683f009742a7331d6ca91bd8221cda636cbce91099c081b491c9bc"
+      }
+    },
+    {
+      "table": "ModerationRoleBinding",
+      "exists": true,
+      "count": 5,
+      "maxId": 65,
+      "minDate": "2026-04-01T12:52:14.921Z",
+      "maxDate": "2026-04-06T09:36:35.722Z",
+      "checksum": {
+        "rows": 5,
+        "chunks": 1,
+        "sha256": "351ceb119971e449f9c97eb723216197c2fa60643e880647cc9e9bcf6947576a"
+      }
+    },
+    {
+      "table": "ModerationCase",
+      "exists": true,
+      "count": 17,
+      "maxId": 17,
+      "minDate": "2026-03-15T22:53:29.798Z",
+      "maxDate": "2026-06-21T08:53:05.939Z",
+      "checksum": {
+        "rows": 17,
+        "chunks": 1,
+        "sha256": "fcd7ee6510c41f216b88e1cfdb6e7d1e5a234717d71b97c9383e6b1d1eec82c2"
+      }
+    },
+    {
+      "table": "AppealConfig",
+      "exists": true,
+      "count": 3,
+      "maxId": 31,
+      "minDate": "2026-03-12T23:11:16.727Z",
+      "maxDate": "2026-04-06T09:36:48.404Z",
+      "checksum": {
+        "rows": 3,
+        "chunks": 1,
+        "sha256": "043a86b17ff51628bf239ddb4f7a66b768f97a1e3fec154460f7983785880106"
+      }
+    },
+    {
+      "table": "AppealTicket",
+      "exists": true,
+      "count": 0,
+      "maxId": null,
+      "minDate": null,
+      "maxDate": null,
+      "checksum": {
+        "rows": 0,
+        "chunks": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "table": "AppealEvent",
+      "exists": false,
+      "count": 0,
+      "maxId": null,
+      "minDate": null,
+      "maxDate": null,
+      "checksum": {
+        "rows": 0,
+        "chunks": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "table": "RetentionPolicy",
+      "exists": true,
+      "count": 18,
+      "maxId": 192,
+      "minDate": "2026-04-01T12:52:14.921Z",
+      "maxDate": "2026-04-06T09:46:09.648Z",
+      "checksum": {
+        "rows": 18,
+        "chunks": 1,
+        "sha256": "667a42a2f5669f6a8c63c496f42c198e3fa9f199209b85bba21c3c7c4a1d5309"
+      }
+    },
+    {
+      "table": "ModerationCaseNote",
+      "exists": true,
+      "count": 0,
+      "maxId": null,
+      "minDate": null,
+      "maxDate": null,
+      "checksum": {
+        "rows": 0,
+        "chunks": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "table": "ModerationCommandGrant",
+      "exists": true,
+      "count": 0,
+      "maxId": null,
+      "minDate": null,
+      "maxDate": null,
+      "checksum": {
+        "rows": 0,
+        "chunks": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "table": "AutomodRuleConfig",
+      "exists": true,
+      "count": 36,
+      "maxId": 376,
+      "minDate": "2026-04-01T12:52:14.921Z",
+      "maxDate": "2026-04-06T09:46:09.648Z",
+      "checksum": {
+        "rows": 36,
+        "chunks": 1,
+        "sha256": "055855f3d445f6f4364491cf05581fee06c0257b7abda36e665916ddc10facb5"
+      }
+    },
+    {
+      "table": "AutomodCustomRule",
+      "exists": true,
+      "count": 0,
+      "maxId": null,
+      "minDate": null,
+      "maxDate": null,
+      "checksum": {
+        "rows": 0,
+        "chunks": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "table": "AutomodSanctionStep",
+      "exists": true,
+      "count": 0,
+      "maxId": null,
+      "minDate": null,
+      "maxDate": null,
+      "checksum": {
+        "rows": 0,
+        "chunks": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "table": "AiModerationConfig",
+      "exists": true,
+      "count": 3,
+      "maxId": 23,
+      "minDate": "2026-03-12T23:11:16.700Z",
+      "maxDate": "2026-03-22T12:24:38.067Z",
+      "checksum": {
+        "rows": 3,
+        "chunks": 1,
+        "sha256": "f324443352bde5843d47d935c6b3b4cf6113ac0e100044f8d1d05896a82e49ef"
+      }
+    },
+    {
+      "table": "AiModerationCategoryRule",
+      "exists": true,
+      "count": 24,
+      "maxId": 256,
+      "minDate": "2026-04-01T12:52:14.921Z",
+      "maxDate": "2026-04-06T09:46:09.648Z",
+      "checksum": {
+        "rows": 24,
+        "chunks": 1,
+        "sha256": "9ca839aad337213bb026af002cfa3c23cefa1aed3704a67d0c5f3444c1c3732d"
+      }
+    },
+    {
+      "table": "AiModerationIncident",
+      "exists": true,
+      "count": 0,
+      "maxId": null,
+      "minDate": null,
+      "maxDate": null,
+      "checksum": {
+        "rows": 0,
+        "chunks": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "table": "TempVoiceConfig",
+      "exists": true,
+      "count": 1,
+      "maxId": 1,
+      "minDate": "2026-03-11T16:18:24.492Z",
+      "maxDate": "2026-03-11T16:18:24.492Z",
+      "checksum": {
+        "rows": 1,
+        "chunks": 1,
+        "sha256": "3032452eac2429027f69aea18fb49549699ad9beef2ff4ce60a2e8b9cde0f43e"
+      }
+    },
+    {
+      "table": "TempVoiceRoom",
+      "exists": true,
+      "count": 0,
+      "maxId": null,
+      "minDate": null,
+      "maxDate": null,
+      "checksum": {
+        "rows": 0,
+        "chunks": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "table": "UserVoiceSettings",
+      "exists": true,
+      "count": 0,
+      "maxId": null,
+      "minDate": null,
+      "maxDate": null,
+      "checksum": {
+        "rows": 0,
+        "chunks": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "table": "MusicNowPlaying",
+      "exists": true,
+      "count": 1,
+      "maxId": 10,
+      "minDate": "2026-03-04T22:21:28.687Z",
+      "maxDate": "2026-03-04T22:21:28.687Z",
+      "checksum": {
+        "rows": 1,
+        "chunks": 1,
+        "sha256": "8a5fbc334bca41de60441569cae5f1af16c8588b28ec3c157f5acf75f3e5bdf2"
+      }
+    },
+    {
+      "table": "MessageEvent",
+      "exists": true,
+      "count": 35,
+      "maxId": 35,
+      "minDate": "2026-03-04T00:14:55.177Z",
+      "maxDate": "2026-03-06T00:00:38.509Z",
+      "checksum": {
+        "rows": 35,
+        "chunks": 1,
+        "sha256": "bca820bfbb4a80088809328048fe1f0c56509ecea42dc799889a9bdfe90e215c"
+      }
+    },
+    {
+      "table": "AuditLogEvent",
+      "exists": true,
+      "count": 404,
+      "maxId": 404,
+      "minDate": "2026-03-03T23:35:19.106Z",
+      "maxDate": "2026-03-06T00:56:03.666Z",
+      "checksum": {
+        "rows": 404,
+        "chunks": 1,
+        "sha256": "127cd80ddc1d4777f41c54d90fbaca86667e4d230fbcfba736b7237962908739"
+      }
+    },
+    {
+      "table": "AuditTagRoute",
+      "exists": true,
+      "count": 1,
+      "maxId": 1,
+      "minDate": "2026-03-16T00:13:16.526Z",
+      "maxDate": "2026-03-16T00:13:16.526Z",
+      "checksum": {
+        "rows": 1,
+        "chunks": 1,
+        "sha256": "4d8712b2678733683f2b093e2b89e5636230b92e24faa353e37efa9a54eaf2f4"
+      }
+    },
+    {
+      "table": "InviteSnapshot",
+      "exists": true,
+      "count": 37,
+      "maxId": 145,
+      "minDate": "2026-03-03T23:35:18.093Z",
+      "maxDate": "2026-03-04T06:55:38.927Z",
+      "checksum": {
+        "rows": 37,
+        "chunks": 1,
+        "sha256": "1c0c38191564ebd5d139bd3216574b7254130eac9937b913222fc4af6fce7069"
+      }
+    },
+    {
+      "table": "InviteUseEvent",
+      "exists": true,
+      "count": 0,
+      "maxId": null,
+      "minDate": null,
+      "maxDate": null,
+      "checksum": {
+        "rows": 0,
+        "chunks": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "table": "StatMessage",
+      "exists": true,
+      "count": 484,
+      "maxId": 484,
+      "minDate": "2026-03-04T00:14:53.000Z",
+      "maxDate": "2026-03-04T22:52:39.268Z",
+      "checksum": {
+        "rows": 484,
+        "chunks": 1,
+        "sha256": "0f8ef8f21ec0a97c483ec40fc9132d3a324030127fe7c9ce05b9dce04f169a6d"
+      }
+    },
+    {
+      "table": "StatVoiceState",
+      "exists": true,
+      "count": 49,
+      "maxId": 49,
+      "minDate": "2026-03-03T23:47:28.946Z",
+      "maxDate": "2026-03-04T22:48:34.436Z",
+      "checksum": {
+        "rows": 49,
+        "chunks": 1,
+        "sha256": "995b31bf84ee0ebb0a7e19b8b0d4b428c3adea9ac6083763fa530bf615324a1f"
+      }
+    },
+    {
+      "table": "StatMemberCount",
+      "exists": true,
+      "count": 0,
+      "maxId": null,
+      "minDate": null,
+      "maxDate": null,
+      "checksum": {
+        "rows": 0,
+        "chunks": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "table": "StatMemberEvent",
+      "exists": true,
+      "count": 0,
+      "maxId": null,
+      "minDate": null,
+      "maxDate": null,
+      "checksum": {
+        "rows": 0,
+        "chunks": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "table": "StatHourly",
+      "exists": true,
+      "count": 750,
+      "maxId": 5183,
+      "minDate": "2026-02-02T01:00:00.000Z",
+      "maxDate": "2026-03-04T22:00:00.000Z",
+      "checksum": {
+        "rows": 750,
+        "chunks": 1,
+        "sha256": "4a7ebaf762fbe36535ed6dc0de287287a54580a3c393aa9904ea5da8e26eba12"
+      }
+    },
+    {
+      "table": "StatDaily",
+      "exists": true,
+      "count": 55,
+      "maxId": 216,
+      "minDate": "2026-02-02T22:00:00.000Z",
+      "maxDate": "2026-03-04T00:00:00.000Z",
+      "checksum": {
+        "rows": 55,
+        "chunks": 1,
+        "sha256": "a0635198faedba5c202a77057297c38c3e2d2124c32fa1d8a9b95d1c74458cef"
+      }
+    },
+    {
+      "table": "StatTopMember",
+      "exists": true,
+      "count": 0,
+      "maxId": null,
+      "minDate": null,
+      "maxDate": null,
+      "checksum": {
+        "rows": 0,
+        "chunks": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "table": "StatTopChannel",
+      "exists": true,
+      "count": 0,
+      "maxId": null,
+      "minDate": null,
+      "maxDate": null,
+      "checksum": {
+        "rows": 0,
+        "chunks": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "table": "StatMemberDaily",
+      "exists": true,
+      "count": 0,
+      "maxId": null,
+      "minDate": null,
+      "maxDate": null,
+      "checksum": {
+        "rows": 0,
+        "chunks": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "table": "StatChannelDaily",
+      "exists": true,
+      "count": 0,
+      "maxId": null,
+      "minDate": null,
+      "maxDate": null,
+      "checksum": {
+        "rows": 0,
+        "chunks": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "table": "StatActivity",
+      "exists": true,
+      "count": 2778,
+      "maxId": 2778,
+      "minDate": "2026-03-03T23:37:07.594Z",
+      "maxDate": "2026-03-04T22:37:50.059Z",
+      "checksum": {
+        "rows": 2778,
+        "chunks": 3,
+        "sha256": "05a34048e36c67e23e53a71e7bccdb0b573b937325b09e72a57535dc4be3442c"
+      }
+    },
+    {
+      "table": "StatInteraction",
+      "exists": true,
+      "count": 122,
+      "maxId": 122,
+      "minDate": "2026-03-04T00:53:37.086Z",
+      "maxDate": "2026-03-04T22:52:39.282Z",
+      "checksum": {
+        "rows": 122,
+        "chunks": 1,
+        "sha256": "260aa53172d464d14057a4a1d976206395b4f40c91f845d8e4c9ccf026f11087"
+      }
+    },
+    {
+      "table": "GuildTimezoneHistory",
+      "exists": true,
+      "count": 0,
+      "maxId": null,
+      "minDate": null,
+      "maxDate": null,
+      "checksum": {
+        "rows": 0,
+        "chunks": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "table": "StatsAggregationState",
+      "exists": true,
+      "count": 0,
+      "maxId": null,
+      "minDate": null,
+      "maxDate": null,
+      "checksum": {
+        "rows": 0,
+        "chunks": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "table": "StatsJob",
+      "exists": true,
+      "count": 0,
+      "maxId": null,
+      "minDate": null,
+      "maxDate": null,
+      "checksum": {
+        "rows": 0,
+        "chunks": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "table": "TicketConfig",
+      "exists": true,
+      "count": 0,
+      "maxId": null,
+      "minDate": null,
+      "maxDate": null,
+      "checksum": {
+        "rows": 0,
+        "chunks": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "table": "TicketCategory",
+      "exists": true,
+      "count": 0,
+      "maxId": null,
+      "minDate": null,
+      "maxDate": null,
+      "checksum": {
+        "rows": 0,
+        "chunks": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "table": "TicketItem",
+      "exists": true,
+      "count": 0,
+      "maxId": null,
+      "minDate": null,
+      "maxDate": null,
+      "checksum": {
+        "rows": 0,
+        "chunks": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "table": "TicketFormQuestion",
+      "exists": true,
+      "count": 0,
+      "maxId": null,
+      "minDate": null,
+      "maxDate": null,
+      "checksum": {
+        "rows": 0,
+        "chunks": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "table": "Ticket",
+      "exists": true,
+      "count": 0,
+      "maxId": null,
+      "minDate": null,
+      "maxDate": null,
+      "checksum": {
+        "rows": 0,
+        "chunks": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "table": "TicketEvent",
+      "exists": true,
+      "count": 0,
+      "maxId": null,
+      "minDate": null,
+      "maxDate": null,
+      "checksum": {
+        "rows": 0,
+        "chunks": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    }
+  ]
+}

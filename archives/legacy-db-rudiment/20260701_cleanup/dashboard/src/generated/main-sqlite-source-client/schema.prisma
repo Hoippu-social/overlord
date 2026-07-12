@@ -1,0 +1,770 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/main-sqlite-source-client"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("MAIN_SQLITE_SOURCE_URL")
+}
+
+model AiModerationCategoryRule {
+  id        Int      @id @default(autoincrement())
+  guildId   String
+  category  String
+  enabled   Boolean  @default(false)
+  threshold Int      @default(80)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+
+  @@unique([guildId, category])
+  @@index([guildId, sortOrder])
+}
+
+model AiModerationConfig {
+  id                 Int      @id @default(autoincrement())
+  guildId            String   @unique
+  enabled            Boolean  @default(false)
+  provider           String?
+  model              String?
+  defaultThreshold   Int      @default(80)
+  scanEdits          Boolean  @default(true)
+  includedChannels   String?
+  excludedChannels   String?
+  exemptRoles        String?
+  exemptUsers        String?
+  customPolicyPrompt String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime
+
+  @@index([guildId, enabled])
+}
+
+model AiModerationIncident {
+  id         Int       @id @default(autoincrement())
+  guildId    String
+  messageId  String
+  channelId  String
+  authorId   String
+  excerpt    String
+  summary    String?
+  categories String?
+  provider   String?
+  model      String?
+  confidence Int?
+  status     String    @default("OPEN")
+  reviewerId String?
+  reviewedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime
+
+  @@unique([guildId, messageId])
+  @@index([guildId, status, createdAt])
+}
+
+model AppealConfig {
+  id                 Int      @id @default(autoincrement())
+  guildId            String   @unique
+  enabled            Boolean  @default(false)
+  appealChannelId    String?
+  pardonLogChannelId String?
+  allowUserAppeals   Boolean  @default(true)
+  allowDirectPardon  Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime
+  settingsJson       String?
+}
+
+model AppealTicket {
+  id             Int            @id @default(autoincrement())
+  guildId        String
+  caseId         Int
+  caseNumber     Int
+  userId         String
+  appealType     String         @default("APPEAL")
+  status         String         @default("OPEN")
+  message        String
+  resolutionNote String?
+  reviewerId     String?
+  reviewedAt     DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime
+  ModerationCase ModerationCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([caseId, createdAt])
+  @@index([guildId, userId, createdAt])
+  @@index([guildId, status, createdAt])
+}
+
+model AuditLogEvent {
+  id        Int      @id @default(autoincrement())
+  guildId   String
+  tag       String
+  actorId   String?
+  targetId  String?
+  channelId String?
+  messageId String?
+  payload   String?
+  severity  String?
+  createdAt DateTime @default(now())
+
+  @@index([guildId, tag, createdAt])
+}
+
+model AuditTagRoute {
+  id        Int      @id @default(autoincrement())
+  guildId   String
+  tag       String
+  channelId String
+  enabled   Boolean  @default(true)
+  template  String?
+  mentions  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+
+  @@unique([guildId, tag])
+}
+
+model AutomodCustomRule {
+  id           Int      @id @default(autoincrement())
+  guildId      String
+  name         String
+  ruleType     String   @default("regex")
+  pattern      String
+  enabled      Boolean  @default(true)
+  action       String   @default("DELETE")
+  strikeWeight Int      @default(1)
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime
+
+  @@index([guildId, enabled])
+}
+
+model AutomodRuleConfig {
+  id        Int      @id @default(autoincrement())
+  guildId   String
+  ruleKey   String
+  enabled   Boolean  @default(false)
+  config    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+
+  @@unique([guildId, ruleKey])
+}
+
+model AutomodSanctionStep {
+  id                 Int      @id @default(autoincrement())
+  guildId            String
+  triggerStrikeCount Int
+  actionType         String
+  durationMinutes    Int?
+  enabled            Boolean  @default(true)
+  sortOrder          Int      @default(0)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime
+
+  @@unique([guildId, triggerStrikeCount, actionType])
+  @@index([guildId, sortOrder])
+}
+
+model BotSettings {
+  id                      Int      @id @default(autoincrement())
+  guildId                 String   @unique
+  locale                  String   @default("ru")
+  timezone                String   @default("UTC")
+  prefixCommandsEnabled   Boolean  @default(true)
+  commandChannelMode      String   @default("BLACKLIST")
+  allowedTextChannels     String?
+  adminRoles              String?
+  restoreRolesOnRejoin    Boolean  @default(false)
+  restoreNicknameOnRejoin Boolean  @default(false)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime
+  Guild                   Guild    @relation(fields: [guildId], references: [id])
+}
+
+model Guild {
+  id                String              @id
+  prefix            String              @default("!")
+  name              String?
+  icon              String?
+  channels          String?
+  roles             String?
+  memberCount       Int?
+  onlineCount       Int?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime
+  BotSettings       BotSettings?
+  ModerationConfig  ModerationConfig?
+  MusicConfig       MusicConfig?
+  MusicNowPlaying   MusicNowPlaying?
+  TempVoiceConfig   TempVoiceConfig?
+  Ticket            Ticket[]
+  TicketConfig      TicketConfig?
+  UserVoiceSettings UserVoiceSettings[]
+}
+
+model GuildTimezoneHistory {
+  id            Int      @id @default(autoincrement())
+  guildId       String
+  timezone      String
+  source        String   @default("manual")
+  effectiveFrom DateTime @default(now())
+  createdAt     DateTime @default(now())
+
+  @@index([guildId, effectiveFrom])
+}
+
+model InviteSnapshot {
+  id        Int       @id @default(autoincrement())
+  guildId   String
+  code      String
+  inviterId String?
+  uses      Int       @default(0)
+  maxUses   Int?
+  expiresAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime
+
+  @@unique([guildId, code])
+}
+
+model InviteUseEvent {
+  id               Int       @id @default(autoincrement())
+  guildId          String
+  memberId         String
+  inviterId        String?
+  code             String?
+  joinedAt         DateTime  @default(now())
+  leftAt           DateTime?
+  stayDurationSec  Int?
+  voiceDurationSec Int?
+  createdAt        DateTime  @default(now())
+
+  @@index([guildId, memberId])
+}
+
+model MessageEvent {
+  id                Int      @id @default(autoincrement())
+  guildId           String
+  channelId         String
+  messageId         String
+  authorId          String?
+  eventType         String
+  isBot             Boolean  @default(false)
+  contentBefore     String?
+  contentAfter      String?
+  createdAt         DateTime @default(now())
+  attachmentsAfter  String?
+  attachmentsBefore String?
+
+  @@index([guildId, authorId, createdAt])
+  @@index([guildId, channelId, createdAt])
+}
+
+model ModerationCase {
+  id                 Int                  @id @default(autoincrement())
+  guildId            String
+  caseNumber         Int
+  actionType         String
+  source             String
+  actorUserId        String?
+  targetUserId       String
+  reason             String?
+  status             String               @default("ACTIVE")
+  expiresAt          DateTime?
+  relatedCaseId      Int?
+  metadata           String?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime
+  AppealTicket       AppealTicket[]
+  ModerationCaseNote ModerationCaseNote[]
+
+  @@unique([guildId, caseNumber])
+  @@index([guildId, actionType, createdAt])
+  @@index([guildId, targetUserId, createdAt])
+}
+
+model ModerationCaseNote {
+  id             Int            @id @default(autoincrement())
+  guildId        String
+  caseId         Int
+  actorUserId    String
+  note           String
+  createdAt      DateTime       @default(now())
+  ModerationCase ModerationCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([caseId, createdAt])
+  @@index([guildId, createdAt])
+}
+
+model ModerationCommandGrant {
+  id        Int      @id @default(autoincrement())
+  guildId   String
+  roleId    String
+  scopeType String
+  scopeKey  String
+  effect    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+
+  @@unique([guildId, roleId, scopeType, scopeKey])
+  @@index([guildId, scopeType, scopeKey])
+}
+
+model ModerationConfig {
+  id                   Int      @id @default(autoincrement())
+  guildId              String   @unique
+  muteRoleId           String?
+  ignoredChannels      String?
+  ignoredRoles         String?
+  ignoredUsers         String?
+  commandOnlyChannels  String?
+  aiProvider           String?
+  aiModel              String?
+  aiDefaultThreshold   Int      @default(80)
+  aiScanEdits          Boolean  @default(true)
+  aiIncludedChannels   String?
+  aiExcludedChannels   String?
+  aiExemptRoles        String?
+  aiExemptUsers        String?
+  aiCustomPolicyPrompt String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime
+  commandRules         String?
+  Guild                Guild    @relation(fields: [guildId], references: [id])
+}
+
+model ModerationRoleBinding {
+  id          Int      @id @default(autoincrement())
+  guildId     String
+  roleId      String
+  title       String
+  accessLevel Int      @default(50)
+  enabled     Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime
+
+  @@unique([guildId, roleId])
+  @@index([guildId, sortOrder])
+}
+
+model MusicConfig {
+  id              Int      @id @default(autoincrement())
+  guildId         String   @unique
+  channelMode     String   @default("BLACKLIST")
+  allowedChannels String?
+  djMode          Boolean  @default(false)
+  djRoles         String?
+  defaultVolume   Int      @default(50)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime
+  Guild           Guild    @relation(fields: [guildId], references: [id])
+}
+
+model MusicNowPlaying {
+  id         Int      @id @default(autoincrement())
+  guildId    String   @unique
+  title      String
+  author     String?
+  uri        String?
+  artworkUrl String?
+  durationMs Int?
+  positionMs Int?
+  volume     Int?
+  paused     Boolean  @default(false)
+  updatedAt  DateTime
+  createdAt  DateTime @default(now())
+  Guild      Guild    @relation(fields: [guildId], references: [id])
+}
+
+model RetentionPolicy {
+  id        Int      @id @default(autoincrement())
+  guildId   String
+  category  String
+  strategy  String   @default("KEEP")
+  ttlDays   Int?
+  enabled   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+
+  @@unique([guildId, category])
+  @@index([guildId, enabled])
+}
+
+model StatActivity {
+  id         Int       @id @default(autoincrement())
+  guildId    String
+  userId     String
+  name       String
+  startTime  DateTime  @default(now())
+  endTime    DateTime?
+  duration   Int?
+  sessionKey String?   @unique
+
+  @@index([guildId, startTime])
+  @@index([guildId, name])
+  @@index([guildId, userId])
+}
+
+model StatChannelDaily {
+  id           Int      @id @default(autoincrement())
+  guildId      String
+  channelId    String
+  date         DateTime
+  messages     Int      @default(0)
+  voiceSeconds Int      @default(0)
+  interactions Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime
+
+  @@unique([guildId, channelId, date])
+  @@index([guildId, channelId, date])
+  @@index([guildId, date])
+}
+
+model StatDaily {
+  id           Int      @id @default(autoincrement())
+  guildId      String
+  date         DateTime
+  messages     Int      @default(0)
+  voiceSeconds Int      @default(0)
+  newMembers   Int      @default(0)
+  leftMembers  Int      @default(0)
+  maxOnline    Int      @default(0)
+
+  @@unique([guildId, date])
+}
+
+model StatHourly {
+  id           Int      @id @default(autoincrement())
+  guildId      String
+  dateHour     DateTime
+  messages     Int      @default(0)
+  voiceSeconds Int      @default(0)
+  newMembers   Int      @default(0)
+  leftMembers  Int      @default(0)
+
+  @@unique([guildId, dateHour])
+}
+
+model StatInteraction {
+  id             Int      @id @default(autoincrement())
+  guildId        String
+  fromUserId     String
+  toUserId       String
+  type           String
+  channelId      String
+  createdAt      DateTime @default(now())
+  interactionKey String?  @unique
+
+  @@index([guildId, toUserId])
+  @@index([guildId, fromUserId])
+  @@index([guildId, createdAt])
+}
+
+model StatMemberCount {
+  id        Int      @id @default(autoincrement())
+  guildId   String
+  online    Int      @default(0)
+  idle      Int      @default(0)
+  dnd       Int      @default(0)
+  offline   Int      @default(0)
+  total     Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([guildId, createdAt])
+}
+
+model StatMemberDaily {
+  id           Int      @id @default(autoincrement())
+  guildId      String
+  userId       String
+  date         DateTime
+  messages     Int      @default(0)
+  voiceSeconds Int      @default(0)
+  interactions Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime
+
+  @@unique([guildId, userId, date])
+  @@index([guildId, userId, date])
+  @@index([guildId, date])
+}
+
+model StatMemberEvent {
+  id        Int      @id @default(autoincrement())
+  guildId   String
+  userId    String
+  eventType String
+  eventKey  String?  @unique
+  source    String   @default("live")
+  createdAt DateTime @default(now())
+
+  @@index([guildId, eventType, createdAt])
+  @@index([guildId, userId, createdAt])
+  @@index([guildId, createdAt])
+}
+
+model StatMessage {
+  id              Int      @id @default(autoincrement())
+  guildId         String
+  channelId       String
+  authorId        String
+  length          Int
+  createdAt       DateTime @default(now())
+  sourceMessageId String?  @unique
+
+  @@index([guildId, createdAt])
+  @@index([guildId, authorId])
+  @@index([guildId, channelId])
+}
+
+model StatTopChannel {
+  id        Int      @id @default(autoincrement())
+  guildId   String
+  channelId String
+  period    String
+  category  String
+  value     Int      @default(0)
+  updatedAt DateTime
+
+  @@unique([guildId, channelId, period, category])
+  @@index([guildId, period, category, value(sort: Desc)])
+}
+
+model StatTopMember {
+  id        Int      @id @default(autoincrement())
+  guildId   String
+  userId    String
+  period    String
+  category  String
+  value     Int      @default(0)
+  updatedAt DateTime
+
+  @@unique([guildId, userId, period, category])
+  @@index([guildId, period, category, value(sort: Desc)])
+}
+
+model StatVoiceState {
+  id         Int       @id @default(autoincrement())
+  guildId    String
+  channelId  String
+  userId     String
+  joinedAt   DateTime  @default(now())
+  leftAt     DateTime?
+  duration   Int?
+  sessionKey String?   @unique
+
+  @@index([guildId, joinedAt])
+  @@index([guildId, userId])
+  @@index([guildId, channelId])
+}
+
+model StatsAggregationState {
+  guildId                 String    @id
+  timezone                String    @default("UTC")
+  schemaVersion           Int       @default(1)
+  sourceHighWatermark     String?
+  rebuildRequired         Boolean   @default(false)
+  jobStatus               String    @default("IDLE")
+  lastSuccessfulRebuildAt DateTime?
+  lastSourceEventAt       DateTime?
+  lastReadModelSyncAt     DateTime?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime
+}
+
+model StatsJob {
+  id         Int       @id @default(autoincrement())
+  guildId    String
+  jobType    String
+  status     String    @default("PENDING")
+  payload    String?
+  attempts   Int       @default(0)
+  startedAt  DateTime?
+  finishedAt DateTime?
+  error      String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime
+
+  @@index([guildId, status, createdAt])
+  @@index([status, createdAt])
+}
+
+model TempVoiceConfig {
+  id                 Int             @id @default(autoincrement())
+  guildId            String          @unique
+  hubChannelId       String
+  interfaceChannelId String?
+  categoryId         String?
+  nameTemplate       String          @default("Room {user}")
+  userLimit          Int?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime
+  Guild              Guild           @relation(fields: [guildId], references: [id])
+  TempVoiceRoom      TempVoiceRoom[]
+}
+
+model TempVoiceRoom {
+  id              Int             @id @default(autoincrement())
+  channelId       String          @unique
+  ownerId         String
+  guildId         String
+  hubChannelId    String
+  createdAt       DateTime        @default(now())
+  TempVoiceConfig TempVoiceConfig @relation(fields: [guildId], references: [guildId], onDelete: Cascade)
+
+  @@index([guildId])
+}
+
+model Ticket {
+  id              Int            @id @default(autoincrement())
+  guildId         String
+  number          Int
+  threadId        String         @unique
+  categoryId      Int
+  itemId          Int?
+  authorId        String
+  claimedBy       String?
+  status          String         @default("OPEN")
+  formAnswers     String?
+  participants    String?
+  closedBy        String?
+  closeReason     String?
+  lastActivityAt  DateTime       @default(now())
+  transcript      String?
+  transcriptToken String?        @unique
+  deleteAfterAt   DateTime?
+  rating          Int?
+  createdAt       DateTime       @default(now())
+  closedAt        DateTime?
+  TicketCategory  TicketCategory @relation(fields: [categoryId], references: [id])
+  Guild           Guild          @relation(fields: [guildId], references: [id])
+
+  @@unique([guildId, number])
+  @@index([guildId, authorId, status])
+  @@index([guildId, status, createdAt])
+}
+
+model TicketCategory {
+  id                 Int                  @id @default(autoincrement())
+  guildId            String
+  name               String
+  channelId          String?
+  panelMessageId     String?
+  nameTemplate       String               @default("ticket-{number}")
+  closeAction        String               @default("ARCHIVE")
+  autoDeleteHours    Int?
+  saveHistory        Boolean              @default(false)
+  mentionAgents      Boolean              @default(true)
+  allowUserClose     Boolean              @default(true)
+  splitLogs          Boolean              @default(false)
+  enableRating       Boolean              @default(false)
+  agentRoles         String?
+  messageText        String?
+  messageEmbeds      String?
+  buttonText         String               @default("Create Ticket")
+  buttonEmoji        String?
+  buttonStyle        String               @default("PRIMARY")
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime
+  Ticket             Ticket[]
+  TicketFormQuestion TicketFormQuestion[]
+  TicketItem         TicketItem[]
+
+  @@index([guildId])
+}
+
+model TicketConfig {
+  id                      Int      @id @default(autoincrement())
+  guildId                 String   @unique
+  enabled                 Boolean  @default(true)
+  logChannelId            String?
+  maxOpenPerUser          Int      @default(1)
+  cooldownSeconds         Int      @default(60)
+  transcriptRetentionDays Int      @default(90)
+  nextTicketNumber        Int      @default(1)
+  blacklist               String?
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime
+  Guild                   Guild    @relation(fields: [guildId], references: [id])
+}
+
+model TicketEvent {
+  id          Int      @id @default(autoincrement())
+  guildId     String
+  ticketId    Int
+  eventType   String
+  actorUserId String?
+  note        String?
+  payload     String?
+  createdAt   DateTime @default(now())
+
+  @@index([guildId, createdAt])
+  @@index([ticketId, createdAt])
+}
+
+model TicketFormQuestion {
+  id             Int            @id @default(autoincrement())
+  categoryId     Int
+  label          String
+  type           String
+  required       Boolean        @default(true)
+  placeholder    String?
+  order          Int            @default(0)
+  TicketCategory TicketCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+}
+
+model TicketItem {
+  id             Int            @id @default(autoincrement())
+  categoryId     Int
+  type           String
+  label          String
+  description    String?
+  emoji          String?
+  replyContent   String?
+  agentRoles     String?
+  requiredRoles  String?
+  TicketCategory TicketCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+}
+
+model User {
+  id        String    @id
+  balance   Int       @default(0)
+  xp        Int       @default(0)
+  level     Int       @default(1)
+  lastDaily DateTime?
+  lastWork  DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime
+  Warning   Warning[]
+}
+
+model UserVoiceSettings {
+  id             Int      @id @default(autoincrement())
+  guildId        String
+  userId         String
+  preferredName  String?
+  preferredLimit Int?
+  locked         Boolean  @default(false)
+  blockedUsers   String?
+  allowedUsers   String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime
+  Guild          Guild    @relation(fields: [guildId], references: [id])
+
+  @@unique([guildId, userId])
+}
+
+model Warning {
+  id          Int      @id @default(autoincrement())
+  reason      String
+  userId      String
+  moderatorId String
+  createdAt   DateTime @default(now())
+  User        User     @relation(fields: [userId], references: [id])
+}

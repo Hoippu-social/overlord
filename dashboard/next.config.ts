@@ -7,6 +7,7 @@ import dotenv from "dotenv";
 dotenv.config({ path: path.resolve(__dirname, "../bot/.env") });
 
 const nextConfig: NextConfig = {
+  allowedDevOrigins: ['overlord.ink'],
   outputFileTracingRoot: __dirname,
   turbopack: {
     root: __dirname,

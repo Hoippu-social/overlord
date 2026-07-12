@@ -1,6 +1,6 @@
 import { AutomodActionConfig, AutomodAdvertisingConfig, AutomodBanwordsConfig, AutomodCommandChannelsConfig, AutomodEmojiConfig, AutomodEmojiSpamConfig, AutomodFloodAction, AutomodFloodConfig, AutomodFloodWindowUnit, AutomodImageFilterConfig, AutomodLinesConfig, AutomodLinksConfig, AutomodMentionSpamConfig, AutomodSpamConfig, AutomodZalgoConfig, CommandRule, ConfigState } from './types';
 import { createDefaultCommandRules, getDefaultCommandRule } from '@/lib/commandCatalog';
-import { normalizeAppealSettings } from '@/lib/appealsConfig';
+import { normalizeAppealSettings } from '@/lib/appealsSettings';
 
 type JsonObject = Record<string, unknown>;
 

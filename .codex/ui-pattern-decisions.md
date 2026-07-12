@@ -44,6 +44,35 @@ Keep only explicit user approvals here. The latest section with `status: approve
 - exceptions: Ask again for pages that require more than 2 actions, destructive-only bars, or static inline save controls.
 - notes: Keep the container opaque (no transparency), preserve the same fixed-bottom animation/positioning, and keep Save/Reset button proportions consistent.
 
+### terminology-tooltip
+- status: approved
+- approved_on: 2026-07-10
+- chosen_pattern: Portal-based compact question-mark tooltip (`TermHint`) with viewport-aware positioning
+- source_file: dashboard/src/components/tickets/primitives.tsx
+- usage_examples:
+  - dashboard/src/components/tickets/PrioritiesPanel.tsx
+  - dashboard/src/components/tickets/TicketDetailDrawer.tsx
+  - dashboard/src/components/tickets/CategoriesPanel.tsx
+  - dashboard/src/components/tickets/OverviewPanel.tsx
+- reuse_scope: Reuse for domain terminology, abbreviations, Discord-specific concepts, automation labels, and support-process jargon inside the tickets module.
+- exceptions: Do not add it to ordinary language, self-explanatory actions, or every repeated data badge when the surrounding section already explains the same term.
+- notes: Hover opens on desktop; click/tap toggles on touch and keyboard. Render through a body portal so card overflow never clips the explanation.
+
+### emoji-picker
+- status: approved
+- approved_on: 2026-07-11
+- chosen_pattern: Economy `EmojiField` picker with common emoji grid, optional server emojis, custom Discord emoji input, and preview trigger
+- source_file: dashboard/src/components/economy/primitives.tsx
+- usage_examples:
+  - dashboard/src/components/economy/ConfigPanel.tsx
+  - dashboard/src/components/economy/ShopPanel.tsx
+  - dashboard/src/components/tickets/CategoriesPanel.tsx
+  - dashboard/src/components/tickets/TicketPanelMessageDesigner.tsx
+  - dashboard/src/components/moderation/tabs/AppealsTab.tsx
+- reuse_scope: Reuse for every dashboard setting that lets an administrator choose, enter, or change an emoji.
+- exceptions: Do not use for a static emoji preview or a non-editable Discord payload.
+- notes: Prefer server emoji data when the surface already has it; otherwise preserve the common grid and custom Discord emoji input.
+
 ## Entry Template
 
 ### dropdown

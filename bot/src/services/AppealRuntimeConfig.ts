@@ -207,22 +207,13 @@ export function normalizeAppealSettings(value: unknown): AppealSettings {
     };
 }
 
-export async function ensureAppealSettingsColumn() {
-    await prisma.$executeRawUnsafe('ALTER TABLE "AppealConfig" ADD COLUMN "settingsJson" TEXT').catch(() => null);
-    await prisma.$executeRawUnsafe('ALTER TABLE "AppealConfig" ADD COLUMN "panelChannelId" TEXT').catch(() => null);
-    await prisma.$executeRawUnsafe('ALTER TABLE "AppealConfig" ADD COLUMN "panelMessageId" TEXT').catch(() => null);
-    await prisma.$executeRawUnsafe('ALTER TABLE "AppealConfig" ADD COLUMN "sharedPanelChannelId" TEXT').catch(() => null);
-    await prisma.$executeRawUnsafe('ALTER TABLE "AppealConfig" ADD COLUMN "sharedPanelMessageId" TEXT').catch(() => null);
-}
-
 export async function getAppealRuntimeSettings(guildId: string): Promise<AppealSettings> {
-    await ensureAppealSettingsColumn();
-    const rows = await prisma.$queryRawUnsafe<AppealConfigRow[]>(
-        'SELECT "settingsJson" FROM "AppealConfig" WHERE "guildId" = ? LIMIT 1',
-        guildId,
-    );
+    const config = await prisma.appealConfig.findUnique({
+        where: { guildId },
+        select: { settingsJson: true },
+    });
 
-    const settingsJson = rows[0]?.settingsJson;
+    const settingsJson = config?.settingsJson;
     if (!settingsJson) {
         return DEFAULT_APPEAL_SETTINGS;
     }
@@ -235,47 +226,45 @@ export async function getAppealRuntimeSettings(guildId: string): Promise<AppealS
 }
 
 export async function readAppealPanelMeta(guildId: string): Promise<AppealPanelMeta> {
-    await ensureAppealSettingsColumn();
-    const rows = await prisma.$queryRawUnsafe<AppealConfigRow[]>(
-        'SELECT "panelChannelId", "panelMessageId" FROM "AppealConfig" WHERE "guildId" = ? LIMIT 1',
-        guildId,
-    );
+    const config = await prisma.appealConfig.findUnique({
+        where: { guildId },
+        select: { panelChannelId: true, panelMessageId: true },
+    });
 
     return {
-        panelChannelId: rows[0]?.panelChannelId ?? null,
-        panelMessageId: rows[0]?.panelMessageId ?? null,
+        panelChannelId: config?.panelChannelId ?? null,
+        panelMessageId: config?.panelMessageId ?? null,
     };
 }
 
 export async function writeAppealPanelMeta(guildId: string, meta: AppealPanelMeta) {
-    await ensureAppealSettingsColumn();
-    await prisma.$executeRawUnsafe(
-        'UPDATE "AppealConfig" SET "panelChannelId" = ?, "panelMessageId" = ?, "updatedAt" = CURRENT_TIMESTAMP WHERE "guildId" = ?',
-        meta.panelChannelId,
-        meta.panelMessageId,
-        guildId,
-    );
+    await prisma.appealConfig.update({
+        where: { guildId },
+        data: {
+            panelChannelId: meta.panelChannelId,
+            panelMessageId: meta.panelMessageId,
+        },
+    });
 }
 
 export async function readAppealSharedPanelMeta(guildId: string): Promise<AppealSharedPanelMeta> {
-    await ensureAppealSettingsColumn();
-    const rows = await prisma.$queryRawUnsafe<AppealConfigRow[]>(
-        'SELECT "sharedPanelChannelId", "sharedPanelMessageId" FROM "AppealConfig" WHERE "guildId" = ? LIMIT 1',
-        guildId,
-    );
+    const config = await prisma.appealConfig.findUnique({
+        where: { guildId },
+        select: { sharedPanelChannelId: true, sharedPanelMessageId: true },
+    });
 
     return {
-        sharedPanelChannelId: rows[0]?.sharedPanelChannelId ?? null,
-        sharedPanelMessageId: rows[0]?.sharedPanelMessageId ?? null,
+        sharedPanelChannelId: config?.sharedPanelChannelId ?? null,
+        sharedPanelMessageId: config?.sharedPanelMessageId ?? null,
     };
 }
 
 export async function writeAppealSharedPanelMeta(guildId: string, meta: AppealSharedPanelMeta) {
-    await ensureAppealSettingsColumn();
-    await prisma.$executeRawUnsafe(
-        'UPDATE "AppealConfig" SET "sharedPanelChannelId" = ?, "sharedPanelMessageId" = ?, "updatedAt" = CURRENT_TIMESTAMP WHERE "guildId" = ?',
-        meta.sharedPanelChannelId,
-        meta.sharedPanelMessageId,
-        guildId,
-    );
+    await prisma.appealConfig.update({
+        where: { guildId },
+        data: {
+            sharedPanelChannelId: meta.sharedPanelChannelId,
+            sharedPanelMessageId: meta.sharedPanelMessageId,
+        },
+    });
 }

@@ -70,8 +70,8 @@ export function AiModerationTab({ config, setConfig, incidentState, locale, tr }
     };
 
     return (
-        <div className="space-y-8 animate-fade-in">
-            
+        <div className="space-y-8 animate-fade-in" data-tour="mod-ai">
+
             {/* Main Switch & Provider */}
             <AnimatedCard 
                 title={tr('Нейросетевая Модерация (AutoMod-V2)', 'AI Moderation (AutoMod-V2)')}

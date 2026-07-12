@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react';
 import { usePathname } from 'next/navigation';
 import { Bell, Question } from '@phosphor-icons/react';
 import { useGuildLocale } from '@/lib/i18n';
@@ -8,6 +8,8 @@ import { Avatar, Button } from '@nextui-org/react';
 import { useSession } from 'next-auth/react';
 import { DashboardSearch } from '@/components/common/DashboardSearch';
 import { FitSingleLineText } from '@/components/common/FitSingleLineText';
+import { useTour } from '@/components/tour/TourProvider';
+import { getTourCopy } from '@/lib/tour/i18n';
 
 interface TopNavProps {
     guildId: string;
@@ -42,62 +44,126 @@ const strings = {
     },
 } as const;
 
+type StableProfile = {
+    image?: string;
+    name: string;
+};
+
+const DEFAULT_PROFILE: StableProfile = { name: 'User' };
+const PROFILE_EVENT = 'dashboardProfileChange';
+
+const subscribeClientReady = () => () => undefined;
+const getClientReadySnapshot = () => true;
+const getServerReadySnapshot = () => false;
+const getProfileStorageKey = (sessionUserId: string) => `dashboard-profile:${sessionUserId}`;
+
+function getStoredProfileSnapshot(sessionUserId: string) {
+    if (typeof window === 'undefined') {
+        return '';
+    }
+
+    try {
+        return window.localStorage.getItem(getProfileStorageKey(sessionUserId)) || '';
+    } catch {
+        return '';
+    }
+}
+
+function parseProfileSnapshot(raw: string): StableProfile {
+    if (!raw) {
+        return DEFAULT_PROFILE;
+    }
+
+    try {
+        const cached = JSON.parse(raw) as { image?: string; name?: string };
+        return {
+            name: cached.name?.trim() || DEFAULT_PROFILE.name,
+            image: cached.image?.trim() || undefined,
+        };
+    } catch {
+        return DEFAULT_PROFILE;
+    }
+}
+
+function subscribeStoredProfile(sessionUserId: string, onStoreChange: () => void) {
+    if (typeof window === 'undefined') {
+        return () => undefined;
+    }
+
+    const storageKey = getProfileStorageKey(sessionUserId);
+    const handleProfileChange = (event: Event) => {
+        const detail = (event as CustomEvent<{ sessionUserId?: string }>).detail;
+        if (!detail?.sessionUserId || detail.sessionUserId === sessionUserId) {
+            onStoreChange();
+        }
+    };
+    const handleStorage = (event: StorageEvent) => {
+        if (event.key === storageKey) {
+            onStoreChange();
+        }
+    };
+
+    window.addEventListener(PROFILE_EVENT, handleProfileChange);
+    window.addEventListener('storage', handleStorage);
+    return () => {
+        window.removeEventListener(PROFILE_EVENT, handleProfileChange);
+        window.removeEventListener('storage', handleStorage);
+    };
+}
+
+function writeStoredProfile(sessionUserId: string, profile: StableProfile) {
+    if (typeof window === 'undefined') {
+        return;
+    }
+
+    try {
+        window.localStorage.setItem(getProfileStorageKey(sessionUserId), JSON.stringify(profile));
+        window.dispatchEvent(new CustomEvent(PROFILE_EVENT, { detail: { sessionUserId } }));
+    } catch {
+        // Ignore quota or privacy-mode failures.
+    }
+}
+
 export const TopNav: React.FC<TopNavProps> = ({ guildId }) => {
     const { locale } = useGuildLocale(guildId);
     const text = strings[locale];
+    const tourCopy = getTourCopy(locale);
+    const { start: startTour, available: tourAvailable } = useTour();
     const pathname = usePathname();
     const { data: session } = useSession();
     const sessionUserId = (session?.user as { id?: string } | undefined)?.id || 'viewer';
-    const [stableProfile, setStableProfile] = useState<{ image?: string; name: string }>({ name: 'User' });
-
-    useEffect(() => {
-        if (typeof window === 'undefined') {
-            return;
-        }
-
-        const storageKey = `dashboard-profile:${sessionUserId}`;
-        try {
-            const raw = window.localStorage.getItem(storageKey);
-            if (!raw) {
-                setStableProfile({ name: 'User' });
-                return;
-            }
-
-            const cached = JSON.parse(raw) as { image?: string; name?: string };
-            setStableProfile({
-                name: cached.name?.trim() || 'User',
-                image: cached.image?.trim() || undefined,
-            });
-        } catch {
-            // Ignore malformed local profile cache.
-        }
-    }, [sessionUserId]);
-
-    useEffect(() => {
+    const tourTriggerReady = useSyncExternalStore(
+        subscribeClientReady,
+        getClientReadySnapshot,
+        getServerReadySnapshot,
+    );
+    const rawCachedProfile = useSyncExternalStore(
+        useCallback((onStoreChange) => subscribeStoredProfile(sessionUserId, onStoreChange), [sessionUserId]),
+        useCallback(() => getStoredProfileSnapshot(sessionUserId), [sessionUserId]),
+        () => '',
+    );
+    const cachedProfile = useMemo(() => parseProfileSnapshot(rawCachedProfile), [rawCachedProfile]);
+    const sessionProfile = useMemo<StableProfile | null>(() => {
         const nextName = session?.user?.name?.trim();
         const nextImage = session?.user?.image?.trim();
 
         if (!nextName && !nextImage) {
-            return;
+            return null;
         }
 
-        setStableProfile((current) => {
-            const updated = {
-                name: nextName || current.name,
-                image: nextImage || current.image,
-            };
+        return {
+            name: nextName || cachedProfile.name,
+            image: nextImage || cachedProfile.image,
+        };
+    }, [cachedProfile.image, cachedProfile.name, session?.user?.image, session?.user?.name]);
 
-            if (typeof window !== 'undefined') {
-                try {
-                    window.localStorage.setItem(`dashboard-profile:${sessionUserId}`, JSON.stringify(updated));
-                } catch {
-                    // Ignore quota or privacy-mode failures.
-                }
-            }
+    useEffect(() => {
+        if (sessionProfile) {
+            writeStoredProfile(sessionUserId, sessionProfile);
+        }
+    }, [sessionProfile, sessionUserId]);
 
-            return updated;
-        });
-    }, [session?.user?.image, session?.user?.name, sessionUserId]);
+    const stableProfile = sessionProfile ?? cachedProfile;
 
     const userImage = stableProfile.image;
     const userName = stableProfile.name;
@@ -133,11 +199,26 @@ export const TopNav: React.FC<TopNavProps> = ({ guildId }) => {
 
                 <div className="mx-1 hidden h-6 w-px bg-[var(--border-subtle)] sm:block" />
 
-                <div className="hidden items-center gap-3 sm:flex">
-                    <Button isIconOnly variant="flat" className="h-11 w-11 min-w-11 rounded-full border border-[var(--border-divider)] bg-[var(--surface-card)] p-0 text-[var(--text-secondary)] shadow-sm hover:text-white">
+                {tourTriggerReady ? (
+                    <button
+                        type="button"
+                        data-tour-trigger
+                        onClick={startTour}
+                        disabled={!tourAvailable}
+                        title={tourAvailable ? tourCopy.startTour : tourCopy.noTour}
+                        aria-label={tourAvailable ? tourCopy.startTour : tourCopy.noTour}
+                        className="flex h-10 w-10 min-w-10 shrink-0 items-center justify-center rounded-full border border-[var(--border-divider)] bg-[var(--surface-card)] p-0 text-[var(--text-secondary)] shadow-sm transition-colors hover:text-white disabled:cursor-not-allowed disabled:opacity-40 sm:h-11 sm:w-11 sm:min-w-11"
+                    >
                         <Question size={20} weight="bold" />
-                    </Button>
+                    </button>
+                ) : (
+                    <span
+                        aria-hidden="true"
+                        className="block h-10 w-10 min-w-10 shrink-0 rounded-full border border-transparent sm:h-11 sm:w-11 sm:min-w-11"
+                    />
+                )}
 
+                <div className="hidden items-center gap-3 sm:flex">
                     <Button isIconOnly variant="flat" className="relative h-11 w-11 min-w-11 rounded-full border border-[var(--border-divider)] bg-[var(--surface-card)] p-0 text-[var(--text-secondary)] shadow-sm hover:text-white">
                         <Bell size={20} weight="bold" />
                         <span className="absolute right-2.5 top-2.5 h-2 w-2 rounded-full bg-[var(--color-primary-1)] ring-2 ring-[var(--bg-base)] shadow-[0_0_10px_rgba(117,241,106,1)]" />

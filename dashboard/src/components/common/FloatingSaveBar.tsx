@@ -27,17 +27,19 @@ export function FloatingSaveBar({
     disableReset = false,
 }: FloatingSaveBarProps) {
     return (
-        <div className={`fixed bottom-8 left-1/2 z-50 flex w-full max-w-lg -translate-x-1/2 justify-center px-4 transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${visible ? 'translate-y-0 scale-100 opacity-100' : 'pointer-events-none translate-y-24 scale-95 opacity-0'}`}>
-            <div className="flex w-full gap-2 rounded-full border border-[var(--border-subtle)] bg-[var(--surface-card)] p-2 shadow-2xl">
+        <>
+            <div aria-hidden className={`transition-[height] duration-300 ${visible ? 'h-24 sm:h-28' : 'h-0'}`} />
+            <div className={`fixed bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-1/2 z-50 flex w-full max-w-lg -translate-x-1/2 justify-center px-3 transition-all duration-300 ease-out sm:bottom-8 sm:px-4 ${visible ? 'translate-y-0 scale-100 opacity-100' : 'pointer-events-none translate-y-24 scale-95 opacity-0'}`}>
+            <div className="flex w-full gap-2 rounded-full border border-[var(--border-subtle)] bg-[var(--surface-card)] p-1.5 shadow-2xl sm:p-2">
                 <button
-                    className="flex h-12 flex-1 items-center justify-center gap-2 rounded-full bg-[var(--color-primary-1)] text-sm font-bold text-black transition-colors hover:bg-[var(--color-primary-2)] disabled:pointer-events-none disabled:opacity-50"
+                    className="flex h-11 flex-1 items-center justify-center gap-2 rounded-full bg-[var(--color-primary-1)] px-4 text-sm font-bold text-black transition-colors hover:bg-[var(--color-primary-2)] hover:text-white disabled:pointer-events-none disabled:opacity-50 sm:h-12"
                     onClick={onSave}
                     disabled={disableSave || saving}
                 >
                     {saving ? savingLabel : saveLabel}
                 </button>
                 <button
-                    className="flex h-12 w-12 min-w-12 items-center justify-center rounded-full bg-[var(--surface-hover)] text-[var(--text-secondary)] transition-colors hover:bg-[var(--border-divider)] hover:text-white disabled:pointer-events-none disabled:opacity-50"
+                    className="flex h-11 w-11 min-w-11 items-center justify-center rounded-full bg-[var(--surface-hover)] text-[var(--text-secondary)] transition-colors hover:bg-[var(--border-divider)] hover:text-white disabled:pointer-events-none disabled:opacity-50 sm:h-12 sm:w-12 sm:min-w-12"
                     onClick={onReset}
                     title={resetLabel}
                     aria-label={resetLabel}
@@ -46,6 +48,7 @@ export function FloatingSaveBar({
                     <ArrowClockwise size={20} weight="bold" />
                 </button>
             </div>
-        </div>
+            </div>
+        </>
     );
 }

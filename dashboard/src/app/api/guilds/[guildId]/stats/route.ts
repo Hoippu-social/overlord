@@ -1,3 +1,4 @@
+import '@/lib/bigintJson';
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma, statsPrisma } from '@/lib/prisma';
 import { requireGuildStatsAccess } from '@/lib/statsAccess';
@@ -16,11 +17,6 @@ import {
 } from '@/lib/stats';
 
 const BOT_API_URL = process.env.BOT_API_URL || 'http://127.0.0.1:3002';
-
-// Patch BigInt serialization for JSON
-(BigInt.prototype as any).toJSON = function () {
-    return this.toString();
-};
 
 const isMissingTableError = (error: unknown) => {
     const err = error as { code?: string; message?: string };
@@ -82,7 +78,7 @@ async function enrichTopData(
     }
 }
 
-// Merge raw data from stats.db and development.db to avoid missing recent data
+// Merge raw data from PostgreSQL stats storage and main PostgreSQL storage to avoid missing recent data
 async function getMergedMessages(guildId: string, startDate: Date) {
     return statsPrisma.statMessage.findMany({ where: { guildId, createdAt: { gte: startDate } } });
 }
@@ -372,16 +368,6 @@ export async function GET(
         try {
             const timezone = await getGuildStatsTimezone(guildId);
             let responseData: any = {};
-            const debugInfo = {
-                url: process.env.DATABASE_URL,
-                startDate: startDate.toISOString(),
-                guildId,
-                period,
-                type,
-                timezone,
-            };
-            responseData._debug = debugInfo;
-
         // 1. Overview Data
         if (type === 'overview') {
             let activityData: any[] = [];

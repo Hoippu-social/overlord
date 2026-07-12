@@ -320,7 +320,7 @@ export function AccessControlTab({ config, setConfig, locale, tr }: AccessContro
     };
 
     return (
-        <div className="space-y-8 animate-fade-in">
+        <div className="space-y-8 animate-fade-in" data-tour="mod-access">
             <AnimatedCard
                 title={tr('Базовые настройки модерации', 'Base Moderation Scope')}
                 subtitle={tr('Глобальные правила игнорирования и роль для мьюта.', 'Global ignore rules and mute role setup.')}

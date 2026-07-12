@@ -32,6 +32,7 @@ const TAG_COLORS: Record<string, number> = {
     invites: 0xe67e22,    // Orange
     security: 0xed4245,   // Red
     bot: 0x9b59b6,        // Purple
+    economy: 0x57f287,    // Green
 };
 
 const MODERATION_EVENT_ALIASES: Record<string, string> = {
@@ -425,7 +426,10 @@ async function sendToRoute(client: Client, input: AuditInput) {
         if (moderationEmbed) {
             for (const routeChannelId of routeChannelIds) {
                 try {
-                    const channel = await client.channels.fetch(routeChannelId).catch(() => null);
+                    const guild = client.guilds.cache.get(input.guildId) ?? await client.guilds.fetch(input.guildId).catch(() => null);
+                    const channel = guild
+                        ? guild.channels.cache.get(routeChannelId) ?? await guild.channels.fetch(routeChannelId).catch(() => null)
+                        : null;
                     if (!channel || !channel.isTextBased() || !('send' in channel)) continue;
                     if (moderationEvent && shouldSkipDuplicateDispatch(routeChannelId, input, moderationEvent.canonicalEvent)) {
                         continue;
@@ -544,7 +548,10 @@ async function sendToRoute(client: Client, input: AuditInput) {
 
         for (const routeChannelId of routeChannelIds) {
             try {
-                const channel = await client.channels.fetch(routeChannelId).catch(() => null);
+                const guild = client.guilds.cache.get(input.guildId) ?? await client.guilds.fetch(input.guildId).catch(() => null);
+                const channel = guild
+                    ? guild.channels.cache.get(routeChannelId) ?? await guild.channels.fetch(routeChannelId).catch(() => null)
+                    : null;
                 if (!channel || !channel.isTextBased() || !('send' in channel)) continue;
                 await (channel as any).send({ embeds: [EmbedBuilder.from(embed)] });
             } catch (channelError) {

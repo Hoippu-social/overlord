@@ -1,13 +1,10 @@
-const fs = require('fs');
 const path = require('path');
 const dotenv = require('dotenv');
 const { PrismaClient } = require('@prisma/client');
+const { PrismaClient: StatsPgPrismaClient } = require('../src/generated/stats-pg-client');
 const { toZonedTime, fromZonedTime } = require('date-fns-tz');
 
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
-
-const DEFAULT_STATS_DB_PATH = path.resolve(__dirname, '../../bot/prisma/stats.db');
-const SNAPSHOT_DIR = path.resolve(__dirname, '../../bot/prisma/staging');
 
 function getArg(name) {
     const prefix = `--${name}=`;
@@ -15,16 +12,12 @@ function getArg(name) {
     return match ? match.slice(prefix.length) : undefined;
 }
 
-function buildStatsUrl(statsPath) {
-    if (statsPath.startsWith('file:')) {
-        return statsPath;
+function getStatsPgUrl() {
+    const url = process.env.STATS_PG_DATABASE_URL;
+    if (!url || !/^postgres(?:ql)?:\/\//i.test(url)) {
+        throw new Error('STATS_PG_DATABASE_URL must be configured with a PostgreSQL URL');
     }
-    return `file:${path.resolve(statsPath)}`;
-}
-
-function getTimestamp() {
-    const now = new Date();
-    return `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`;
+    return url;
 }
 
 function splitIntoChunks(items, chunkSize) {
@@ -429,14 +422,8 @@ async function rebuildGuild(statsPrisma, guildId, timezone) {
 }
 
 async function main() {
-    const statsPathArg = getArg('stats-path');
     const targetGuildId = getArg('guild');
-    const statsUrl = buildStatsUrl(statsPathArg || DEFAULT_STATS_DB_PATH);
-    const statsPath = statsUrl.replace(/^file:/, '');
-
-    fs.mkdirSync(SNAPSHOT_DIR, { recursive: true });
-    const snapshotPath = path.join(SNAPSHOT_DIR, `stats_pre_rebuild_${getTimestamp()}.db`);
-    fs.copyFileSync(statsPath, snapshotPath);
+    const statsUrl = getStatsPgUrl();
 
     const appPrisma = new PrismaClient({
         datasources: {
@@ -445,7 +432,7 @@ async function main() {
             },
         },
     });
-    const statsPrisma = new PrismaClient({
+    const statsPrisma = new StatsPgPrismaClient({
         datasources: {
             db: {
                 url: statsUrl,
@@ -457,7 +444,7 @@ async function main() {
         await Promise.all([appPrisma.$connect(), statsPrisma.$connect()]);
         const guildIds = await getFlaggedGuildIds(statsPrisma, targetGuildId);
 
-        console.log(`[rebuild-flagged] Snapshot: ${snapshotPath}`);
+        console.log('[rebuild-flagged] Stats storage: PostgreSQL');
         console.log(`[rebuild-flagged] Guilds to rebuild: ${guildIds.length}`);
 
         for (const guildId of guildIds) {

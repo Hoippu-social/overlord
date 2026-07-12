@@ -16,6 +16,12 @@ type BotGuild = {
     botSettings?: { adminRoles: string | null } | null;
 };
 
+type TicketAccessProfileRecord = {
+    guildId: string;
+    roleIds: string | null;
+    permissions: string;
+};
+
 const ADMIN_PERMISSION = BigInt(0x8);
 const MANAGE_GUILD_PERMISSION = BigInt(0x20);
 const DISCORD_API_TIMEOUT_MS = 4000;
@@ -236,8 +242,26 @@ export async function resolveAllowedGuildIds(
 
     const userGuilds = await fetchDiscordGuilds(accessToken, options);
     const userGuildMap = new Map(userGuilds.map((guild) => [guild.id, guild]));
+    let ticketProfiles: TicketAccessProfileRecord[] = [];
+    try {
+        ticketProfiles = await prisma.ticketAccessProfile.findMany({
+            where: { enabled: true },
+            select: { guildId: true, roleIds: true, permissions: true },
+        });
+    } catch (error) {
+        if (!isMissingTableError(error)) {
+            throw error;
+        }
+    }
+    const profilesByGuild = new Map<string, TicketAccessProfileRecord[]>();
+    for (const profile of ticketProfiles) {
+        const existing = profilesByGuild.get(profile.guildId) ?? [];
+        existing.push(profile);
+        profilesByGuild.set(profile.guildId, existing);
+    }
+
     const directAccessIds = new Set<string>();
-    const roleCheckCandidates: Array<{ adminRoles: string[]; guildId: string }> = [];
+    const roleCheckCandidates: Array<{ accessRoles: string[]; guildId: string }> = [];
 
     for (const guild of guilds) {
         const userGuild = userGuildMap.get(guild.id);
@@ -250,21 +274,26 @@ export async function resolveAllowedGuildIds(
             continue;
         }
 
-        const adminRoles = parseJsonArray(guild.botSettings?.adminRoles);
-        if (!adminRoles.length) {
+        const profileRoles = (profilesByGuild.get(guild.id) ?? [])
+            .flatMap((profile) => parseJsonArray(profile.roleIds));
+        const accessRoles = [...new Set([
+            ...parseJsonArray(guild.botSettings?.adminRoles),
+            ...profileRoles,
+        ])];
+        if (!accessRoles.length) {
             continue;
         }
 
-        roleCheckCandidates.push({ adminRoles, guildId: guild.id });
+        roleCheckCandidates.push({ accessRoles, guildId: guild.id });
     }
 
-    const roleGrantedIds = await mapWithConcurrency(roleCheckCandidates, ROLE_CHECK_CONCURRENCY, async ({ guildId, adminRoles }) => {
+    const roleGrantedIds = await mapWithConcurrency(roleCheckCandidates, ROLE_CHECK_CONCURRENCY, async ({ guildId, accessRoles }) => {
         const memberRoles = await fetchMemberRoles(guildId, accessToken, options);
         if (!memberRoles) {
             return null;
         }
 
-        return memberRoles.some((roleId) => adminRoles.includes(roleId)) ? guildId : null;
+        return memberRoles.some((roleId) => accessRoles.includes(roleId)) ? guildId : null;
     });
 
     const allowedGuildIds = Array.from(
@@ -312,18 +341,27 @@ export async function canAccessGuild(
     }
 
     let adminRoles: string[] = [];
+    let ticketProfileRoles: string[] = [];
     try {
-        const botSettings = await prisma.botSettings.findUnique({
-            where: { guildId },
-            select: { adminRoles: true }
-        });
+        const [botSettings, profiles] = await Promise.all([
+            prisma.botSettings.findUnique({
+                where: { guildId },
+                select: { adminRoles: true }
+            }),
+            prisma.ticketAccessProfile.findMany({
+                where: { guildId, enabled: true },
+                select: { roleIds: true },
+            }),
+        ]);
         adminRoles = parseJsonArray(botSettings?.adminRoles);
+        ticketProfileRoles = profiles.flatMap((profile) => parseJsonArray(profile.roleIds));
     } catch (error) {
         if (!isMissingTableError(error)) {
             throw error;
         }
     }
-    if (!adminRoles.length) {
+    const accessRoles = [...new Set([...adminRoles, ...ticketProfileRoles])];
+    if (!accessRoles.length) {
         return options.forceRefresh
             ? false
             : setCachedValue(discordAccessCache.guildAccess, cacheKey, false, GUILD_ACCESS_CACHE_TTL_MS);
@@ -336,7 +374,7 @@ export async function canAccessGuild(
             : setCachedValue(discordAccessCache.guildAccess, cacheKey, false, GUILD_ACCESS_CACHE_TTL_MS);
     }
 
-    const hasAccess = memberRoles.some((roleId) => adminRoles.includes(roleId));
+    const hasAccess = memberRoles.some((roleId) => accessRoles.includes(roleId));
 
     return options.forceRefresh
         ? hasAccess
@@ -346,4 +384,67 @@ export async function canAccessGuild(
             hasAccess,
             GUILD_ACCESS_CACHE_TTL_MS
         );
+}
+
+export async function resolveTicketPermissions(
+    accessToken: string,
+    guildId: string,
+    options: AccessLookupOptions = {}
+): Promise<Set<string>> {
+    const permissions = new Set<string>();
+    if (accessToken === 'admin') {
+        permissions.add('*');
+        return permissions;
+    }
+
+    const guilds = await fetchDiscordGuilds(accessToken, options);
+    const userGuild = guilds.find((guild) => guild.id === guildId);
+    if (!userGuild) {
+        return permissions;
+    }
+
+    if (userGuild.owner || hasGuildPermission(userGuild.permissions)) {
+        permissions.add('*');
+        return permissions;
+    }
+
+    const memberRoles = await fetchMemberRoles(guildId, accessToken, options);
+    if (!memberRoles) {
+        return permissions;
+    }
+
+    try {
+        const [botSettings, profiles] = await Promise.all([
+            prisma.botSettings.findUnique({
+                where: { guildId },
+                select: { adminRoles: true },
+            }),
+            prisma.ticketAccessProfile.findMany({
+                where: { guildId, enabled: true },
+                select: { roleIds: true, permissions: true },
+            }),
+        ]);
+
+        const adminRoles = parseJsonArray(botSettings?.adminRoles);
+        if (memberRoles.some((roleId) => adminRoles.includes(roleId))) {
+            permissions.add('*');
+            return permissions;
+        }
+
+        for (const profile of profiles) {
+            const roleIds = parseJsonArray(profile.roleIds);
+            if (!memberRoles.some((roleId) => roleIds.includes(roleId))) {
+                continue;
+            }
+            for (const permission of parseJsonArray(profile.permissions)) {
+                permissions.add(permission);
+            }
+        }
+    } catch (error) {
+        if (!isMissingTableError(error)) {
+            throw error;
+        }
+    }
+
+    return permissions;
 }

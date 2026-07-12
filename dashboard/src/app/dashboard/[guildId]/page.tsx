@@ -9,7 +9,7 @@ import {
 } from '@phosphor-icons/react';
 import { useGuildLocale } from '@/lib/i18n';
 import { DashboardAudioPlayer } from '@/components/music/DashboardAudioPlayer';
-import { fetchWithTimeout, withTimeout } from '@/lib/requestTimeout';
+import { fetchWithTimeout, TimeoutError, withTimeout } from '@/lib/requestTimeout';
 import { FitSingleLineText } from '@/components/common/FitSingleLineText';
 import { hyphenateServerName } from '@/lib/textHyphenation';
 
@@ -49,8 +49,9 @@ interface AuditEvent {
     createdAt: string;
 }
 
-const PAGE_DATA_TIMEOUT_MS = 6000;
+const PAGE_DATA_TIMEOUT_MS = 12000;
 const ENRICH_TIMEOUT_MS = 3500;
+const REFRESH_INTERVAL_MS = 10000;
 
 /* ─── Strings ────────────────────────────────────────────────────── */
 const strings = {
@@ -275,7 +276,13 @@ async function readJson<T>(
             `${label} body`
         );
     } catch (error) {
-        console.error(`[HubPage] ${label} failed:`, error);
+        if (error instanceof TimeoutError) {
+            console.warn(`[HubPage] ${error.message}`);
+        } else {
+            // A mobile network switch or dev-server reconnect is recoverable:
+            // keep the last successful state without triggering Next's overlay.
+            console.warn(`[HubPage] ${label} temporarily unavailable:`, error);
+        }
         return null;
     }
 }
@@ -343,6 +350,10 @@ export default function HubPage({ params }: { params: Promise<{ guildId: string 
     }, [guildId]);
 
     const fetchAll = useCallback(async () => {
+        if (typeof navigator !== 'undefined' && !navigator.onLine) {
+            return;
+        }
+
         if (fetchInFlightRef.current) {
             return;
         }
@@ -400,8 +411,10 @@ export default function HubPage({ params }: { params: Promise<{ guildId: string 
     useEffect(() => {
         void fetchAll();
         const interval = setInterval(() => {
-            void fetchAll();
-        }, 3000);
+            if (document.visibilityState === 'visible') {
+                void fetchAll();
+            }
+        }, REFRESH_INTERVAL_MS);
         return () => clearInterval(interval);
     }, [fetchAll]);
 
@@ -415,7 +428,7 @@ export default function HubPage({ params }: { params: Promise<{ guildId: string 
                 <div className="flex min-w-0 flex-col gap-8">
 
                     {/* ─── HEADER ROW (Green Block) ─── */}
-                    <div className="flex flex-col min-w-0">
+                    <div className="flex flex-col min-w-0" data-tour="hub-server-card">
                         <div className="bg-[var(--surface-card)] rounded-[24px] border border-[var(--border-subtle)] px-5 py-5 sm:px-8 flex flex-col md:flex-row items-center justify-between gap-6 min-w-0">
                             <div className="flex w-full min-w-0 items-center gap-4 md:w-auto">
                                 {guild?.guild.icon ? (
@@ -452,7 +465,7 @@ export default function HubPage({ params }: { params: Promise<{ guildId: string 
                         <div className="xl:col-span-8 flex flex-col gap-8">
 
                             {/* Audio Player (Purple Block) */}
-                            <div className="flex flex-col min-w-0">
+                            <div className="flex flex-col min-w-0" data-tour="hub-audio-player">
                                 <SectionHeader title="Audio Player" icon={MusicNotesSimple} />
                                 <DashboardAudioPlayer guildId={guildId} />
                             </div>
@@ -460,7 +473,7 @@ export default function HubPage({ params }: { params: Promise<{ guildId: string 
                             {/* Events Row (Black Blocks) */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 flex-1">
                                 {/* Bot Events */}
-                                <div className="flex flex-col h-full min-w-0">
+                                <div className="flex flex-col h-full min-w-0" data-tour="hub-bot-events">
                                     <SectionHeader title={t.botEvents} icon={Gear} />
                                     <div className="bg-[var(--surface-card)] rounded-[24px] border border-[var(--border-subtle)] overflow-hidden flex flex-col flex-1">
                                         {events.filter(ev => ev.tag === 'bot_event' || ev.tag === 'dashboard_event').length > 0 ? (
@@ -495,7 +508,7 @@ export default function HubPage({ params }: { params: Promise<{ guildId: string 
                                 </div>
 
                                 {/* Server Events */}
-                                <div className="flex flex-col h-full min-w-0">
+                                <div className="flex flex-col h-full min-w-0" data-tour="hub-server-events">
                                     <SectionHeader title={t.serverEvents} icon={Scroll} />
                                     <div className="bg-[var(--surface-card)] rounded-[24px] border border-[var(--border-subtle)] overflow-hidden flex flex-col flex-1 justify-between">
                                         {events.filter(ev => ['ban', 'kick', 'mute', 'unmute', 'warn', 'security', 'channels', 'role'].includes(ev.tag)).length > 0 ? (
@@ -533,7 +546,7 @@ export default function HubPage({ params }: { params: Promise<{ guildId: string 
                         <div className="xl:col-span-4 flex flex-col gap-8">
 
                             {/* Summary (Red Block 1) */}
-                            <div className="flex flex-col min-w-0">
+                            <div className="flex flex-col min-w-0" data-tour="hub-summary">
                                 <SectionHeader title={t.metricsSummary} icon={Lightning} />
                                 <div className="flex flex-col gap-3">
                                     <Link href={`/dashboard/${guildId}/tickets`} className="bg-[var(--surface-card)] border border-[var(--border-subtle)] hover:border-[var(--color-destructive)]/50 rounded-2xl p-4 flex items-center justify-between transition-colors group">
@@ -555,7 +568,7 @@ export default function HubPage({ params }: { params: Promise<{ guildId: string 
                             </div>
 
                             {/* Quick Launch (Red Block 2) */}
-                            <div className="flex flex-col min-w-0 flex-1">
+                            <div className="flex flex-col min-w-0 flex-1" data-tour="hub-quick-launch">
                                 <SectionHeader title={t.quickLaunch} icon={Pulse} />
                                 <div className="grid grid-cols-2 gap-3 content-start">
                                     {[

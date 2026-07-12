@@ -8,6 +8,7 @@ import {
 import { Button, Select, SelectItem } from '@nextui-org/react';
 import { useGuildLocale } from '@/lib/i18n';
 import { SegmentedTabs } from '@/components/common/SegmentedTabs';
+import { LoadingSkeleton } from '@/components/common/LoadingSkeleton';
 import { HistoricalSyncModal } from '@/components/stats/HistoricalSyncModal';
 
 const strings = {
@@ -117,6 +118,7 @@ function StatsNavContent({ guildId }: { guildId: string }) {
                 labels={labels}
                 tabs={tabs}
                 className="flex-1"
+                dataTour="stats-tabs"
             />
 
             <div className="flex w-full flex-shrink-0 flex-col items-stretch gap-2 sm:w-auto xl:items-end">
@@ -127,6 +129,7 @@ function StatsNavContent({ guildId }: { guildId: string }) {
                         isLoading={syncing}
                         onPress={handleSync}
                         aria-label="Sync"
+                        data-tour="stats-sync"
                         className="h-10 w-10 rounded-full text-white/40 transition-all hover:bg-white/[0.04] hover:text-[var(--color-primary-1)]"
                         title="Sync"
                     >
@@ -136,6 +139,7 @@ function StatsNavContent({ guildId }: { guildId: string }) {
                     <Select
                         selectedKeys={[period]}
                         onChange={(e) => setParam('period', e.target.value)}
+                        data-tour="stats-period"
                         className="min-w-0 flex-1 sm:w-28 sm:flex-none"
                         classNames={{
                             trigger: 'h-10 min-h-10 rounded-full border-0 bg-transparent px-3 shadow-none transition-colors hover:bg-white/[0.04]',
@@ -173,7 +177,7 @@ function StatsNavContent({ guildId }: { guildId: string }) {
 
 export function StatsNav({ guildId }: { guildId: string }) {
     return (
-        <Suspense fallback={<div className="h-[110px] rounded-2xl skeleton sm:h-[46px]" />}>
+        <Suspense fallback={<LoadingSkeleton className="h-[110px] rounded-2xl sm:h-[46px]" />}>
             <StatsNavContent guildId={guildId} />
         </Suspense>
     );

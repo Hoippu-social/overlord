@@ -8,6 +8,9 @@ import { loadEvents } from './handlers/eventHandler';
 import { handleAiModerationButton, isAiModerationButton } from './services/AiModerationService';
 import { ModerationLifecycleService } from './services/ModerationLifecycleService';
 import { RetentionService } from './services/RetentionService';
+import { TicketLifecycleService } from './services/TicketLifecycleService';
+import { EconomyEarnService } from './services/EconomyEarnService';
+import { EconomyLifecycleService } from './services/EconomyLifecycleService';
 import { StatsService } from './services/StatsService';
 import { connectDB, prisma } from './utils/database';
 import { getInteractionLocale, t } from './utils/i18n';
@@ -31,11 +34,13 @@ const client = new Client({
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.GuildMembers,
         GatewayIntentBits.MessageContent,
+        GatewayIntentBits.GuildMessageReactions,
     ],
     partials: [
         Partials.Channel,
         Partials.GuildMember,
         Partials.Message,
+        Partials.Reaction,
     ],
     presence: {
         status: 'online',
@@ -68,6 +73,9 @@ process.on('SIGINT', async () => {
     StatsService.shutdown();
     ModerationLifecycleService.stop();
     RetentionService.stop();
+    TicketLifecycleService.stop();
+    EconomyEarnService.shutdown();
+    EconomyLifecycleService.stop();
     cleanup();
     client.destroy();
     process.exit(0);
@@ -78,6 +86,9 @@ process.on('SIGTERM', async () => {
     StatsService.shutdown();
     ModerationLifecycleService.stop();
     RetentionService.stop();
+    TicketLifecycleService.stop();
+    EconomyEarnService.shutdown();
+    EconomyLifecycleService.stop();
     cleanup();
     client.destroy();
     process.exit(0);
@@ -89,7 +100,8 @@ process.on('uncaughtException', (error) => {
         msg.includes('Lavalink') ||
         msg.includes('/v4/info') ||
         msg.includes('not connected') ||
-        msg.includes('ECONNREFUSED')
+        msg.includes('ECONNREFUSED') ||
+        msg.includes('WebSocket was closed before the connection was established')
     ) {
         logger.warn('[Process] Non-fatal Lavalink error (server may not be running yet):', msg);
     } else {

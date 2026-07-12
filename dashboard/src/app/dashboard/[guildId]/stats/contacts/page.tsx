@@ -9,7 +9,7 @@ import * as THREE from 'three';
 
 import {
     MicrophoneStage, ChatText, Intersect, MagnifyingGlass, User,
-    Cube, CornersOut, CornersIn
+    Cube, CornersOut, CornersIn, X
 } from '@phosphor-icons/react';
 
 import { useGuildLocale } from '@/lib/i18n';
@@ -33,13 +33,17 @@ const ForceGraph3D = dynamic(() => import('react-force-graph-3d'), {
     loading: () => <GraphLoadingFallback />,
 });
 
-// â”€â”€â”€ Constants â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const EDGE_COLORS: Record<string, string> = {
-    reply: 'rgba(117,241,106,0.65)',
-    mention: 'rgba(59,130,246,0.65)',
-    voice: 'rgba(245,158,11,0.55)',
-    mixed: 'rgba(139,92,246,0.6)',
+    reply: 'rgba(117,241,106,0.7)',
+    mention: 'rgba(94,168,255,0.7)',
+    voice: 'rgba(245,176,75,0.6)',
+    mixed: 'rgba(143,94,255,0.65)',
 };
+
+const EDGE_COLORS_DIM = 'rgba(244,241,238,0.03)';
+
+const ACCENT_LOW: [number, number, number] = [143, 94, 255];
+const ACCENT_HIGH: [number, number, number] = [117, 241, 106];
 
 const strings = {
     en: {
@@ -58,27 +62,28 @@ const strings = {
         mode3D: '3D Mode',
         fullscreen: 'Toggle Fullscreen',
         score: 'score',
+        deselect: 'Reset selection',
     },
     ru: {
-        voice: '\u0413\u043e\u043b\u043e\u0441', text: '\u0422\u0435\u043a\u0441\u0442', mixed: '\u0421\u043c\u0435\u0448\u0430\u043d\u043d\u044b\u0439',
-        day7: '7 \u0434\u043d\u0435\u0439', day30: '30 \u0434\u043d\u0435\u0439', day90: '90 \u0434\u043d\u0435\u0439', day365: '365 \u0434\u043d\u0435\u0439',
-        searchUser: '\u041f\u043e\u0438\u0441\u043a \u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u0435\u043b\u044f...', selectUser: '\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u0435\u043b\u044f \u0434\u043b\u044f \u043f\u0440\u043e\u0441\u043c\u043e\u0442\u0440\u0430 \u0435\u0433\u043e \u0441\u0432\u044f\u0437\u0435\u0439',
-        noData: '\u041d\u0435\u0442 \u0432\u0437\u0430\u0438\u043c\u043e\u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0439 \u0437\u0430 \u044d\u0442\u043e\u0442 \u043f\u0435\u0440\u0438\u043e\u0434', loading: '\u0421\u0442\u0440\u043e\u0438\u043c \u0433\u0440\u0430\u0444 \u0441\u0432\u044f\u0437\u0435\u0439...',
-        fullMap: '\u041f\u043e\u043b\u043d\u0430\u044f \u043a\u0430\u0440\u0442\u0430', egoMode: '\u042d\u0433\u043e-\u0440\u0435\u0436\u0438\u043c', activeUsers: '\u0430\u043a\u0442\u0438\u0432\u043d\u044b\u0445', connections: '\u0441\u0432\u044f\u0437\u0435\u0439',
-        egoBanner: '\u0421\u0435\u0440\u0432\u0435\u0440 \u0431\u043e\u043b\u044c\u0448\u043e\u0439 - \u043f\u043e\u043a\u0430\u0437\u044b\u0432\u0430\u0435\u043c 2 \u0443\u0440\u043e\u0432\u043d\u044f \u0441\u0432\u044f\u0437\u0435\u0439 \u0432\u044b\u0431\u0440\u0430\u043d\u043d\u043e\u0433\u043e \u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u0435\u043b\u044f',
-        loadingGraph: '\u0417\u0430\u0433\u0440\u0443\u0436\u0430\u0435\u043c \u0433\u0440\u0430\u0444...',
-        loading3D: '\u0417\u0430\u0433\u0440\u0443\u0436\u0430\u0435\u043c 3D \u0433\u0440\u0430\u0444...',
-        reply: '\u041e\u0442\u0432\u0435\u0442',
-        mention: '\u0423\u043f\u043e\u043c\u0438\u043d\u0430\u043d\u0438\u0435',
-        nodeSizeActivity: '\u0420\u0430\u0437\u043c\u0435\u0440 \u0443\u0437\u043b\u0430 = \u0430\u043a\u0442\u0438\u0432\u043d\u043e\u0441\u0442\u044c',
-        mode2D: '2D \u0440\u0435\u0436\u0438\u043c',
-        mode3D: '3D \u0440\u0435\u0436\u0438\u043c',
-        fullscreen: '\u041f\u043e\u043b\u043d\u044b\u0439 \u044d\u043a\u0440\u0430\u043d',
-        score: '\u0441\u0447\u0451\u0442',
+        voice: 'Голос', text: 'Текст', mixed: 'Смешанный',
+        day7: '7 дней', day30: '30 дней', day90: '90 дней', day365: '365 дней',
+        searchUser: 'Поиск пользователя...', selectUser: 'Выберите пользователя для просмотра его связей',
+        noData: 'Нет взаимодействий за этот период', loading: 'Строим граф связей...',
+        fullMap: 'Полная карта', egoMode: 'Эго-режим', activeUsers: 'активных', connections: 'связей',
+        egoBanner: 'Сервер большой - показываем 2 уровня связей выбранного пользователя',
+        loadingGraph: 'Загружаем граф...',
+        loading3D: 'Загружаем 3D граф...',
+        reply: 'Ответ',
+        mention: 'Упоминание',
+        nodeSizeActivity: 'Размер узла = активность',
+        mode2D: '2D режим',
+        mode3D: '3D режим',
+        fullscreen: 'Полный экран',
+        score: 'счёт',
+        deselect: 'Сбросить выбор',
     },
 } as const;
 
-// â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 interface GraphNode {
     id: string; name: string; avatar: string | null;
     activity: number; size: number; level?: number;
@@ -93,7 +98,6 @@ interface ContactsData {
     edges: GraphEdge[];
 }
 
-// â”€â”€â”€ Avatar image cache â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const avatarCache = new Map<string, HTMLImageElement>();
 function loadAvatar(url: string): void {
     if (avatarCache.has(url)) return;
@@ -103,7 +107,38 @@ function loadAvatar(url: string): void {
     img.src = url;
 }
 
-// â”€â”€â”€ Main Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+function lerpAccent(t: number): [number, number, number] {
+    return [
+        Math.round(ACCENT_LOW[0] + (ACCENT_HIGH[0] - ACCENT_LOW[0]) * t),
+        Math.round(ACCENT_LOW[1] + (ACCENT_HIGH[1] - ACCENT_LOW[1]) * t),
+        Math.round(ACCENT_LOW[2] + (ACCENT_HIGH[2] - ACCENT_LOW[2]) * t),
+    ];
+}
+
+function drawRoundedRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+    const radius = Math.min(r, w / 2, h / 2);
+    ctx.beginPath();
+    if (typeof ctx.roundRect === 'function') {
+        ctx.roundRect(x, y, w, h, radius);
+    } else {
+        ctx.moveTo(x + radius, y);
+        ctx.arcTo(x + w, y, x + w, y + h, radius);
+        ctx.arcTo(x + w, y + h, x, y + h, radius);
+        ctx.arcTo(x, y + h, x, y, radius);
+        ctx.arcTo(x, y, x + w, y, radius);
+        ctx.closePath();
+    }
+}
+
+function escapeHtml(value: string): string {
+    return value
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 export default function ContactsPage() {
     const { guildId } = useParams<{ guildId: string }>();
     const { locale } = useGuildLocale(guildId);
@@ -190,8 +225,14 @@ export default function ContactsPage() {
     const graphData = useMemo(() => {
         if (!data || data.nodes.length === 0) return { nodes: [], links: [] };
         const maxWeight = Math.max(...data.edges.map(e => e.weight), 1);
+        const ranked = [...data.nodes].sort((a, b) => a.activity - b.activity);
+        const rankById = new Map<string, number>();
+        ranked.forEach((n, i) => rankById.set(n.id, ranked.length > 1 ? i / (ranked.length - 1) : 1));
         return {
-            nodes: data.nodes.map(n => ({ ...n, _size: n.size })),
+            nodes: data.nodes.map(n => {
+                const [r, g, b] = lerpAccent(rankById.get(n.id) ?? 0.5);
+                return { ...n, _size: n.size, _accentRGB: `${r},${g},${b}` };
+            }),
             links: data.edges.map(e => ({
                 source: e.source,
                 target: e.target,
@@ -201,6 +242,30 @@ export default function ContactsPage() {
             })),
         };
     }, [data]);
+
+    const neighborsById = useMemo(() => {
+        const m = new Map<string, Set<string>>();
+        if (!data) return m;
+        for (const e of data.edges) {
+            if (!m.has(e.source)) m.set(e.source, new Set());
+            if (!m.has(e.target)) m.set(e.target, new Set());
+            m.get(e.source)!.add(e.target);
+            m.get(e.target)!.add(e.source);
+        }
+        return m;
+    }, [data]);
+
+    const selectedNode = useMemo(() => {
+        if (!selectedUserId || !data) return null;
+        return data.nodes.find(n => n.id === selectedUserId)
+            ?? data.topUsers.find(u => u.id === selectedUserId)
+            ?? null;
+    }, [selectedUserId, data]);
+
+    const selectedLinkCount = useMemo(() => {
+        if (!selectedUserId) return 0;
+        return neighborsById.get(selectedUserId)?.size ?? 0;
+    }, [selectedUserId, neighborsById]);
 
     // After physics settles, trigger zoom and set link distances
     const handleEngineStop = useCallback(() => {
@@ -227,15 +292,21 @@ export default function ContactsPage() {
         setInitialZoomDone(false);
     }, [graphData.links, is3D]);
 
+    const isNodeDimmed = useCallback((id: string) => {
+        if (!hoveredNode || hoveredNode === id) return false;
+        return !neighborsById.get(hoveredNode)?.has(id);
+    }, [hoveredNode, neighborsById]);
+
     // Custom node 3D renderer
     const createNodeThreeObject = useCallback((node: any) => {
-        const { id, name, avatar, _size } = node;
+        const { id, name, avatar, _size, _accentRGB } = node;
         const radius = _size || 4;
+        const accent = _accentRGB || '143,94,255';
 
         const canvas = document.createElement('canvas');
         const imgSize = 120;
-        const padding = 16;
-        const textHeight = 40;
+        const padding = 24;
+        const textHeight = 44;
         canvas.width = imgSize + padding * 2;
         canvas.height = imgSize + padding * 2 + textHeight;
 
@@ -244,6 +315,7 @@ export default function ContactsPage() {
 
         const isHovered = hoveredNode === id;
         const isSelected = selectedUserId === id;
+        const dimmed = isNodeDimmed(id);
 
         const cx = canvas.width / 2;
         const cy = padding + imgSize / 2;
@@ -251,17 +323,14 @@ export default function ContactsPage() {
 
         ctx.save();
 
-        // Glow
-        if (isSelected || isHovered) {
-            ctx.beginPath();
-            ctx.arc(cx, cy, r, 0, Math.PI * 2);
-            ctx.shadowBlur = 15;
-            ctx.shadowColor = isSelected ? '#75F16A' : 'rgba(244,241,238,0.6)';
-            ctx.fillStyle = isSelected ? 'rgba(117,241,106,0.3)' : 'rgba(244,241,238,0.2)';
-            ctx.fill();
-            ctx.shadowBlur = 0;
-            ctx.shadowColor = 'transparent';
-        }
+        // Soft accent halo
+        const halo = ctx.createRadialGradient(cx, cy, r * 0.5, cx, cy, r + padding);
+        halo.addColorStop(0, `rgba(${isSelected ? '117,241,106' : accent},${isSelected || isHovered ? 0.4 : 0.22})`);
+        halo.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = halo;
+        ctx.beginPath();
+        ctx.arc(cx, cy, r + padding, 0, Math.PI * 2);
+        ctx.fill();
 
         // Clip region
         ctx.beginPath();
@@ -269,7 +338,7 @@ export default function ContactsPage() {
         ctx.clip();
 
         // Background
-        ctx.fillStyle = '#1a1a1a';
+        ctx.fillStyle = '#131315';
         ctx.fill();
 
         const img = avatar ? avatarCache.get(avatar) : null;
@@ -277,12 +346,12 @@ export default function ContactsPage() {
             ctx.drawImage(img, cx - r, cy - r, r * 2, r * 2);
         } else {
             const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-            g.addColorStop(0, '#2a2a2a');
-            g.addColorStop(1, '#151515');
+            g.addColorStop(0, `rgba(${accent},0.28)`);
+            g.addColorStop(1, '#121214');
             ctx.fillStyle = g;
             ctx.fill();
 
-            ctx.fillStyle = 'rgba(244,241,238,0.55)';
+            ctx.fillStyle = 'rgba(244,241,238,0.75)';
             ctx.font = `bold ${r * 0.8}px Inter, sans-serif`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
@@ -294,27 +363,46 @@ export default function ContactsPage() {
         // Ring
         ctx.beginPath();
         ctx.arc(cx, cy, r, 0, Math.PI * 2);
-        ctx.strokeStyle = isSelected ? '#75F16A' : isHovered ? 'rgba(244,241,238,0.4)' : 'rgba(244,241,238,0.07)';
-        ctx.lineWidth = isSelected || isHovered ? 4 : 2;
+        ctx.strokeStyle = isSelected
+            ? '#75F16A'
+            : isHovered
+                ? 'rgba(244,241,238,0.8)'
+                : `rgba(${accent},0.55)`;
+        ctx.lineWidth = isSelected || isHovered ? 5 : 3;
         ctx.stroke();
 
-        // Text
+        // Label pill
         if (isHovered || isSelected || _size >= 6) {
-            const textY = cy + r + 24;
-            ctx.font = `500 24px Inter, sans-serif`;
+            const label = name || id;
+            ctx.font = `600 22px Inter, sans-serif`;
+            const tw = ctx.measureText(label).width;
+            const pillW = Math.min(tw + 28, canvas.width - 4);
+            const pillH = 34;
+            const pillX = cx - pillW / 2;
+            const pillY = cy + r + 8;
+
+            ctx.fillStyle = 'rgba(8,8,10,0.78)';
+            drawRoundedRect(ctx, pillX, pillY, pillW, pillH, pillH / 2);
+            ctx.fill();
+            ctx.strokeStyle = isSelected ? 'rgba(117,241,106,0.4)' : 'rgba(244,241,238,0.12)';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+
             ctx.fillStyle = 'rgba(244,241,238,0.95)';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.shadowBlur = 8;
-            ctx.shadowColor = 'rgba(14,14,14,0.8)';
-            ctx.fillText(name || id, cx, textY);
-            ctx.shadowBlur = 0;
+            ctx.fillText(label, cx, pillY + pillH / 2, pillW - 20);
         }
 
         const texture = new THREE.CanvasTexture(canvas);
         texture.minFilter = THREE.LinearFilter;
         texture.generateMipmaps = false;
-        const material = new THREE.SpriteMaterial({ map: texture, depthTest: false, transparent: true });
+        const material = new THREE.SpriteMaterial({
+            map: texture,
+            depthTest: false,
+            transparent: true,
+            opacity: dimmed ? 0.14 : 1,
+        });
         const sprite = new THREE.Sprite(material);
 
         const spriteScale = radius * 4;
@@ -322,32 +410,42 @@ export default function ContactsPage() {
         sprite.renderOrder = isSelected || isHovered ? 1 : 0;
 
         return sprite;
-    }, [hoveredNode, selectedUserId]);
+    }, [hoveredNode, selectedUserId, isNodeDimmed]);
 
     // Custom node canvas renderer
     const drawNode = useCallback((node: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
-        const { x, y, _size, name, avatar, id } = node;
+        const { x, y, _size, name, avatar, id, _accentRGB } = node;
         const isHovered = hoveredNode === id;
         const isSelected = selectedUserId === id;
+        const dimmed = isNodeDimmed(id);
+        const accent = _accentRGB || '143,94,255';
         const radius = (_size || 4) * 3.5;
 
         if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(radius) || radius < 0) return;
 
         ctx.save();
+        ctx.globalAlpha = dimmed ? 0.12 : 1;
 
-        // Glow
-        if (isHovered || isSelected) {
-            ctx.shadowBlur = 24;
-            ctx.shadowColor = isSelected ? '#75F16A' : 'rgba(244,241,238,0.4)';
+        // Soft accent halo
+        if (!dimmed) {
+            const haloR = radius * (isHovered || isSelected ? 2.4 : 1.8);
+            const halo = ctx.createRadialGradient(x, y, radius * 0.6, x, y, haloR);
+            halo.addColorStop(0, `rgba(${isSelected ? '117,241,106' : accent},${isSelected || isHovered ? 0.35 : 0.16})`);
+            halo.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.fillStyle = halo;
+            ctx.beginPath();
+            ctx.arc(x, y, haloR, 0, Math.PI * 2);
+            ctx.fill();
         }
 
         // Clip to circle
         ctx.beginPath();
         ctx.arc(x, y, radius, 0, Math.PI * 2);
+        ctx.save();
         ctx.clip();
 
         // Background
-        ctx.fillStyle = '#1a1a1a';
+        ctx.fillStyle = '#131315';
         ctx.fill();
 
         // Avatar or fallback initials
@@ -356,11 +454,11 @@ export default function ContactsPage() {
             ctx.drawImage(img, x - radius, y - radius, radius * 2, radius * 2);
         } else {
             const g = ctx.createRadialGradient(x, y, 0, x, y, radius);
-            g.addColorStop(0, '#2a2a2a');
-            g.addColorStop(1, '#151515');
+            g.addColorStop(0, `rgba(${accent},0.28)`);
+            g.addColorStop(1, '#121214');
             ctx.fillStyle = g;
             ctx.fill();
-            ctx.fillStyle = 'rgba(244,241,238,0.55)';
+            ctx.fillStyle = 'rgba(244,241,238,0.75)';
             ctx.font = `bold ${radius * 0.8}px Inter, sans-serif`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
@@ -372,24 +470,41 @@ export default function ContactsPage() {
         // Ring
         ctx.beginPath();
         ctx.arc(x, y, radius, 0, Math.PI * 2);
-        ctx.strokeStyle = isSelected ? '#75F16A' : isHovered ? 'rgba(244,241,238,0.4)' : 'rgba(244,241,238,0.07)';
-        ctx.lineWidth = isSelected || isHovered ? 2 : 0.8;
+        ctx.strokeStyle = isSelected
+            ? '#75F16A'
+            : isHovered
+                ? 'rgba(244,241,238,0.85)'
+                : `rgba(${accent},0.5)`;
+        ctx.lineWidth = isSelected || isHovered ? 2 : 1;
         ctx.stroke();
 
-        // Label
+        // Label pill
         if (globalScale > 1.5 || isHovered || isSelected) {
+            const label = name || id;
             const fs = Math.min(14, Math.max(8, radius * 0.6)) / globalScale;
-            ctx.save();
-            ctx.font = `${fs}px Inter, sans-serif`;
+            ctx.font = `600 ${fs}px Inter, sans-serif`;
+            const tw = ctx.measureText(label).width;
+            const padX = 6 / globalScale;
+            const pillH = fs + 8 / globalScale;
+            const pillW = tw + padX * 2;
+            const pillX = x - pillW / 2;
+            const pillY = y + radius + 3 / globalScale;
+
+            ctx.fillStyle = 'rgba(8,8,10,0.72)';
+            drawRoundedRect(ctx, pillX, pillY, pillW, pillH, pillH / 2);
+            ctx.fill();
+            ctx.strokeStyle = isSelected ? 'rgba(117,241,106,0.35)' : 'rgba(244,241,238,0.08)';
+            ctx.lineWidth = 1 / globalScale;
+            ctx.stroke();
+
+            ctx.fillStyle = 'rgba(244,241,238,0.92)';
             ctx.textAlign = 'center';
-            ctx.textBaseline = 'top';
-            ctx.fillStyle = 'rgba(244,241,238,0.85)';
-            ctx.shadowBlur = 4;
-            ctx.shadowColor = 'rgba(14,14,14,0.8)';
-            ctx.fillText(name || id, x, y + radius + 2 / globalScale);
-            ctx.restore();
+            ctx.textBaseline = 'middle';
+            ctx.fillText(label, x, pillY + pillH / 2);
         }
-    }, [hoveredNode, selectedUserId]);
+
+        ctx.restore();
+    }, [hoveredNode, selectedUserId, isNodeDimmed]);
 
     // Node hit area
     const paintNodePointer = useCallback((node: any, color: string, ctx: CanvasRenderingContext2D) => {
@@ -403,6 +518,11 @@ export default function ContactsPage() {
     }, []);
 
     const getLinkColor = useCallback((link: any) => {
+        if (hoveredNode) {
+            const srcId = typeof link.source === 'object' ? link.source?.id : link.source;
+            const tgtId = typeof link.target === 'object' ? link.target?.id : link.target;
+            if (srcId !== hoveredNode && tgtId !== hoveredNode) return EDGE_COLORS_DIM;
+        }
         const types: string[] = link.types || [];
         const hasVoice = types.includes('voice');
         const hasText = types.includes('reply') || types.includes('mention');
@@ -411,9 +531,20 @@ export default function ContactsPage() {
         if (types.includes('reply')) return EDGE_COLORS.reply;
         if (types.includes('mention')) return EDGE_COLORS.mention;
         return 'rgba(244,241,238,0.15)';
-    }, []);
+    }, [hoveredNode]);
 
     const getLinkWidth = useCallback((link: any) => link._width || 1, []);
+
+    const nodeTooltip = useCallback((node: any) => {
+        const name = escapeHtml(node.name || node.id || '');
+        const avatarUrl = node.avatar ? escapeHtml(node.avatar) : null;
+        const initial = escapeHtml(((node.name || '?')[0] || '?').toUpperCase());
+        const accent = node._accentRGB || '143,94,255';
+        const avatarHtml = avatarUrl
+            ? `<img src="${avatarUrl}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;border:1.5px solid rgba(${accent},0.6)" />`
+            : `<div style="width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(${accent},0.16);border:1.5px solid rgba(${accent},0.5);color:rgba(244,241,238,0.85);font-weight:700;font-size:15px">${initial}</div>`;
+        return `<div style="display:flex;align-items:center;gap:10px;padding:9px 14px 9px 9px;background:rgba(10,10,12,0.88);border:1px solid rgba(244,241,238,0.09);border-radius:999px;backdrop-filter:blur(14px);box-shadow:0 12px 40px rgba(0,0,0,0.55)">${avatarHtml}<div style="line-height:1.25"><div style="font-size:13px;font-weight:700;color:rgba(244,241,238,0.95)">${name}</div><div style="font-size:11px;color:rgba(244,241,238,0.45)">${t.score}: ${Number(node.activity) || 0}</div></div></div>`;
+    }, [t]);
 
     const handleNodeClick = useCallback((node: any) => {
         setSelectedUserId((prev) => node?.id === prev ? null : (node?.id ?? null));
@@ -423,16 +554,15 @@ export default function ContactsPage() {
         setHoveredNode(node ? node.id : null);
     }, []);
 
-    // â”€â”€â”€ Mode toggle button â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const ModeButton = ({ m, icon: Icon, label }: { m: 'voice' | 'text' | 'mixed'; icon: any; label: string }) => {
         const active = mode === m;
         return (
             <button
                 type="button"
                 onClick={() => handleModeChange(m)}
-                className={`flex flex-none items-center gap-1.5 rounded-full px-3 py-2 text-sm font-bold transition-all ${active
-                    ? 'bg-primary text-black shadow-[0_0_14px_rgba(117,241,106,0.3)]'
-                    : 'text-white/40 hover:text-white/70 hover:bg-white/[0.04]'
+                className={`flex flex-none items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-bold transition-all duration-300 ${active
+                    ? 'bg-gradient-to-r from-[#75f16a] to-[#9dff94] text-black shadow-[0_0_20px_rgba(117,241,106,0.35)]'
+                    : 'text-white/40 hover:text-white/75 hover:bg-white/[0.05]'
                     }`}
             >
                 <Icon size={15} weight={active ? 'fill' : 'regular'} />
@@ -441,44 +571,55 @@ export default function ContactsPage() {
         );
     };
 
-    // â”€â”€â”€ Render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    const legendItems = [
+        ...(mode === 'voice' || mode === 'mixed' ? [{ color: EDGE_COLORS.voice, label: t.voice }] : []),
+        ...(mode === 'text' || mode === 'mixed' ? [
+            { color: EDGE_COLORS.reply, label: t.reply },
+            { color: EDGE_COLORS.mention, label: t.mention },
+        ] : []),
+        ...(mode === 'mixed' ? [{ color: EDGE_COLORS.mixed, label: t.mixed }] : []),
+    ];
+
     return (
         <div className="flex flex-col gap-3 px-3 pb-4 sm:gap-4 sm:px-0 sm:pb-6" style={{ height: 'calc(100dvh - 150px)', minHeight: 440 }}>
+            <style>{`
+                .graph-tooltip, .scene-tooltip {
+                    background: transparent !important;
+                    padding: 0 !important;
+                    border: none !important;
+                    color: inherit !important;
+                    font-family: inherit !important;
+                }
+                @keyframes cgPulseRing {
+                    0% { transform: scale(0.55); opacity: 0.9; }
+                    100% { transform: scale(1.6); opacity: 0; }
+                }
+                @keyframes cgBreathe {
+                    0%, 100% { opacity: 0.55; }
+                    50% { opacity: 1; }
+                }
+            `}</style>
 
             {/* Controls */}
             <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
-                    {/* Mode toggle */}
                     <div className="no-scrollbar flex max-w-full items-center gap-0.5 overflow-x-auto rounded-2xl border border-divider bg-surface p-1 shadow-sm shadow-black/20 sm:rounded-full">
                         <ModeButton m="voice" icon={MicrophoneStage} label={t.voice} />
                         <ModeButton m="text" icon={ChatText} label={t.text} />
                         <ModeButton m="mixed" icon={Intersect} label={t.mixed} />
                     </div>
-
-                    {/* Stats chips */}
-                    {data && !loading && (
-                        <div className="flex items-center gap-2 hidden md:flex">
-                            <span className="text-xs text-white/30 font-semibold">
-                                {data.graphMode === 'full' ? t.fullMap : t.egoMode}
-                            </span>
-                            <div className="h-4 w-px bg-white/[0.06]" />
-                            <span className="text-xs text-white/50">
-                                <span className="text-white/80 font-bold">{data.uniqueActiveUsers}</span> {t.activeUsers}
-                            </span>
-                            <div className="h-4 w-px bg-white/[0.06]" />
-                            <span className="text-xs text-white/50">
-                                <span className="text-white/80 font-bold">{data.edges.length}</span> {t.connections}
-                            </span>
-                        </div>
-                    )}
                 </div>
             </div>
 
-
             {/* Ego mode user picker */}
             {!loading && data?.graphMode === 'ego' && (
-                <div className="flex-shrink-0 rounded-2xl border border-divider bg-surface p-3 sm:p-4">
-                    <p className="text-white/40 text-xs mb-3">{t.egoBanner}</p>
+                <div className="flex-shrink-0 rounded-3xl border border-white/[0.06] bg-gradient-to-b from-white/[0.035] to-white/[0.015] p-4 shadow-lg shadow-black/20 backdrop-blur-sm sm:p-5">
+                    <div className="mb-3 flex items-center gap-2.5">
+                        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-primary">
+                            <Intersect size={14} weight="bold" />
+                        </div>
+                        <p className="text-xs text-white/45">{t.egoBanner}</p>
+                    </div>
                     <Input
                         placeholder={t.searchUser}
                         value={search}
@@ -486,7 +627,7 @@ export default function ContactsPage() {
                         startContent={<MagnifyingGlass size={14} className="text-white/30" />}
                         classNames={{
                             base: "mb-3 w-full sm:max-w-xs",
-                            inputWrapper: "bg-white/[0.04] border border-white/[0.06] rounded-xl h-9",
+                            inputWrapper: "bg-white/[0.04] border border-white/[0.07] rounded-full h-9 hover:border-white/[0.14] transition-colors",
                             input: "text-sm text-white/80",
                         }}
                     />
@@ -495,16 +636,17 @@ export default function ContactsPage() {
                             <button
                                 key={u.id}
                                 onClick={() => setSelectedUserId(u.id === selectedUserId ? null : u.id)}
-                                className={`flex max-w-full items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition-all ${u.id === selectedUserId
-                                    ? 'bg-primary/10 text-primary border-primary/30'
-                                    : 'bg-white/[0.03] text-white/60 border-white/[0.05] hover:bg-white/[0.06] hover:text-white/80'
+                                className={`flex max-w-full items-center gap-2 rounded-full border py-1.5 pl-1.5 pr-3 text-xs font-medium transition-all duration-300 ${u.id === selectedUserId
+                                    ? 'border-primary/40 bg-primary/10 text-primary shadow-[0_0_16px_rgba(117,241,106,0.2)]'
+                                    : 'border-white/[0.06] bg-white/[0.03] text-white/60 hover:border-white/[0.14] hover:bg-white/[0.06] hover:text-white/85'
                                     }`}
                             >
                                 {u.avatar
-                                    ? <img src={u.avatar} alt="" className="w-4 h-4 rounded-full" />
-                                    : <User size={12} />
+                                    ? <img src={u.avatar} alt="" className="h-5 w-5 rounded-full object-cover ring-1 ring-white/10" />
+                                    : <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/[0.06]"><User size={11} /></span>
                                 }
-                                {u.name}
+                                <span className="truncate">{u.name}</span>
+                                <span className={`text-[10px] font-bold tabular-nums ${u.id === selectedUserId ? 'text-primary/70' : 'text-white/25'}`}>{u.activity}</span>
                             </button>
                         ))}
                     </div>
@@ -514,78 +656,145 @@ export default function ContactsPage() {
             {/* Graph canvas area */}
             <div
                 ref={containerRef}
-                className="flex-1 relative rounded-2xl overflow-hidden border border-white/[0.04] bg-[#080808]"
-                style={{ minHeight: 320 }}
+                data-tour="stats-contacts-graph"
+                className="relative flex-1 overflow-hidden rounded-3xl border border-white/[0.06] shadow-[0_20px_60px_-20px_rgba(0,0,0,0.7)]"
+                style={{ minHeight: 320, background: '#070709' }}
             >
-                {/* Floating View Toggles */}
-                <div className="absolute right-3 top-3 z-20 flex items-center gap-2 sm:right-4 sm:top-4">
+                {/* Backdrop: ambient glows */}
+                <div
+                    className="pointer-events-none absolute inset-0"
+                    style={{
+                        background: [
+                            'radial-gradient(ellipse 70% 55% at 22% 8%, rgba(117,241,106,0.05), transparent 60%)',
+                            'radial-gradient(ellipse 65% 55% at 82% 92%, rgba(143,94,255,0.06), transparent 60%)',
+                            'radial-gradient(ellipse 90% 80% at 50% 50%, rgba(20,20,24,0.6), transparent 100%)',
+                        ].join(','),
+                    }}
+                />
+                {/* Backdrop: dot grid */}
+                <div
+                    className="pointer-events-none absolute inset-0"
+                    style={{
+                        backgroundImage: 'radial-gradient(rgba(244,241,238,0.055) 1px, transparent 1.2px)',
+                        backgroundSize: '26px 26px',
+                        maskImage: 'radial-gradient(ellipse 85% 80% at 50% 50%, black 30%, transparent 100%)',
+                        WebkitMaskImage: 'radial-gradient(ellipse 85% 80% at 50% 50%, black 30%, transparent 100%)',
+                    }}
+                />
+
+                {/* HUD: stats capsule */}
+                {data && !loading && !showEgoSelector && data.nodes.length > 0 && (
+                    <div className="pointer-events-none absolute left-3 top-3 z-20 hidden items-center gap-3 rounded-full border border-white/[0.07] bg-black/55 py-2 pl-3.5 pr-4 shadow-lg shadow-black/40 backdrop-blur-xl sm:left-4 sm:top-4 sm:flex">
+                        <span className="relative flex h-2 w-2">
+                            <span className="absolute inline-flex h-full w-full rounded-full bg-primary opacity-60" style={{ animation: 'cgPulseRing 2s cubic-bezier(0,0,0.2,1) infinite' }} />
+                            <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
+                        </span>
+                        <span className="text-xs font-bold uppercase tracking-wider text-white/45">
+                            {data.graphMode === 'full' ? t.fullMap : t.egoMode}
+                        </span>
+                        <span className="h-3.5 w-px bg-white/[0.09]" />
+                        <span className="text-xs text-white/45">
+                            <span className="font-bold tabular-nums text-white/90">{data.uniqueActiveUsers}</span> {t.activeUsers}
+                        </span>
+                        <span className="h-3.5 w-px bg-white/[0.09]" />
+                        <span className="text-xs text-white/45">
+                            <span className="font-bold tabular-nums text-white/90">{data.edges.length}</span> {t.connections}
+                        </span>
+                    </div>
+                )}
+
+                {/* HUD: view toggles */}
+                <div className="absolute right-3 top-3 z-20 flex items-center overflow-hidden rounded-full border border-white/[0.07] bg-black/55 shadow-lg shadow-black/40 backdrop-blur-xl sm:right-4 sm:top-4">
                     <button
                         onClick={() => setIs3D(!is3D)}
-                        className={`flex h-9 w-9 items-center justify-center rounded-full border shadow-lg backdrop-blur-md transition-all ${is3D ? 'border-primary/40 bg-primary/20 text-primary' : 'border-white/[0.08] bg-black/60 text-white/60 hover:bg-black/80 hover:text-white'}`}
+                        className={`flex h-9 w-10 items-center justify-center transition-all duration-300 ${is3D ? 'bg-primary/15 text-primary' : 'text-white/50 hover:bg-white/[0.06] hover:text-white'}`}
                         title={is3D ? t.mode2D : t.mode3D}
                     >
-                        <Cube size={18} weight={is3D ? 'fill' : 'regular'} />
+                        <Cube size={17} weight={is3D ? 'fill' : 'regular'} />
                     </button>
+                    <div className="h-5 w-px bg-white/[0.08]" />
                     <button
                         onClick={toggleFullscreen}
-                        className={`flex h-9 w-9 items-center justify-center rounded-full border shadow-lg backdrop-blur-md transition-all ${isFullscreen ? 'border-primary/40 bg-primary/20 text-primary' : 'border-white/[0.08] bg-black/60 text-white/60 hover:bg-black/80 hover:text-white'}`}
+                        className={`flex h-9 w-10 items-center justify-center transition-all duration-300 ${isFullscreen ? 'bg-primary/15 text-primary' : 'text-white/50 hover:bg-white/[0.06] hover:text-white'}`}
                         title={t.fullscreen}
                     >
-                        {isFullscreen ? <CornersIn size={18} /> : <CornersOut size={18} />}
+                        {isFullscreen ? <CornersIn size={17} /> : <CornersOut size={17} />}
                     </button>
                 </div>
-                {/* Legend */}
-                <div className="pointer-events-none absolute left-4 top-4 z-10 hidden rounded-xl border border-white/[0.06] bg-black/60 p-3 backdrop-blur-md sm:block">
-                    {(mode === 'voice' || mode === 'mixed') && (
-                        <div className="flex items-center gap-2 mb-1">
-                            <div className="w-5 h-px rounded-full" style={{ backgroundColor: EDGE_COLORS.voice, height: 2 }} />
-                            <span className="text-[10px] text-white/40">{t.voice}</span>
-                        </div>
-                    )}
-                    {(mode === 'text' || mode === 'mixed') && (
-                        <>
-                            <div className="flex items-center gap-2 mb-1">
-                                <div className="w-5 rounded-full" style={{ backgroundColor: EDGE_COLORS.reply, height: 2 }} />
-                                <span className="text-[10px] text-white/40">{t.reply}</span>
-                            </div>
-                            <div className="flex items-center gap-2 mb-1">
-                                <div className="w-5 rounded-full" style={{ backgroundColor: EDGE_COLORS.mention, height: 2 }} />
-                                <span className="text-[10px] text-white/40">{t.mention}</span>
-                            </div>
-                        </>
-                    )}
-                    {mode === 'mixed' && (
-                        <div className="flex items-center gap-2 mb-1">
-                            <div className="w-5 rounded-full" style={{ backgroundColor: EDGE_COLORS.mixed, height: 2 }} />
-                            <span className="text-[10px] text-white/40">{t.mixed}</span>
-                        </div>
-                    )}
-                    <div className="mt-1 pt-1.5 border-t border-white/[0.06] text-[10px] text-white/25">
-                        {t.nodeSizeActivity}
+
+                {/* HUD: legend */}
+                {!loading && !showEgoSelector && graphData.nodes.length > 0 && (
+                    <div className="pointer-events-none absolute bottom-3 left-3 z-20 hidden items-center gap-4 rounded-full border border-white/[0.07] bg-black/55 px-4 py-2.5 shadow-lg shadow-black/40 backdrop-blur-xl sm:bottom-4 sm:left-4 sm:flex">
+                        {legendItems.map(item => (
+                            <span key={item.label} className="flex items-center gap-1.5">
+                                <span
+                                    className="h-1 w-4 rounded-full"
+                                    style={{ background: `linear-gradient(90deg, transparent, ${item.color}, transparent)`, boxShadow: `0 0 6px ${item.color}` }}
+                                />
+                                <span className="text-[10px] font-semibold text-white/50">{item.label}</span>
+                            </span>
+                        ))}
+                        <span className="h-3 w-px bg-white/[0.09]" />
+                        <span className="text-[10px] text-white/30">{t.nodeSizeActivity}</span>
                     </div>
-                </div>
+                )}
+
+                {/* HUD: selected user card */}
+                {selectedNode && !loading && !showEgoSelector && (
+                    <div className="absolute bottom-3 right-3 z-20 flex items-center gap-3 rounded-full border border-primary/25 bg-black/60 py-1.5 pl-1.5 pr-2 shadow-[0_0_30px_rgba(117,241,106,0.12)] backdrop-blur-xl sm:bottom-4 sm:right-4">
+                        {selectedNode.avatar
+                            ? <img src={selectedNode.avatar} alt="" className="h-8 w-8 rounded-full object-cover ring-2 ring-primary/50" />
+                            : <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary ring-2 ring-primary/40">{(selectedNode.name || '?')[0].toUpperCase()}</span>
+                        }
+                        <div className="min-w-0 leading-tight">
+                            <p className="max-w-[140px] truncate text-xs font-bold text-white/90">{selectedNode.name}</p>
+                            <p className="text-[10px] tabular-nums text-white/40">
+                                {t.score}: <span className="text-primary/80">{selectedNode.activity}</span>
+                                {selectedLinkCount > 0 && <> · {selectedLinkCount} {t.connections}</>}
+                            </p>
+                        </div>
+                        <button
+                            onClick={() => setSelectedUserId(null)}
+                            className="flex h-6 w-6 flex-none items-center justify-center rounded-full text-white/40 transition-colors hover:bg-white/[0.08] hover:text-white"
+                            title={t.deselect}
+                        >
+                            <X size={12} weight="bold" />
+                        </button>
+                    </div>
+                )}
 
                 {/* Ego prompt */}
                 {showEgoSelector && !loading && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-white/25 pointer-events-none">
-                        <MagnifyingGlass size={44} weight="thin" />
-                        <p className="text-sm">{t.selectUser}</p>
+                    <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center gap-4">
+                        <div className="relative flex h-20 w-20 items-center justify-center">
+                            <span className="absolute inset-0 rounded-full border border-primary/20" style={{ animation: 'cgPulseRing 2.4s cubic-bezier(0,0,0.2,1) infinite' }} />
+                            <span className="flex h-16 w-16 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.03] text-white/40 backdrop-blur-sm">
+                                <MagnifyingGlass size={26} weight="light" />
+                            </span>
+                        </div>
+                        <p className="text-sm text-white/35">{t.selectUser}</p>
                     </div>
                 )}
 
                 {/* Loading */}
                 {loading && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
-                        <div className="h-9 w-9 animate-spin rounded-full border-2 border-primary/20 border-t-primary" />
-                        <p className="text-white/30 text-sm">{t.loading}</p>
+                    <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-5">
+                        <div className="relative flex h-16 w-16 items-center justify-center">
+                            <span className="absolute inset-0 rounded-full border border-primary/25" style={{ animation: 'cgPulseRing 1.8s cubic-bezier(0,0,0.2,1) infinite' }} />
+                            <span className="absolute inset-0 rounded-full border border-[#8f5eff]/25" style={{ animation: 'cgPulseRing 1.8s cubic-bezier(0,0,0.2,1) infinite 0.6s' }} />
+                            <span className="h-9 w-9 animate-spin rounded-full border-2 border-primary/15 border-t-primary" />
+                        </div>
+                        <p className="text-sm text-white/35" style={{ animation: 'cgBreathe 1.8s ease-in-out infinite' }}>{t.loading}</p>
                     </div>
                 )}
 
                 {/* Empty state */}
                 {!loading && !showEgoSelector && data && data.nodes.length === 0 && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-white/25">
-                        <Intersect size={44} weight="thin" />
-                        <p className="text-sm">{t.noData}</p>
+                    <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4">
+                        <span className="flex h-16 w-16 items-center justify-center rounded-full border border-white/[0.07] bg-white/[0.03] text-white/30 backdrop-blur-sm">
+                            <Intersect size={26} weight="light" />
+                        </span>
+                        <p className="text-sm text-white/35">{t.noData}</p>
                     </div>
                 )}
 
@@ -601,11 +810,13 @@ export default function ContactsPage() {
                             nodeThreeObject={createNodeThreeObject}
                             linkColor={getLinkColor}
                             linkWidth={getLinkWidth}
+                            linkCurvature={0.15}
+                            linkOpacity={0.55}
                             linkDirectionalParticles={2}
                             linkDirectionalParticleWidth={(link: any) => Math.max(0.5, link._width * 0.4)}
                             linkDirectionalParticleSpeed={0.003}
                             linkDirectionalParticleColor={getLinkColor}
-                            nodeLabel={(node: any) => `${node.name} - ${t.score}: ${node.activity}`}
+                            nodeLabel={nodeTooltip}
                             onNodeHover={handleNodeHover}
                             onNodeClick={(node) => handleNodeClick(node)}
                             d3AlphaDecay={0.015}
@@ -625,11 +836,12 @@ export default function ContactsPage() {
                             nodePointerAreaPaint={paintNodePointer}
                             linkColor={getLinkColor}
                             linkWidth={getLinkWidth}
+                            linkCurvature={0.15}
                             linkDirectionalParticles={2}
                             linkDirectionalParticleWidth={(link: any) => Math.max(0.5, link._width * 0.4)}
                             linkDirectionalParticleSpeed={0.003}
                             linkDirectionalParticleColor={getLinkColor}
-                            nodeLabel={(node: any) => `${node.name} - ${t.score}: ${node.activity}`}
+                            nodeLabel={nodeTooltip}
                             onNodeHover={handleNodeHover}
                             onNodeClick={(node) => handleNodeClick(node)}
                             d3AlphaDecay={0.015}
@@ -646,4 +858,3 @@ export default function ContactsPage() {
         </div>
     );
 }
-

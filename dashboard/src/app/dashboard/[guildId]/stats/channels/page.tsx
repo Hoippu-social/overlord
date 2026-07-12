@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import {
-    Button, Input, Card, CardBody, Chip, Skeleton, Avatar,
+    Button, Input, Card, CardBody, Chip, Avatar,
     ButtonGroup
 } from "@nextui-org/react";
 import {
@@ -19,6 +19,7 @@ import { ChartContainer } from "@/components/stats/ChartContainer";
 import { ChartTooltip } from "@/components/stats/ChartTooltip";
 import { StatsPageHeader, StatsPageShell } from "@/components/stats/StatsPageScaffold";
 import { SegmentedTabs } from "@/components/common/SegmentedTabs";
+import { LoadingSkeleton } from "@/components/common/LoadingSkeleton";
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid,
     Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell,
@@ -332,7 +333,7 @@ export default function ChannelDrilldownPage() {
             />
 
             {/* Search */}
-            <div className="relative">
+            <div className="relative" data-tour="stats-channels-search">
                 <Input
                     placeholder={text.searchPlaceholder}
                     value={search}
@@ -356,7 +357,7 @@ export default function ChannelDrilldownPage() {
                         {loadingSearch ? (
                             <div className="p-4 space-y-2">
                                 {Array.from({ length: 4 }).map((_, i) => (
-                                    <Skeleton key={i} className="h-12 w-full rounded-xl" />
+                                    <LoadingSkeleton key={i} className="h-12 w-full rounded-xl" />
                                 ))}
                             </div>
                         ) : searchResults.length === 0 ? (
@@ -472,7 +473,7 @@ export default function ChannelDrilldownPage() {
                                 <Card className="border border-divider bg-surface">
                                     <CardBody className="p-5">
                                         <p className="text-xs text-default-400 font-semibold uppercase tracking-wider mb-3">{text.topMember} (msgs)</p>
-                                        {loadingDrilldown ? <Skeleton className="h-8 w-full rounded-lg" /> : (
+                                        {loadingDrilldown ? <LoadingSkeleton className="h-8 w-full rounded-lg" /> : (
                                             drilldownData?.overview?.topMessageMember ? (
                                                 <a href={`/dashboard/${guildId}/stats/users?userId=${drilldownData.overview.topMessageMember.userId || drilldownData.overview.topMessageMember.id}`} className="flex items-center gap-3 hover:bg-white/5 p-1 rounded-lg transition-colors group">
                                                     <Avatar
@@ -495,7 +496,7 @@ export default function ChannelDrilldownPage() {
                                 <Card className="border border-divider bg-surface">
                                     <CardBody className="p-5">
                                         <p className="text-xs text-default-400 font-semibold uppercase tracking-wider mb-3">{text.topMember} (voice)</p>
-                                        {loadingDrilldown ? <Skeleton className="h-8 w-full rounded-lg" /> : (
+                                        {loadingDrilldown ? <LoadingSkeleton className="h-8 w-full rounded-lg" /> : (
                                             drilldownData?.overview?.topVoiceMember ? (
                                                 <a href={`/dashboard/${guildId}/stats/users?userId=${drilldownData.overview.topVoiceMember.userId || drilldownData.overview.topVoiceMember.id}`} className="flex items-center gap-3 hover:bg-white/5 p-1 rounded-lg transition-colors group">
                                                     <Avatar
@@ -518,7 +519,7 @@ export default function ChannelDrilldownPage() {
                                 <Card className="border border-divider bg-surface">
                                     <CardBody className="p-5">
                                         <p className="text-xs text-default-400 font-semibold uppercase tracking-wider mb-3">{text.mostRecent}</p>
-                                        {loadingDrilldown ? <Skeleton className="h-8 w-full rounded-lg" /> : (
+                                        {loadingDrilldown ? <LoadingSkeleton className="h-8 w-full rounded-lg" /> : (
                                             drilldownData?.overview?.mostRecentMessage ? (
                                                 <div>
                                                     <p className="text-white font-bold">{formatDate(drilldownData.overview.mostRecentMessage.date)}</p>
@@ -533,7 +534,7 @@ export default function ChannelDrilldownPage() {
                                 <Card className="border border-divider bg-surface">
                                     <CardBody className="p-5">
                                         <p className="text-xs text-default-400 font-semibold uppercase tracking-wider mb-3">{text.recentMember}</p>
-                                        {loadingDrilldown ? <Skeleton className="h-8 w-full rounded-lg" /> : (
+                                        {loadingDrilldown ? <LoadingSkeleton className="h-8 w-full rounded-lg" /> : (
                                             drilldownData?.overview?.mostRecentMessage ? (
                                                 <div>
                                                     <p className="text-white font-bold">{drilldownData.overview.mostRecentMessage.name}</p>
@@ -707,7 +708,7 @@ function MemberBreakdownSection({
     }, [members, pieTopN, valueKey, otherLabel]);
 
     if (loading) {
-        return <Skeleton className="h-80 w-full rounded-2xl" />;
+        return <LoadingSkeleton className="h-80 w-full rounded-2xl" />;
     }
 
     if (!members.length) return null;

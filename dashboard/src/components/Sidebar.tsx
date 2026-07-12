@@ -18,12 +18,12 @@ import {
     SquaresFour,
     Ticket,
     Translate,
-    X,
 } from '@phosphor-icons/react';
 import { useGuildLocale } from '@/lib/i18n';
 import { Popover, PopoverContent, PopoverTrigger } from '@nextui-org/react';
 import { getBrowserPublicHost, getDashboardHomePath } from '@/lib/publicDashboard';
 import { hyphenateServerName } from '@/lib/textHyphenation';
+import { LoadingSkeleton } from '@/components/common/LoadingSkeleton';
 
 interface SidebarProps {
     guildId: string;
@@ -93,13 +93,15 @@ export const Sidebar: React.FC<SidebarProps> = ({ guildId, guildName, guildIcon 
     const [mobileOpen, setMobileOpen] = useState(false);
     const [langOpen, setLangOpen] = useState(false);
     const [mobileLangOpen, setMobileLangOpen] = useState(false);
-    const [guildMenuOpen, setGuildMenuOpen] = useState(false);
+    const [desktopGuildMenuOpen, setDesktopGuildMenuOpen] = useState(false);
+    const [mobileGuildMenuOpen, setMobileGuildMenuOpen] = useState(false);
     const [guilds, setGuilds] = useState<GuildSummary[]>([]);
     const [guildsLoading, setGuildsLoading] = useState(true);
     const [dashboardHomePath, setDashboardHomePath] = useState('/dashboard');
 
     useEffect(() => {
         setMobileOpen(false);
+        setMobileGuildMenuOpen(false);
     }, [pathname]);
 
     useEffect(() => {
@@ -225,9 +227,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ guildId, guildName, guildIcon 
             <button
                 type="button"
                 onClick={() => {
-                    setGuildMenuOpen(false);
                     if (mobile) {
+                        setMobileGuildMenuOpen(false);
                         setMobileOpen(false);
+                    } else {
+                        setDesktopGuildMenuOpen(false);
                     }
                     router.push(href);
                 }}
@@ -260,13 +264,18 @@ export const Sidebar: React.FC<SidebarProps> = ({ guildId, guildName, guildIcon 
         );
     };
 
-    const GuildSwitcher = ({ mobile = false }: { mobile?: boolean }) => (
+    const GuildSwitcher = ({ mobile = false }: { mobile?: boolean }) => {
+        const open = mobile ? mobileGuildMenuOpen : desktopGuildMenuOpen;
+        const setOpen = mobile ? setMobileGuildMenuOpen : setDesktopGuildMenuOpen;
+
+        return (
         <Popover
             placement="bottom-start"
-            isOpen={guildMenuOpen}
-            onOpenChange={setGuildMenuOpen}
+            isOpen={open}
+            onOpenChange={setOpen}
             offset={10}
             triggerScaleOnOpen={false}
+            classNames={{ base: mobile ? 'z-[80]' : undefined, content: mobile ? 'z-[80]' : undefined }}
         >
             <PopoverTrigger>
                 <button
@@ -290,7 +299,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ guildId, guildName, guildIcon 
                     <CaretDown
                         size={16}
                         weight="bold"
-                        className={`ml-3 flex-shrink-0 text-white/35 transition-transform duration-200 ${guildMenuOpen ? 'rotate-180 text-white/70' : 'group-hover:text-white/60'}`}
+                        className={`ml-3 flex-shrink-0 text-white/35 transition-transform duration-200 ${open ? 'rotate-180 text-white/70' : 'group-hover:text-white/60'}`}
                     />
                 </button>
             </PopoverTrigger>
@@ -303,7 +312,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ guildId, guildName, guildIcon 
                         {guildsLoading ? (
                             <div className="space-y-2 px-1 py-1">
                                 {Array.from({ length: 4 }).map((_, index) => (
-                                    <div key={index} className="h-[58px] rounded-2xl skeleton" />
+                                    <LoadingSkeleton key={index} className="h-[58px] rounded-2xl" />
                                 ))}
                             </div>
                         ) : guilds.length > 0 ? (
@@ -317,7 +326,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ guildId, guildName, guildIcon 
                 </div>
             </PopoverContent>
         </Popover>
-    );
+        );
+    };
 
     const SidebarBody = ({ mobile = false }: { mobile?: boolean }) => (
         <div className="flex h-full w-full flex-col border-r border-[var(--border-subtle)] bg-[var(--surface-sidebar)] text-white">
@@ -332,7 +342,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ guildId, guildName, guildIcon 
                 <GuildSwitcher mobile={mobile} />
             </div>
 
-            <div className="flex-1 space-y-2 overflow-y-auto px-6 pb-6 no-scrollbar">
+            <div className="flex-1 space-y-2 overflow-y-auto px-6 pb-6 no-scrollbar" data-tour="nav-sidebar">
                 <div className="mb-3 mt-2 px-4 text-[10px] font-akony uppercase tracking-widest text-white/30">{text.menu}</div>
                 {navItems.map((item) => (
                     <NavLink key={item.href} href={item.href} label={item.label} icon={item.icon} />
@@ -374,11 +384,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ guildId, guildName, guildIcon 
 
             {mobileOpen ? (
                 <div className="fixed inset-0 z-50 flex md:hidden">
-                    <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
+                    <div
+                        className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+                        onClick={() => {
+                            setMobileGuildMenuOpen(false);
+                            setMobileOpen(false);
+                        }}
+                    />
                     <div className="relative h-full w-[300px] animate-fade-in shadow-2xl">
-                        <button onClick={() => setMobileOpen(false)} className="absolute right-4 top-4 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white/[0.06] text-white transition-colors hover:bg-white/[0.1]">
-                            <X size={20} />
-                        </button>
                         <SidebarBody mobile />
                     </div>
                 </div>

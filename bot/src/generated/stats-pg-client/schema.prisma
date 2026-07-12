@@ -422,3 +422,19 @@ model StatsJob {
   @@index([status, createdAt])
   @@index([guildId, status, createdAt])
 }
+
+model StatsApiRequestMetric {
+  id         Int      @id @default(autoincrement())
+  guildId    String
+  endpoint   String
+  method     String
+  period     String?
+  statusCode Int
+  durationMs Int
+  errorCode  String?
+  createdAt  DateTime @default(now())
+
+  @@index([guildId, createdAt])
+  @@index([guildId, endpoint, createdAt])
+  @@index([createdAt])
+}

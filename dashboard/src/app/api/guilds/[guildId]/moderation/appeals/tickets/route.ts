@@ -73,13 +73,19 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         let rawEvents: AppealEventRecord[] = [];
         if (ticketIds.length) {
             try {
-                rawEvents = await prisma.$queryRawUnsafe<AppealEventRecord[]>(
-                    `SELECT "id", "ticketId", "eventType", "actorUserId", "note", "payload", "createdAt"
-                     FROM "AppealEvent"
-                     WHERE "ticketId" IN (${ticketIds.map(() => '?').join(', ')})
-                     ORDER BY "createdAt" DESC, "id" DESC`,
-                    ...ticketIds,
-                );
+                rawEvents = await prisma.appealEvent.findMany({
+                    where: { ticketId: { in: ticketIds } },
+                    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+                    select: {
+                        id: true,
+                        ticketId: true,
+                        eventType: true,
+                        actorUserId: true,
+                        note: true,
+                        payload: true,
+                        createdAt: true,
+                    },
+                });
             } catch {
                 rawEvents = [];
             }

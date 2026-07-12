@@ -44,7 +44,7 @@ type LavalinkSearchResponse = {
 
 const LAVALINK_HOST = process.env.LAVALINK_HOST || 'localhost';
 const LAVALINK_PORT = process.env.LAVALINK_PORT || '2334';
-const LAVALINK_PASSWORD = process.env.LAVALINK_PASSWORD || 'youshallnotpass';
+const LAVALINK_PASSWORD = process.env.LAVALINK_PASSWORD;
 const LAVALINK_SECURE = (process.env.LAVALINK_SECURE || '').toLowerCase() === 'true';
 const LAVALINK_SESSION_ID = process.env.LAVALINK_SESSION_ID || '';
 const SESSION_FILE_PATH = path.resolve(process.cwd(), '../bot/lavalink.session');
@@ -52,6 +52,10 @@ const SESSION_FILE_PATH = path.resolve(process.cwd(), '../bot/lavalink.session')
 const lavalinkBaseUrl = `${LAVALINK_SECURE ? 'https' : 'http'}://${LAVALINK_HOST}:${LAVALINK_PORT}`;
 
 async function lavalinkFetch(path: string, init: RequestInit = {}) {
+    if (!LAVALINK_PASSWORD) {
+        throw new Error('LAVALINK_PASSWORD is not configured');
+    }
+
     const url = path.startsWith('http') ? path : `${lavalinkBaseUrl}${path}`;
     const headers = {
         Authorization: LAVALINK_PASSWORD,

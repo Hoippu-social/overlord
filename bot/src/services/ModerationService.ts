@@ -14,6 +14,8 @@ import {
 } from 'discord.js';
 import { prisma } from '../utils/database';
 import { getInteractionLocale, t } from '../utils/i18n';
+import { EconomyService } from './EconomyService';
+import logger from '../utils/logger';
 
 const MAX_CLEAR_FETCH = 1000;
 
@@ -323,7 +325,7 @@ export async function createModerationCase(input: {
 }) {
     const caseNumber = await getNextCaseNumber(input.guildId);
 
-    return prisma.moderationCase.create({
+    const moderationCase = await prisma.moderationCase.create({
         data: {
             guildId: input.guildId,
             caseNumber,
@@ -338,6 +340,18 @@ export async function createModerationCase(input: {
             metadata: input.metadata ? JSON.stringify(input.metadata) : null,
         },
     });
+
+    // Economy integration: auto-fine the target if a rule is configured for this action
+    // type. Fire-and-forget so a fine failure never blocks the moderation action itself.
+    EconomyService.applyFineForCase({
+        guildId: input.guildId,
+        userId: input.targetUserId,
+        actionType: input.actionType,
+        caseId: moderationCase.id,
+        actorId: input.actorUserId,
+    }).catch((err) => logger.error('[Economy] Failed to apply fine for moderation case', err));
+
+    return moderationCase;
 }
 
 type ModerationResolutionType = 'manual' | 'expired' | 'appeal_review' | 'pardon';

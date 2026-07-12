@@ -7,18 +7,16 @@ interface Props {
 }
 
 export default async function TranscriptPage({ params }: Props) {
-    const { ticketId } = await params;
+    // ticketId param here is actually the transcriptToken (random URL-safe string)
+    const { ticketId: token } = await params;
 
-    // Fetch ticket with transcript
-    // We cast to any because the schema update might not be applied in the client yet due to file locks
-    // @ts-ignore
     const ticket = await prisma.ticket.findUnique({
-        where: { id: parseInt(ticketId) },
+        where: { transcriptToken: token },
         include: {
             guild: { select: { name: true, icon: true } },
             category: { select: { name: true } }
         }
-    }) as any;
+    });
 
     if (!ticket || !ticket.transcript) {
         return notFound();
@@ -35,15 +33,17 @@ export default async function TranscriptPage({ params }: Props) {
                         <div>
                             <h1 className="text-2xl font-bold">{ticket.guild?.name || 'Server'} Support Ticket</h1>
                             <p className="text-gray-500">
-                                {ticket.category?.name} • Ticket #{ticket.id} • Closed on {ticket.closedAt ? new Date(ticket.closedAt).toLocaleDateString() : 'N/A'}
+                                {ticket.category?.name} • Ticket #{ticket.number} • Closed on {ticket.closedAt ? new Date(ticket.closedAt).toLocaleDateString() : 'N/A'}
                             </p>
                         </div>
                     </div>
                 </div>
 
-                <div
-                    className="prose max-w-none"
-                    dangerouslySetInnerHTML={{ __html: ticket.transcript }}
+                <iframe
+                    className="h-[70vh] w-full rounded-lg border border-gray-200 bg-white"
+                    sandbox=""
+                    srcDoc={ticket.transcript}
+                    title={`Ticket #${ticket.number} transcript`}
                 />
             </div>
 

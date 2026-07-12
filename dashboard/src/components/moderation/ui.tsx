@@ -297,7 +297,7 @@ function SelectedChip({ option, onRemove }: { option: SelectOption; onRemove: ()
             className={`inline-flex items-center gap-2 rounded-xl border px-3 py-1.5 text-xs font-semibold shadow-sm backdrop-blur-md ${
                 isCategory ? 'border-amber-300/25 bg-amber-300/10 text-amber-100' : 'border-white/20 bg-white/10 text-white/90'
             }`}
-            style={!isCategory && color ? { borderColor: `${color}55`, color, backgroundColor: `${color}18` } : undefined}
+            style={!isCategory && color ? { borderColor: `${color}66`, color: `color-mix(in srgb, ${color} 55%, white)`, backgroundColor: `${color}18` } : undefined}
         >
             <OptionIcon option={option} />
             <span className="max-w-[220px] truncate">{option.name}</span>
@@ -331,7 +331,7 @@ function getRoleOptionTone(option: SelectOption) {
             ['--role-item-bg-hover' as string]: withAlpha(color, '2d'),
             } as React.CSSProperties,
         textStyle: {
-            color,
+            color: `color-mix(in srgb, ${color} 55%, white)`,
         } as React.CSSProperties,
     };
 }
@@ -456,7 +456,7 @@ export function TextField({ label, value, type = 'text', placeholder, onChange, 
     );
 }
 
-export function SmoothToggle({ label, checked, onChange, description }: { label: string; checked: boolean; onChange: (v: boolean) => void; description?: string }) {
+export function SmoothToggle({ label, checked, onChange, description }: { label: React.ReactNode; checked: boolean; onChange: (v: boolean) => void; description?: React.ReactNode }) {
     const isCompact = !label && !description;
 
     return (
@@ -479,10 +479,10 @@ export function SmoothToggle({ label, checked, onChange, description }: { label:
 
             <button
                 type="button"
-                aria-label={label || description || 'Toggle setting'}
+                aria-label={typeof label === 'string' ? label : typeof description === 'string' ? description : 'Toggle setting'}
                 className={`relative flex h-7 w-12 shrink-0 cursor-pointer items-center rounded-full border-2 transition-all duration-300 ease-spring focus:outline-none ${checked ? 'border-[#7AAA7A] bg-[#7AAA7A] shadow-[0_0_15px_rgba(122,170,122,0.3)]' : 'border-white/20 bg-black/30'}`}
             >
-                <span className="sr-only">Toggle {label}</span>
+                <span className="sr-only">Toggle {typeof label === 'string' ? label : 'setting'}</span>
                 <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition-transform duration-300 ease-spring ${checked ? 'translate-x-5 scale-110' : 'translate-x-0.5 scale-90 opacity-70'}`} />
             </button>
         </div>

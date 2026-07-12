@@ -114,7 +114,7 @@ export default function ActivitiesPage() {
             />
 
             {/* Summary Cards */}
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 sm:gap-4 lg:gap-6">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 sm:gap-4 lg:gap-6" data-tour="stats-activities-cards">
                 <StatsCard
                     title={text.totalPlaytime}
                     value={`${totalHours}\u00A0${text.hours}`}
@@ -132,7 +132,7 @@ export default function ActivitiesPage() {
             </div>
 
             {/* Charts */}
-            <div className="grid grid-cols-1 gap-4 sm:gap-6">
+            <div className="grid grid-cols-1 gap-4 sm:gap-6" data-tour="stats-activities-top">
                 <ChartContainer title={text.topActivities} loading={loading} height={isMobile ? 'auto' : 500}>
                     <div className="flex min-h-[560px] flex-col-reverse gap-6 lg:h-full lg:min-h-0 lg:flex-row lg:gap-8">
                         {/* List Section */}

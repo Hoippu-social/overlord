@@ -73,36 +73,12 @@ function isTextSendableChannel(channel: unknown): channel is GuildTextBasedChann
     return Boolean(channel && typeof channel === 'object' && 'isTextBased' in channel && typeof (channel as { isTextBased?: () => boolean }).isTextBased === 'function' && (channel as { isTextBased: () => boolean }).isTextBased() && 'send' in channel);
 }
 
-async function ensureAppealTicketMetaColumns() {
-    await prisma.$executeRawUnsafe('ALTER TABLE "AppealTicket" ADD COLUMN "threadChannelId" TEXT').catch(() => null);
-    await prisma.$executeRawUnsafe('ALTER TABLE "AppealTicket" ADD COLUMN "threadMessageId" TEXT').catch(() => null);
-}
-
-async function ensureAppealEventTable() {
-    await prisma.$executeRawUnsafe(`
-        CREATE TABLE IF NOT EXISTS "AppealEvent" (
-            "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-            "guildId" TEXT NOT NULL,
-            "ticketId" INTEGER NOT NULL,
-            "eventType" TEXT NOT NULL,
-            "actorUserId" TEXT,
-            "note" TEXT,
-            "payload" TEXT,
-            "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-        )
-    `).catch(() => null);
-    await prisma.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS "AppealEvent_ticketId_createdAt_idx" ON "AppealEvent"("ticketId", "createdAt")').catch(() => null);
-    await prisma.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS "AppealEvent_guildId_createdAt_idx" ON "AppealEvent"("guildId", "createdAt")').catch(() => null);
-}
-
 async function readAppealTicketMeta(ticketId: number): Promise<AppealTicketMetaRow> {
-    await ensureAppealTicketMetaColumns();
-    const rows = await prisma.$queryRawUnsafe<AppealTicketMetaRow[]>(
-        'SELECT "threadChannelId", "threadMessageId" FROM "AppealTicket" WHERE "id" = ? LIMIT 1',
-        ticketId,
-    );
-
-    return rows[0] ?? {};
+    const ticket = await prisma.appealTicket.findUnique({
+        where: { id: ticketId },
+        select: { threadChannelId: true, threadMessageId: true },
+    });
+    return ticket ?? {};
 }
 
 export async function getAppealTicketMeta(ticketId: number): Promise<AppealTicketMetaRow> {
@@ -110,13 +86,13 @@ export async function getAppealTicketMeta(ticketId: number): Promise<AppealTicke
 }
 
 async function writeAppealTicketMeta(ticketId: number, meta: AppealTicketMetaRow) {
-    await ensureAppealTicketMetaColumns();
-    await prisma.$executeRawUnsafe(
-        'UPDATE "AppealTicket" SET "threadChannelId" = ?, "threadMessageId" = ? WHERE "id" = ?',
-        meta.threadChannelId ?? null,
-        meta.threadMessageId ?? null,
-        ticketId,
-    );
+    await prisma.appealTicket.update({
+        where: { id: ticketId },
+        data: {
+            threadChannelId: meta.threadChannelId ?? null,
+            threadMessageId: meta.threadMessageId ?? null,
+        },
+    });
 }
 
 async function appendAppealEvent(options: {
@@ -127,24 +103,32 @@ async function appendAppealEvent(options: {
     note?: string | null;
     payload?: Record<string, unknown> | null;
 }) {
-    await ensureAppealEventTable();
-    await prisma.$executeRawUnsafe(
-        'INSERT INTO "AppealEvent" ("guildId", "ticketId", "eventType", "actorUserId", "note", "payload") VALUES (?, ?, ?, ?, ?, ?)',
-        options.guildId,
-        options.ticketId,
-        options.eventType,
-        options.actorUserId ?? null,
-        options.note ?? null,
-        options.payload ? JSON.stringify(options.payload) : null,
-    );
+    await prisma.appealEvent.create({
+        data: {
+            guildId: options.guildId,
+            ticketId: options.ticketId,
+            eventType: options.eventType,
+            actorUserId: options.actorUserId ?? null,
+            note: options.note ?? null,
+            payload: options.payload ? JSON.stringify(options.payload) : null,
+        },
+    });
 }
 
 export async function listAppealEvents(ticketId: number): Promise<AppealEventRow[]> {
-    await ensureAppealEventTable();
-    return prisma.$queryRawUnsafe<AppealEventRow[]>(
-        'SELECT "id", "ticketId", "eventType", "actorUserId", "note", "payload", "createdAt" FROM "AppealEvent" WHERE "ticketId" = ? ORDER BY "createdAt" ASC, "id" ASC',
-        ticketId,
-    );
+    return prisma.appealEvent.findMany({
+        where: { ticketId },
+        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+        select: {
+            id: true,
+            ticketId: true,
+            eventType: true,
+            actorUserId: true,
+            note: true,
+            payload: true,
+            createdAt: true,
+        },
+    });
 }
 
 function buildAppealTimelineText(events: AppealEventRow[]) {
@@ -456,7 +440,9 @@ export async function ensureAppealConfig(guildId: string) {
 
 async function sendToConfiguredChannel(client: Client, guildId: string, channelId: string | null | undefined, payload: string | MessageCreateOptions) {
     if (!channelId) return;
-    const channel = await client.channels.fetch(channelId).catch(() => null);
+    const guild = client.guilds.cache.get(guildId) ?? await client.guilds.fetch(guildId).catch(() => null);
+    if (!guild) return;
+    const channel = guild.channels.cache.get(channelId) ?? await guild.channels.fetch(channelId).catch(() => null);
     if (!channel || !isTextSendableChannel(channel)) return;
     await channel.send(payload).catch(() => null);
 }

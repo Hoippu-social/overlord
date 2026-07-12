@@ -1,12 +1,50 @@
-export const PUBLIC_DASHBOARD_HOST = 'dashboard.overlord.ink';
 export const INTERNAL_DASHBOARD_PREFIX = '/dashboard';
+const CANONICAL_DASHBOARD_ORIGIN = 'https://overlord.ink';
+const LEGACY_DASHBOARD_HOST = 'dashboard.overlord.ink';
 
 function normalizeHost(host?: string | null) {
-    return (host ?? '').split(':')[0].toLowerCase();
+    const value = (host ?? '').split(',')[0]?.trim();
+    if (!value) {
+        return '';
+    }
+
+    try {
+        const url = new URL(value.includes('://') ? value : `https://${value}`);
+        return url.hostname.toLowerCase();
+    } catch {
+        return value.replace(/:\d+$/, '').toLowerCase();
+    }
 }
 
-export function isPublicDashboardHost(host?: string | null) {
-    return normalizeHost(host) === PUBLIC_DASHBOARD_HOST;
+function isLegacyDashboardHost(host?: string | null) {
+    return normalizeHost(host) === LEGACY_DASHBOARD_HOST;
+}
+
+function getPublicDashboardOrigin() {
+    const configuredOrigin = process.env.NEXT_PUBLIC_DASHBOARD_ORIGIN?.trim();
+    if (!configuredOrigin) {
+        return CANONICAL_DASHBOARD_ORIGIN;
+    }
+
+    try {
+        return new URL(configuredOrigin).origin;
+    } catch {
+        return CANONICAL_DASHBOARD_ORIGIN;
+    }
+}
+
+function pathWithSearchAndHash(url: URL) {
+    return `${url.pathname}${url.search}${url.hash}`;
+}
+
+function legacyDashboardPath(url: URL) {
+    const pathname = url.pathname === '/' ? INTERNAL_DASHBOARD_PREFIX : url.pathname;
+    return `${pathname}${url.search}${url.hash}`;
+}
+
+function toPublicDashboardUrl(path: string) {
+    const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+    return `${getPublicDashboardOrigin()}${normalizedPath}`;
 }
 
 export function getRequestPublicHost(headers: Headers) {
@@ -18,21 +56,50 @@ export function getBrowserPublicHost() {
 }
 
 export function getDashboardHomePath(host?: string | null) {
-    return isPublicDashboardHost(host) ? '/' : INTERNAL_DASHBOARD_PREFIX;
+    if (isLegacyDashboardHost(host)) {
+        return toPublicDashboardUrl(INTERNAL_DASHBOARD_PREFIX);
+    }
+
+    return INTERNAL_DASHBOARD_PREFIX;
 }
 
 export function toPublicDashboardPath(path: string, host?: string | null) {
-    if (!isPublicDashboardHost(host)) {
-        return path;
-    }
-
-    if (path === INTERNAL_DASHBOARD_PREFIX) {
-        return '/';
-    }
-
-    if (path.startsWith(`${INTERNAL_DASHBOARD_PREFIX}/`)) {
-        return path.slice(INTERNAL_DASHBOARD_PREFIX.length);
+    if (isLegacyDashboardHost(host)) {
+        return toPublicDashboardUrl(path);
     }
 
     return path;
+}
+
+export function resolveAuthRedirectUrl(url: string, baseUrl: string) {
+    const publicOrigin = getPublicDashboardOrigin();
+    let base: URL;
+
+    try {
+        base = new URL(baseUrl);
+    } catch {
+        base = new URL(publicOrigin);
+    }
+
+    let target: URL;
+    try {
+        target = new URL(url, base);
+    } catch {
+        return isLegacyDashboardHost(base.hostname) ? publicOrigin : base.origin;
+    }
+
+    if (isLegacyDashboardHost(target.hostname)) {
+        return `${publicOrigin}${legacyDashboardPath(target)}`;
+    }
+
+    if (target.origin === publicOrigin) {
+        return target.toString();
+    }
+
+    if (url.startsWith('/') || target.origin === base.origin) {
+        const origin = isLegacyDashboardHost(base.hostname) ? publicOrigin : base.origin;
+        return `${origin}${pathWithSearchAndHash(target)}`;
+    }
+
+    return isLegacyDashboardHost(base.hostname) ? publicOrigin : base.origin;
 }

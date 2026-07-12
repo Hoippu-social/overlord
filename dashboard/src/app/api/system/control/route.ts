@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import botManager from '@/lib/botProcess';
+import { isSuperUser } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
+    if (!(await isSuperUser(request))) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     try {
         const { action } = await request.json();
 

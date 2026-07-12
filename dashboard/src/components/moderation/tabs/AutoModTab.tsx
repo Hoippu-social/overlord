@@ -1643,7 +1643,7 @@ export function AutoModTab({ config, setConfig, locale, tr }: AutoModTabProps) {
     };
 
     return (
-        <div className="space-y-8 animate-fade-in">
+        <div className="space-y-8 animate-fade-in" data-tour="mod-automod">
             <AnimatedCard
                 title={tr('Игнорируемые категории', 'Ignored Categories')}
                 subtitle={tr('Роли и каналы, где игнорируются все правила автомодерации на всём сервере.', 'Roles and channels where all AutoMod rules are ignored server-wide.')}

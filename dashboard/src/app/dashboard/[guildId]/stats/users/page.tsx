@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import {
-    Button, Input, Card, CardBody, Chip, Skeleton, Avatar,
+    Button, Input, Card, CardBody, Chip, Avatar,
     ButtonGroup
 } from "@nextui-org/react";
 import {
@@ -19,6 +19,7 @@ import { ChartContainer } from "@/components/stats/ChartContainer";
 import { ChartTooltip } from "@/components/stats/ChartTooltip";
 import { StatsPageHeader, StatsPageShell } from "@/components/stats/StatsPageScaffold";
 import { SegmentedTabs } from "@/components/common/SegmentedTabs";
+import { LoadingSkeleton } from "@/components/common/LoadingSkeleton";
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid,
     Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell,
@@ -546,7 +547,7 @@ export default function UserDrilldownPage() {
             />
 
             {/* Search */}
-            <div className="relative">
+            <div className="relative" data-tour="stats-users-search">
                 <Input
                     placeholder={text.searchPlaceholder}
                     value={search}
@@ -570,7 +571,7 @@ export default function UserDrilldownPage() {
                         {loadingSearch ? (
                             <div className="p-4 space-y-2">
                                 {Array.from({ length: 4 }).map((_, i) => (
-                                    <Skeleton key={i} className="h-12 w-full rounded-xl" />
+                                    <LoadingSkeleton key={i} className="h-12 w-full rounded-xl" />
                                 ))}
                             </div>
                         ) : searchResults.length === 0 ? (
@@ -695,7 +696,7 @@ export default function UserDrilldownPage() {
                                 <Card className="border border-divider bg-surface">
                                     <CardBody className="p-5">
                                         <p className="text-xs text-default-400 font-semibold uppercase tracking-wider mb-3">{text.topChannelMsgs}</p>
-                                        {loadingDrilldown ? <Skeleton className="h-8 w-full rounded-lg" /> : (
+                                        {loadingDrilldown ? <LoadingSkeleton className="h-8 w-full rounded-lg" /> : (
                                             drilldownData?.overview?.topMessageChannel ? (
                                                 <a href={`/dashboard/${guildId}/stats/channels?channelId=${drilldownData.overview.topMessageChannel.channelId || drilldownData.overview.topMessageChannel.id}`} className="flex items-center gap-3 hover:bg-white/5 p-1 rounded-lg transition-colors group">
                                                     <div className="w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/10 flex items-center justify-center flex-shrink-0 group-hover:border-cyan-500/30">
@@ -715,7 +716,7 @@ export default function UserDrilldownPage() {
                                 <Card className="border border-divider bg-surface">
                                     <CardBody className="p-5">
                                         <p className="text-xs text-default-400 font-semibold uppercase tracking-wider mb-3">{text.topChannelVoice}</p>
-                                        {loadingDrilldown ? <Skeleton className="h-8 w-full rounded-lg" /> : (
+                                        {loadingDrilldown ? <LoadingSkeleton className="h-8 w-full rounded-lg" /> : (
                                             drilldownData?.overview?.topVoiceChannel ? (
                                                 <a href={`/dashboard/${guildId}/stats/channels?channelId=${drilldownData.overview.topVoiceChannel.channelId || drilldownData.overview.topVoiceChannel.id}`} className="flex items-center gap-3 hover:bg-white/5 p-1 rounded-lg transition-colors group">
                                                     <div className="w-8 h-8 rounded-lg bg-orange-500/10 border border-orange-500/10 flex items-center justify-center flex-shrink-0 group-hover:border-orange-500/30">
@@ -735,7 +736,7 @@ export default function UserDrilldownPage() {
                                 <Card className="border border-divider bg-surface">
                                     <CardBody className="p-5">
                                         <p className="text-xs text-default-400 font-semibold uppercase tracking-wider mb-3">{text.mostRecentMsg}</p>
-                                        {loadingDrilldown ? <Skeleton className="h-8 w-full rounded-lg" /> : (
+                                        {loadingDrilldown ? <LoadingSkeleton className="h-8 w-full rounded-lg" /> : (
                                             drilldownData?.overview?.mostRecentMessage ? (
                                                 <div>
                                                     <p className="text-white font-bold">{formatDate(drilldownData.overview.mostRecentMessage.date)}</p>
@@ -750,7 +751,7 @@ export default function UserDrilldownPage() {
                                 <Card className="border border-divider bg-surface">
                                     <CardBody className="p-5">
                                         <p className="text-xs text-default-400 font-semibold uppercase tracking-wider mb-3">{text.mostRecentVoice}</p>
-                                        {loadingDrilldown ? <Skeleton className="h-8 w-full rounded-lg" /> : (
+                                        {loadingDrilldown ? <LoadingSkeleton className="h-8 w-full rounded-lg" /> : (
                                             drilldownData?.overview?.mostRecentVoice ? (
                                                 <div>
                                                     <p className="text-white font-bold">{formatDate(drilldownData.overview.mostRecentVoice.date)}</p>
@@ -894,7 +895,7 @@ export default function UserDrilldownPage() {
                                 {loadingActions ? (
                                     <div className="space-y-3">
                                         {Array.from({ length: 4 }).map((_, index) => (
-                                            <Skeleton key={index} className="h-24 w-full rounded-2xl" />
+                                            <LoadingSkeleton key={index} className="h-24 w-full rounded-2xl" />
                                         ))}
                                     </div>
                                 ) : actionsError ? (
@@ -1065,7 +1066,7 @@ function ChannelBreakdownSection({
     }, [channels, pieTopN, valueKey, otherLabel]);
 
     if (loading) {
-        return <Skeleton className="h-80 w-full rounded-2xl" />;
+        return <LoadingSkeleton className="h-80 w-full rounded-2xl" />;
     }
 
     if (!channels.length) return null;

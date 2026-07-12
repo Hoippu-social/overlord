@@ -13,6 +13,8 @@ import {
 import { useGuildLocale } from '@/lib/i18n';
 import Link from 'next/link';
 import { InteractiveSelect, MultiSelectField } from '@/components/moderation/ui';
+import { EmojiField } from '@/components/economy/primitives';
+import type { DiscordEmojiRef } from '@/lib/economy/types';
 // import { toast } from 'sonner';
 
 // --- Interfaces ---
@@ -77,11 +79,13 @@ export default function TicketCategoryPage() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [deleting, setDeleting] = useState(false);
+    const [saveNotice, setSaveNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
     // Data
     const [category, setCategory] = useState<TicketCategory | null>(null);
     const [channels, setChannels] = useState<{ text: ChannelOption[], categories: ChannelOption[] }>({ text: [], categories: [] });
     const [roles, setRoles] = useState<RoleOption[]>([]);
+    const [serverEmojis, setServerEmojis] = useState<DiscordEmojiRef[]>([]);
 
     // Form State (Local)
     const [formData, setFormData] = useState<TicketCategory | null>(null);
@@ -92,6 +96,7 @@ export default function TicketCategoryPage() {
         delete: locale === 'ru' ? 'Удалить' : 'Delete',
         saveChanges: locale === 'ru' ? 'Сохранить изменения' : 'Save Changes',
         saveSuccess: locale === 'ru' ? 'Изменения сохранены' : 'Saved successfully',
+        saveError: locale === 'ru' ? 'Не удалось сохранить изменения' : 'Failed to save changes',
         saveTranscripts: locale === 'ru' ? 'Сохранять транскрипты' : 'Save Transcripts',
         allowUserClose: locale === 'ru' ? 'Разрешить пользователям закрывать' : 'Allow Users to Close',
         createTicket: locale === 'ru' ? 'Создать тикет' : 'Create Ticket',
@@ -99,6 +104,9 @@ export default function TicketCategoryPage() {
         deleteWarning: locale === 'ru'
             ? 'Вы уверены, что хотите удалить эту категорию? Это действие нельзя отменить.'
             : 'Are you sure you want to delete this category? This action cannot be undone.',
+        deleteImpact: locale === 'ru'
+            ? 'Все настройки этой категории будут потеряны. Существующие тикеты останутся, но часть функциональности может исчезнуть.'
+            : 'All configurations for this category will be lost. Existing tickets will remain but may lose functionality.',
         cancel: locale === 'ru' ? 'Отмена' : 'Cancel',
     };
 
@@ -106,11 +114,12 @@ export default function TicketCategoryPage() {
         const load = async () => {
             try {
                 // Parallel fetch
-                const [catRes, textRes, catChanRes, roleRes] = await Promise.all([
+                const [catRes, textRes, catChanRes, roleRes, emojiRes] = await Promise.all([
                     fetch(`/api/guilds/${guildId}/tickets/${categoryId}`),
                     fetch(`/api/guilds/${guildId}/channels?type=text`),
                     fetch(`/api/guilds/${guildId}/channels?type=category`),
-                    fetch(`/api/guilds/${guildId}/roles`)
+                    fetch(`/api/guilds/${guildId}/roles`),
+                    fetch(`/api/guilds/${guildId}/emojis`),
                 ]);
 
                 if (catRes.ok) {
@@ -132,6 +141,10 @@ export default function TicketCategoryPage() {
                     setChannels(prev => ({ ...prev, categories: catData }));
                 }
                 if (roleRes.ok) setRoles(await roleRes.json());
+                if (emojiRes.ok) {
+                    const data = await emojiRes.json() as { emojis?: DiscordEmojiRef[] };
+                    setServerEmojis(data.emojis ?? []);
+                }
 
             } catch (e) {
                 console.error(e);
@@ -145,6 +158,7 @@ export default function TicketCategoryPage() {
     const handleSave = async () => {
         if (!formData) return;
         setSaving(true);
+        setSaveNotice(null);
         try {
             const res = await fetch(`/api/guilds/${guildId}/tickets/${categoryId}`, {
                 method: 'PUT',
@@ -153,11 +167,14 @@ export default function TicketCategoryPage() {
             });
 
             if (res.ok) {
-                // Show success toast or visual feedback
-                alert(text.saveSuccess);
+                setSaveNotice({ type: 'success', message: text.saveSuccess });
+            } else {
+                const data = await res.json().catch(() => null) as { error?: string } | null;
+                setSaveNotice({ type: 'error', message: data?.error || text.saveError });
             }
         } catch (e) {
             console.error(e);
+            setSaveNotice({ type: 'error', message: text.saveError });
         } finally {
             setSaving(false);
         }
@@ -180,7 +197,7 @@ export default function TicketCategoryPage() {
     };
 
     // Helper to update form data
-    const updateField = (field: keyof TicketCategory, value: any) => {
+    const updateField = <K extends keyof TicketCategory>(field: K, value: TicketCategory[K]) => {
         setFormData(prev => prev ? ({ ...prev, [field]: value }) : null);
     };
 
@@ -237,6 +254,16 @@ export default function TicketCategoryPage() {
                 </div>
             </div>
 
+            {saveNotice && (
+                <div className={`rounded-[20px] border px-4 py-3 text-sm font-semibold ${
+                    saveNotice.type === 'success'
+                        ? 'border-[var(--color-success)]/25 bg-[var(--color-success)]/10 text-[var(--color-success)]'
+                        : 'border-[var(--color-destructive)]/25 bg-[var(--color-destructive)]/10 text-[var(--color-destructive)]'
+                }`}>
+                    {saveNotice.message}
+                </div>
+            )}
+
             <Tabs
                 aria-label="Category Options"
                 color="primary"
@@ -256,7 +283,7 @@ export default function TicketCategoryPage() {
                 }>
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
                         {/* Basic Settings */}
-                        <Card className="bg-[#181A20] border border-white/5 p-4">
+                        <Card className="bg-[var(--surface-card)] border border-[var(--border-subtle)] p-4">
                             <CardBody className="space-y-6">
                                 <h3 className="text-lg font-bold text-white border-b border-white/5 pb-2">Basic Settings</h3>
 
@@ -293,7 +320,7 @@ export default function TicketCategoryPage() {
                         </Card>
 
                         {/* Toggles */}
-                        <Card className="bg-[#181A20] border border-white/5 p-4">
+                        <Card className="bg-[var(--surface-card)] border border-[var(--border-subtle)] p-4">
                             <CardBody className="space-y-6">
                                 <h3 className="text-lg font-bold text-white border-b border-white/5 pb-2">Behavior & Permissions</h3>
 
@@ -328,7 +355,7 @@ export default function TicketCategoryPage() {
                     </div>
                 }>
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-                        <Card className="bg-[#181A20] border border-white/5 p-4">
+                        <Card className="bg-[var(--surface-card)] border border-[var(--border-subtle)] p-4">
                             <CardBody className="space-y-6">
                                 <h3 className="text-lg font-bold text-white border-b border-white/5 pb-2">Panel Message</h3>
                                 <Textarea
@@ -339,19 +366,18 @@ export default function TicketCategoryPage() {
                                     minRows={3}
                                     variant="bordered"
                                 />
-                                {/* Simplified Embed Editor - Just JSON for now or simple fields? */}
-                                <div className="p-4 rounded-xl bg-default-50 border border-default-100">
+                                <div className="p-4 rounded-xl bg-[var(--surface-hover)] border border-[var(--border-divider)]">
                                     <p className="text-sm font-semibold mb-2">Embed Preview</p>
-                                    <div className="bg-[#2f3136] p-4 rounded-l border-l-4 border-primary text-white text-sm">
+                                    <div className="bg-[var(--surface-card)] p-4 rounded-l border-l-4 border-primary text-white text-sm">
                                         <p className="font-bold">Ticket Support</p>
                                         <p className="mt-1 opacity-90">Click the button below to open a ticket.</p>
                                     </div>
-                                    <p className="text-xs text-default-400 mt-2">Embed editing coming soon.</p>
+                                    <p className="text-xs text-[var(--text-muted)] mt-2">Rich embed blocks are configured from the category modal on the tickets overview.</p>
                                 </div>
                             </CardBody>
                         </Card>
 
-                        <Card className="bg-[#181A20] border border-white/5 p-4">
+                        <Card className="bg-[var(--surface-card)] border border-[var(--border-subtle)] p-4">
                             <CardBody className="space-y-6">
                                 <h3 className="text-lg font-bold text-white border-b border-white/5 pb-2">Button Style</h3>
                                 <Input
@@ -360,24 +386,27 @@ export default function TicketCategoryPage() {
                                     onValueChange={(v) => updateField('buttonText', v)}
                                     variant="bordered"
                                 />
-                                <Input
-                                    label="Button Emoji"
-                                    value={formData.buttonEmoji || '🎫'}
-                                    onValueChange={(v) => updateField('buttonEmoji', v)}
-                                    variant="bordered"
-                                    placeholder="e.g. 🎫"
+                                <div className="space-y-2">
+                                    <span className="text-sm font-semibold tracking-wide text-white/50">{locale === 'ru' ? 'Эмодзи кнопки' : 'Button emoji'}</span>
+                                    <EmojiField
+                                        value={formData.buttonEmoji || null}
+                                        onChange={(emoji) => updateField('buttonEmoji', emoji ?? '🎫')}
+                                        customLabel={locale === 'ru' ? 'Свой эмодзи' : 'Custom emoji'}
+                                        serverLabel={locale === 'ru' ? 'Эмодзи сервера' : 'Server emoji'}
+                                        serverEmojis={serverEmojis}
+                                    />
+                                </div>
+                                <InteractiveSelect
+                                    label={locale === 'ru' ? 'Стиль кнопки' : 'Button style'}
+                                    value={formData.buttonStyle || 'PRIMARY'}
+                                    onChange={(value) => updateField('buttonStyle', value)}
+                                    options={[
+                                        { id: 'PRIMARY', name: locale === 'ru' ? 'Основной' : 'Primary' },
+                                        { id: 'SECONDARY', name: locale === 'ru' ? 'Вторичный' : 'Secondary' },
+                                        { id: 'SUCCESS', name: locale === 'ru' ? 'Успех' : 'Success' },
+                                        { id: 'DANGER', name: locale === 'ru' ? 'Опасность' : 'Danger' },
+                                    ]}
                                 />
-                                <Select
-                                    label="Button Color"
-                                    selectedKeys={[formData.buttonStyle || 'PRIMARY']}
-                                    onChange={(e) => updateField('buttonStyle', e.target.value)}
-                                    variant="bordered"
-                                >
-                                    <SelectItem key="PRIMARY" value="PRIMARY">Blurple (Primary)</SelectItem>
-                                    <SelectItem key="SECONDARY" value="SECONDARY">Grey (Secondary)</SelectItem>
-                                    <SelectItem key="SUCCESS" value="SUCCESS">Green (Success)</SelectItem>
-                                    <SelectItem key="DANGER" value="DANGER">Red (Danger)</SelectItem>
-                                </Select>
                             </CardBody>
                         </Card>
                     </div>
@@ -390,7 +419,7 @@ export default function TicketCategoryPage() {
                     </div>
                 }>
                     <div className="mt-6">
-                        <Card className="bg-[#181A20] border border-white/5 p-4">
+                        <Card className="bg-[var(--surface-card)] border border-[var(--border-subtle)] p-4">
                             <CardBody>
                                 <div className="flex justify-between items-center mb-6">
                                     <div>
@@ -436,9 +465,12 @@ export default function TicketCategoryPage() {
                                                     selectedKeys={[question.type]}
                                                     size="sm" variant="bordered"
                                                     onChange={(e) => {
-                                                        const newForms = [...formData.forms];
-                                                        newForms[idx].type = e.target.value as any;
-                                                        updateField('forms', newForms);
+                                                        const nextType = e.target.value;
+                                                        if (nextType === 'TEXT' || nextType === 'PARAGRAPH' || nextType === 'NUMBER' || nextType === 'SELECT') {
+                                                            const newForms = [...formData.forms];
+                                                            newForms[idx].type = nextType;
+                                                            updateField('forms', newForms);
+                                                        }
                                                     }}
                                                 >
                                                     <SelectItem key="TEXT" value="TEXT">Short Text</SelectItem>
@@ -484,7 +516,7 @@ export default function TicketCategoryPage() {
                     </div>
                 }>
                     <div className="mt-6">
-                        <div className="p-10 text-center text-default-500 bg-[#181A20] rounded-xl border border-white/5">
+                        <div className="p-10 text-center text-[var(--text-muted)] bg-[var(--surface-card)] rounded-xl border border-[var(--border-subtle)]">
                             <PuzzlePiece size={48} className="mx-auto mb-4 opacity-50" />
                             <h3 className="text-xl font-bold text-white mb-2">Advanced Items</h3>
                             <p>Development in progress. This section will allow defining Quick Replies and Support Department routing.</p>
@@ -495,16 +527,14 @@ export default function TicketCategoryPage() {
 
             {/* Delete Confirmation Modal */}
             <Modal isOpen={deleteModal.isOpen} onOpenChange={deleteModal.onOpenChange}>
-                <ModalContent className="bg-[#181A20] border border-white/10 text-white">
+                <ModalContent className="bg-[var(--surface-card)] border border-[var(--border-subtle)] text-white">
                     {(onClose) => (
                         <>
                             <ModalHeader>{text.deleteCategory}</ModalHeader>
                             <ModalBody>
                                 <p>{text.deleteWarning} <strong>{category?.name}</strong>.</p>
                                 <p className="text-sm text-default-400">
-                                    {locale === 'ru'
-                                        ? 'Все настройки этой категории будут потеряны. Существующие тикеты останутся, но часть функциональности может исчезнуть.'
-                                        : 'All configurations for this category will be lost. Existing tickets will remain but may lose functionality.'}
+                                    {text.deleteImpact}
                                 </p>
                             </ModalBody>
                             <ModalFooter>

@@ -1,12 +1,14 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Checks, FlowArrow, ShieldCheck, Ticket, WarningCircle } from '@phosphor-icons/react';
 import { AppealReviewDecision, AppealTicketState, ConfigState } from '@/app/dashboard/[guildId]/moderation/types';
 import { APPEAL_REVIEW_OPTIONS, formatDate } from '@/app/dashboard/[guildId]/moderation/constants';
 import { InteractiveSelect, MultiSelectField, SectionCard, TextAreaField, TextField, ToggleField } from '@/components/moderation/ui';
 import DiscordMessagePreview, { MessagePayload } from '@/components/tickets/DiscordMessagePreview';
 import { buildChannelSelectOptions } from '@/lib/channelSelectOptions';
+import { EmojiField } from '@/components/economy/primitives';
+import type { DiscordEmojiRef } from '@/lib/economy/types';
 
 interface AppealsTabProps {
     config: ConfigState;
@@ -32,6 +34,16 @@ export function AppealsTab({ config, setConfig, appealState, locale, tr }: Appea
     const [reviewingId, setReviewingId] = useState<number | null>(null);
     const [reviewNote, setReviewNote] = useState('');
     const [submitting, setSubmitting] = useState(false);
+    const [serverEmojis, setServerEmojis] = useState<DiscordEmojiRef[]>([]);
+
+    useEffect(() => {
+        const guildId = window.location.pathname.split('/')[3];
+        if (!guildId) return;
+        void fetch(`/api/guilds/${guildId}/emojis`)
+            .then(async (response) => response.ok ? response.json() as Promise<{ emojis?: DiscordEmojiRef[] }> : null)
+            .then((data) => setServerEmojis(data?.emojis ?? []))
+            .catch(() => setServerEmojis([]));
+    }, []);
 
     const updateAppealConfig = <K extends keyof ConfigState['appealConfig']>(key: K, value: ConfigState['appealConfig'][K]) => {
         setConfig((prev) => ({
@@ -110,7 +122,7 @@ export function AppealsTab({ config, setConfig, appealState, locale, tr }: Appea
     }), [config.appealConfig.firstEmbed, tr]);
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-6" data-tour="mod-appeals">
             <div className="grid grid-cols-1 gap-4 xl:grid-cols-4">
                 <SummaryCard title={tr('\u0412\u0441\u0435\u0433\u043e', 'Total')} value={appealState.summary.total} icon={<Ticket size={20} weight="duotone" />} tone="text-[var(--color-primary-1)]" />
                 <SummaryCard title={tr('\u041d\u043e\u0432\u044b\u0435', 'Submitted')} value={appealState.summary.open} icon={<WarningCircle size={20} weight="duotone" />} tone="text-amber-300" />
@@ -161,7 +173,16 @@ export function AppealsTab({ config, setConfig, appealState, locale, tr }: Appea
                         <TextAreaField label={tr('\u041e\u043f\u0438\u0441\u0430\u043d\u0438\u0435 \u043e\u0442\u0434\u0435\u043b\u044c\u043d\u043e\u0439 \u043f\u0430\u043d\u0435\u043b\u0438', 'Dedicated panel description')} value={config.appealConfig.dedicatedPanel.description} onChange={(value) => updateNested('dedicatedPanel', { ...config.appealConfig.dedicatedPanel, description: value })} rows={3} />
                         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                             <TextField label={tr('\u042f\u0440\u043b\u044b\u043a \u043e\u0431\u0449\u0435\u0439 \u043a\u0430\u0442\u0435\u0433\u043e\u0440\u0438\u0438', 'Shared category label')} value={config.appealConfig.sharedPlacement.label} onChange={(value) => updateNested('sharedPlacement', { ...config.appealConfig.sharedPlacement, label: value })} />
-                            <TextField label={tr('Emoji \u043e\u0431\u0449\u0435\u0439 \u043a\u0430\u0442\u0435\u0433\u043e\u0440\u0438\u0438', 'Shared category emoji')} value={config.appealConfig.sharedPlacement.emoji} onChange={(value) => updateNested('sharedPlacement', { ...config.appealConfig.sharedPlacement, emoji: value })} />
+                            <div className="space-y-2">
+                                <span className="text-sm font-semibold tracking-wide text-white/50">{tr('\u042d\u043c\u043e\u0434\u0437\u0438 \u043e\u0431\u0449\u0435\u0439 \u043a\u0430\u0442\u0435\u0433\u043e\u0440\u0438\u0438', 'Shared category emoji')}</span>
+                                <EmojiField
+                                    value={config.appealConfig.sharedPlacement.emoji || null}
+                                    onChange={(emoji) => updateNested('sharedPlacement', { ...config.appealConfig.sharedPlacement, emoji: emoji ?? '⚖️' })}
+                                    customLabel={tr('\u0421\u0432\u043e\u0439 \u044d\u043c\u043e\u0434\u0437\u0438', 'Custom emoji')}
+                                    serverLabel={tr('\u042d\u043c\u043e\u0434\u0437\u0438 \u0441\u0435\u0440\u0432\u0435\u0440\u0430', 'Server emoji')}
+                                    serverEmojis={serverEmojis}
+                                />
+                            </div>
                             <TextField label={tr('\u041f\u043e\u0440\u044f\u0434\u043e\u043a \u0432 \u043c\u0435\u043d\u044e', 'Menu order')} value={String(config.appealConfig.sharedPlacement.sortOrder)} type="number" onChange={(value) => updateNested('sharedPlacement', { ...config.appealConfig.sharedPlacement, sortOrder: Math.max(0, Number(value) || 0) })} />
                         </div>
                         <TextAreaField label={tr('\u041e\u043f\u0438\u0441\u0430\u043d\u0438\u0435 \u043e\u0431\u0449\u0435\u0439 \u043a\u0430\u0442\u0435\u0433\u043e\u0440\u0438\u0438', 'Shared category description')} value={config.appealConfig.sharedPlacement.description} onChange={(value) => updateNested('sharedPlacement', { ...config.appealConfig.sharedPlacement, description: value })} rows={2} />

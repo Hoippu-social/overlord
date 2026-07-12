@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { LoadingSkeleton } from '@/components/common/LoadingSkeleton';
 
 interface ChartContainerProps {
     title: string;
@@ -32,7 +33,9 @@ export function ChartContainer({
 
             <div style={{ height: resolvedHeight }} className="relative w-full min-w-0">
                 {loading ? (
-                    <div className="absolute inset-0 skeleton rounded-xl" />
+                    <div className="absolute inset-0">
+                        <LoadingSkeleton className="h-full w-full rounded-xl" />
+                    </div>
                 ) : (
                     children
                 )}

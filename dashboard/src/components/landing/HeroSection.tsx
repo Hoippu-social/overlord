@@ -35,7 +35,7 @@ export function HeroSection({ copy }: HeroSectionProps) {
             className="max-w-full overflow-hidden"
           >
             <p className="landing-kicker">{copy.eyebrow}</p>
-            <div className="mt-5 max-w-full font-akony text-[2.35rem] leading-[0.82] tracking-[0.04em] text-[var(--landing-text)] min-[380px]:text-[2.85rem] sm:text-[3.4rem] md:text-[4.35rem] lg:text-[5.35rem] xl:text-[6rem]">
+            <div className="mt-5 max-w-full whitespace-nowrap font-akony text-[clamp(2.35rem,7.6vw,5.15rem)] leading-[0.82] tracking-[0.04em] text-[var(--landing-text)]">
               {copy.brand}
             </div>
           </motion.div>

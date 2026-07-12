@@ -150,7 +150,7 @@ select {
     }
 }
 
-@keyframes shimmer {
+@keyframes loading-skeleton-shimmer {
     0% {
         background-position: -200% center;
     }
@@ -172,11 +172,31 @@ select {
     animation: pulse-dot 2s ease-in-out infinite;
 }
 
+.loading-skeleton,
 .skeleton {
-    background: linear-gradient(90deg, #1f1f1f 25%, #2a2a2a 50%, #1f1f1f 75%);
+    position: relative;
+    display: block;
+    background: var(--surface-hover);
+    overflow: hidden;
+    isolation: isolate;
+}
+
+.loading-skeleton::after,
+.skeleton::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background: linear-gradient(
+        90deg,
+        transparent 0%,
+        rgba(244, 241, 238, 0.08) 50%,
+        transparent 100%
+    );
     background-size: 200% 100%;
-    animation: shimmer 1.5s infinite;
-    border-radius: 8px;
+    animation: loading-skeleton-shimmer 1.5s ease-in-out infinite;
+    will-change: background-position;
 }
 
 .glass {
@@ -193,6 +213,11 @@ select {
 .no-scrollbar {
     -ms-overflow-style: none;
     scrollbar-width: none;
+}
+
+.tickets-surface {
+    --text-muted: rgba(244, 241, 238, 0.52);
+    --border-divider: rgba(244, 241, 238, 0.08);
 }
 
 .landing-shell {
@@ -511,3 +536,46 @@ select {
         transition-duration: 0.01ms;
     }
 }
+
+@keyframes tkPulseRing {
+    0% { transform: scale(0.6); opacity: 0.9; }
+    100% { transform: scale(1.55); opacity: 0; }
+}
+
+@keyframes tkSlideInRight {
+    from { transform: translateX(32px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes tkFadeUp {
+    from { transform: translateY(8px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes tourPulse {
+    0% { transform: scale(1); opacity: 0.9; }
+    100% { transform: scale(1.35); opacity: 0; }
+}
+
+.tour-pulse-ring {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: tourPulse 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .tour-pulse-ring {
+        animation: none;
+    }
+
+    .tickets-surface *,
+    .tickets-surface *::before,
+    .tickets-surface *::after {
+        scroll-behavior: auto !important;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* tickets glass redesign cache-bust 2026-07-08 */

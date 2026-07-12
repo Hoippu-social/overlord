@@ -92,7 +92,7 @@ export function Navbar({ language, setLanguage, copy }: NavbarProps) {
             </div>
 
             <LandingUserMenu language={language} className="hidden lg:flex">
-              <Link href="/login" aria-label={copy.login} className="landing-button-secondary hidden min-h-11 px-5 text-[0.66rem] lg:inline-flex">
+              <Link href="/login" aria-label={copy.login} className="landing-button-secondary min-h-11 px-5 text-[0.66rem]">
                 {copy.login}
                 <ArrowUpRight size={15} weight="bold" />
               </Link>

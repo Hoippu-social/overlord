@@ -185,7 +185,7 @@ export default function VoicePage() {
             />
 
             {/* Summary Cards */}
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5 sm:gap-4 lg:gap-6">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5 sm:gap-4 lg:gap-6" data-tour="stats-voice-cards">
                 <StatsCard
                     title={text.totalTime}
                     value={autoFormatMinutes(totalMinutes, text)}
@@ -219,7 +219,7 @@ export default function VoicePage() {
             </div>
 
             {/* Voice Activity Chart & Heatmap */}
-            <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 sm:gap-6">
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 sm:gap-6" data-tour="stats-voice-chart">
                 <ChartContainer
                     title={text.voiceActivity}
                     loading={loading}

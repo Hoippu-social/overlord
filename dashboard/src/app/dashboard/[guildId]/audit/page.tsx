@@ -518,7 +518,7 @@ export default function AuditPage() {
                 {/* Left Column: Configuration */}
                 <div className="lg:col-span-5 space-y-6 lg:sticky lg:top-8">
                     {/* Add Route Form */}
-                    <div className="bg-[var(--surface-card)] border border-[var(--border-subtle)] rounded-2xl p-6 space-y-6 shadow-sm">
+                    <div className="bg-[var(--surface-card)] border border-[var(--border-subtle)] rounded-2xl p-6 space-y-6 shadow-sm" data-tour="audit-add-route">
                         <div className="flex items-center gap-4">
                             <div className="w-10 h-10 rounded-xl bg-[var(--color-primary-2)]/10 flex items-center justify-center text-[var(--color-primary-2)]">
                                 <Plus size={20} weight="bold" />
@@ -577,7 +577,7 @@ export default function AuditPage() {
                     </div>
 
                     {/* Active Routes List */}
-                    <SectionBlock title={text.routes} description={routes.length > 0 ? `${routes.length} ${ui.activeMappings}` : text.noRoutes} noPadding>
+                    <SectionBlock dataTour="audit-routes-list" title={text.routes} description={routes.length > 0 ? `${routes.length} ${ui.activeMappings}` : text.noRoutes} noPadding>
                         {routes.length === 0 ? (
                             <div className="p-6 text-center">
                                 <p className="text-sm text-white/30">{text.noRoutes}</p>
@@ -624,6 +624,7 @@ export default function AuditPage() {
                 {/* Right Column: Feed */}
                 <div className="lg:col-span-7 space-y-6">
                     <SectionBlock
+                        dataTour="audit-feed"
                         title={text.events}
                         description={text.eventsDesc}
                         action={

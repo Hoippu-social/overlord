@@ -12,6 +12,7 @@ import { BOT_OWNER_ID } from '@/lib/constants';
 import { fetchWithTimeout } from '@/lib/requestTimeout';
 import { getBrowserPublicHost, toPublicDashboardPath } from '@/lib/publicDashboard';
 import { hyphenateServerName } from '@/lib/textHyphenation';
+import { LoadingSkeleton } from '@/components/common/LoadingSkeleton';
 
 interface Guild {
     id: string;
@@ -255,9 +256,9 @@ function LoadingState({ text }: { text: (typeof strings)[Locale] }) {
         <div className="min-h-screen bg-[#06080b] text-white">
             <div className="mx-auto max-w-[1520px] px-4 py-8 sm:px-6 lg:px-8">
                 <div className="rounded-[36px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(14,18,23,0.96),rgba(8,10,14,0.98))] p-6 sm:p-8 lg:p-10">
-                    <div className="h-3 w-40 rounded-full skeleton" />
-                    <div className="mt-6 h-20 max-w-[38rem] rounded-[28px] skeleton" />
-                    <div className="mt-6 h-10 max-w-[28rem] rounded-[18px] skeleton" />
+                    <LoadingSkeleton className="h-3 w-40 rounded-full" />
+                    <LoadingSkeleton className="mt-6 h-20 max-w-[38rem] rounded-[28px]" />
+                    <LoadingSkeleton className="mt-6 h-10 max-w-[28rem] rounded-[18px]" />
                     <div className="mt-8 flex items-center gap-3 text-white/55">
                         <Spinner size="sm" color="success" />
                         <span>{text.loadingServers}</span>
@@ -270,12 +271,12 @@ function LoadingState({ text }: { text: (typeof strings)[Locale] }) {
                             key={index}
                             className="rounded-[30px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(13,16,20,0.96),rgba(8,10,14,0.98))] p-5"
                         >
-                            <div className="h-3 w-28 rounded-full skeleton" />
-                            <div className="mt-7 h-[116px] w-[116px] rounded-[30px] skeleton" />
-                            <div className="mt-7 h-12 w-3/4 rounded-[18px] skeleton" />
-                            <div className="mt-4 h-5 w-2/3 rounded-[12px] skeleton" />
+                            <LoadingSkeleton className="h-3 w-28 rounded-full" />
+                            <LoadingSkeleton className="mt-7 h-[116px] w-[116px] rounded-[30px]" />
+                            <LoadingSkeleton className="mt-7 h-12 w-3/4 rounded-[18px]" />
+                            <LoadingSkeleton className="mt-4 h-5 w-2/3 rounded-[12px]" />
                             <div className="mt-8 h-px w-full bg-white/[0.06]" />
-                            <div className="mt-4 h-5 w-1/2 rounded-[12px] skeleton" />
+                            <LoadingSkeleton className="mt-4 h-5 w-1/2 rounded-[12px]" />
                         </div>
                     ))}
                 </div>
@@ -288,6 +289,7 @@ export default function Dashboard() {
     const { data: session } = useSession();
     const [guilds, setGuilds] = useState<Guild[]>([]);
     const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState<string | null>(null);
     const [mounted, setMounted] = useState(false);
     const [query, setQuery] = useState('');
     const [masterModeEnabled, setMasterModeEnabled] = useState(false);
@@ -301,15 +303,24 @@ export default function Dashboard() {
         const response = await fetchWithTimeout('/api/guilds', { cache: 'no-store' }, 8000, 'Dashboard guild list');
 
         if (response.status === 401 || response.status === 403) {
-            await fetch('/api/logout', { method: 'POST' });
-            await signOut({ callbackUrl: '/login' });
+            void fetch('/api/logout', { method: 'POST' });
+            void signOut({ redirect: false });
+            window.location.assign('/login');
             return;
+        }
+
+        if (!response.ok) {
+            throw new Error(`Dashboard guild list failed with HTTP ${response.status}`);
         }
 
         const data = await response.json();
         if (Array.isArray(data)) {
             setGuilds(data);
+            setLoadError(null);
+            return;
         }
+
+        throw new Error('Dashboard guild list returned an unexpected response');
     }, []);
 
     useEffect(() => {
@@ -322,6 +333,9 @@ export default function Dashboard() {
                 await loadGuilds();
             } catch (error) {
                 console.error('Failed to load guild chooser data:', error);
+                if (active) {
+                    setLoadError(error instanceof Error ? error.message : 'Failed to load guilds');
+                }
             } finally {
                 if (active) {
                     setLoading(false);
@@ -492,7 +506,9 @@ export default function Dashboard() {
 
                 {guilds.length === 0 && (
                     <div className="mt-8 rounded-[30px] border border-dashed border-white/[0.1] bg-white/[0.02] px-6 py-14 text-center">
-                        <p className="mx-auto max-w-[42rem] text-base leading-[1.9] text-white/48 sm:text-lg">{text.noServers}</p>
+                        <p className="mx-auto max-w-[42rem] text-base leading-[1.9] text-white/48 sm:text-lg">
+                            {loadError ? `${text.noServers} (${loadError})` : text.noServers}
+                        </p>
                     </div>
                 )}
 

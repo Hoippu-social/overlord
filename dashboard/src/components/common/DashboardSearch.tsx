@@ -454,7 +454,7 @@ export function DashboardSearch({ guildId, locale, sessionUserId }: DashboardSea
 
     return (
         <>
-            <div ref={desktopRootRef} className="relative hidden w-72 lg:block">
+            <div ref={desktopRootRef} className="relative hidden w-72 lg:block" data-tour="topnav-search">
                 {renderInput(false)}
                 {open ? renderResultsPanel(false) : null}
             </div>

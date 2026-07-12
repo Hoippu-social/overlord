@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 
 export type LocaleCode = 'ru' | 'en';
 
@@ -24,24 +24,35 @@ export const setStoredLocale = (locale: LocaleCode) => {
     window.dispatchEvent(new CustomEvent(LOCALE_EVENT, { detail: locale }));
 };
 
+const subscribeLocale = (onStoreChange: () => void) => {
+    if (typeof window === 'undefined') return () => undefined;
+
+    const handleLocaleChange = () => onStoreChange();
+    const handleStorage = (event: StorageEvent) => {
+        if (event.key === STORAGE_KEY) {
+            onStoreChange();
+        }
+    };
+
+    window.addEventListener(LOCALE_EVENT, handleLocaleChange);
+    window.addEventListener('storage', handleStorage);
+    return () => {
+        window.removeEventListener(LOCALE_EVENT, handleLocaleChange);
+        window.removeEventListener('storage', handleStorage);
+    };
+};
+
+const getServerLocale = () => DEFAULT_LOCALE;
+
 export const useGuildLocale = (guildId?: string) => {
-    const [locale, setLocaleState] = useState<LocaleCode>(getStoredLocale());
+    void guildId;
 
-    useEffect(() => {
-        if (typeof window === 'undefined') return;
-        const handleLocaleChange = (event: Event) => {
-            const next = (event as CustomEvent<LocaleCode>).detail;
-            setLocaleState(normalizeLocale(next));
-        };
-        window.addEventListener(LOCALE_EVENT, handleLocaleChange);
-        return () => window.removeEventListener(LOCALE_EVENT, handleLocaleChange);
-    }, []);
+    const locale = useSyncExternalStore(subscribeLocale, getStoredLocale, getServerLocale);
 
-    const setLocale = (next: LocaleCode) => {
+    const setLocale = useCallback((next: LocaleCode) => {
         const normalized = normalizeLocale(next);
         setStoredLocale(normalized);
-        setLocaleState(normalized);
-    };
+    }, []);
 
     return { locale, setLocale };
 };

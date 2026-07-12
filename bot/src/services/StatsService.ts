@@ -11,10 +11,10 @@ interface UsageMetrics {
 /**
  * StatsService - Single-DB Architecture
  *
- * All statistics are written exclusively to stats.db (statsPrisma).
- * development.db is used only for operational (non-stats) data.
+ * All statistics are written exclusively to PostgreSQL stats storage (statsPrisma).
+ * Operational data is written to the main PostgreSQL database.
  *
- * 1. Raw events (messages, voice, interactions, activities, member events) -> stats.db immediately
+ * 1. Raw events (messages, voice, interactions, activities, member events) -> statsPrisma immediately
  * 2. Aggregated metrics (hourly/daily) accumulated in memory buffer -> flushed every 5 min
  */
 export class StatsService {
@@ -22,13 +22,13 @@ export class StatsService {
     private static flushTimer: NodeJS.Timeout | null = null;
 
     static async init() {
-        console.log('[StatsService] Initializing Single-DB Architecture (stats.db)...');
+        console.log('[StatsService] Initializing PostgreSQL stats architecture...');
 
         this.flushTimer = setInterval(() => {
             this.flushBuffer();
         }, 5 * 60 * 1000);
 
-        console.log('[StatsService] Buffer flush timer started (every 5 min -> stats.db)');
+        console.log('[StatsService] Buffer flush timer started (every 5 min -> PostgreSQL stats storage)');
     }
 
     static shutdown() {
@@ -260,7 +260,7 @@ export class StatsService {
 
     private static async flushBuffer() {
         if (this.buffer.size === 0) return;
-        console.log(`[StatsService] Flushing ${this.buffer.size} guild(s) to stats.db...`);
+        console.log(`[StatsService] Flushing ${this.buffer.size} guild(s) to PostgreSQL stats storage...`);
 
         const now = new Date();
         const snapshot = new Map(this.buffer);

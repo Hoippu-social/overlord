@@ -387,7 +387,7 @@ export default function ServerSettingsPage({ params }: { params: Promise<{ guild
                 {/* Left Column: General & Admins */}
                 <div className="space-y-6">
                     {/* 1. General Settings (Prefix + Language + Timezone) */}
-                    <div className="bg-[var(--surface-card)] border border-[var(--border-subtle)] shadow-sm rounded-[24px] overflow-hidden group hover:border-[#3b82f6]/30 transition-colors h-full flex flex-col">
+                    <div className="bg-[var(--surface-card)] border border-[var(--border-subtle)] shadow-sm rounded-[24px] overflow-hidden group hover:border-[#3b82f6]/30 transition-colors h-full flex flex-col" data-tour="settings-general">
                         <div className="p-6 border-b border-[var(--border-divider)] bg-[var(--surface-hover)] shrink-0 flex items-center gap-4">
                             <div className="w-10 h-10 shrink-0 aspect-square rounded-xl bg-[#3b82f6]/10 flex items-center justify-center text-[#3b82f6] shadow-sm border border-[#3b82f6]/20">
                                 <Keyboard size={20} weight="duotone" />
@@ -476,7 +476,7 @@ export default function ServerSettingsPage({ params }: { params: Promise<{ guild
                     </div>
 
                     {/* 3. Admins Section */}
-                    <div className="bg-[var(--surface-card)] border border-[var(--border-subtle)] shadow-sm rounded-[24px] overflow-visible group hover:border-[#10b981]/30 transition-colors h-full flex flex-col items-start pb-6 z-20">
+                    <div className="bg-[var(--surface-card)] border border-[var(--border-subtle)] shadow-sm rounded-[24px] overflow-visible group hover:border-[#10b981]/30 transition-colors h-full flex flex-col items-start pb-6 z-20" data-tour="settings-admins">
                         <div className="p-6 border-b border-[var(--border-divider)] bg-[var(--surface-hover)] shrink-0 flex w-full items-center gap-4 rounded-t-[24px]">
                             <div className="w-10 h-10 shrink-0 aspect-square rounded-xl bg-[#10b981]/10 flex items-center justify-center text-[#10b981] shadow-sm border border-[#10b981]/20">
                                 <ShieldCheck size={20} weight="duotone" />
@@ -502,7 +502,7 @@ export default function ServerSettingsPage({ params }: { params: Promise<{ guild
                 {/* Right Column: Recovery & Channels */}
                 <div className="space-y-6">
                     {/* 2. Recovery Settings */}
-                    <div className="bg-[var(--surface-card)] border border-[var(--border-subtle)] shadow-sm rounded-[24px] overflow-hidden group hover:border-amber-500/30 transition-colors h-fit mb-6">
+                    <div className="bg-[var(--surface-card)] border border-[var(--border-subtle)] shadow-sm rounded-[24px] overflow-hidden group hover:border-amber-500/30 transition-colors h-fit mb-6" data-tour="settings-recovery">
                         <div className="p-6 border-b border-[var(--border-divider)] bg-[var(--surface-hover)] shrink-0 flex items-center gap-4">
                             <div className="w-10 h-10 shrink-0 aspect-square rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-500 shadow-sm border border-amber-500/20">
                                 <UserCircle size={20} weight="duotone" />
@@ -532,7 +532,7 @@ export default function ServerSettingsPage({ params }: { params: Promise<{ guild
                     </div>
 
                     {/* 4. Channels Section */}
-                    <div className="bg-[var(--surface-card)] border border-[var(--border-subtle)] shadow-sm rounded-[24px] overflow-visible group hover:border-rose-500/30 transition-colors h-full flex flex-col pb-6 z-10">
+                    <div className="bg-[var(--surface-card)] border border-[var(--border-subtle)] shadow-sm rounded-[24px] overflow-visible group hover:border-rose-500/30 transition-colors h-full flex flex-col pb-6 z-10" data-tour="settings-channels">
                         <div className="p-6 border-b border-[var(--border-divider)] bg-[var(--surface-hover)] shrink-0 flex w-full items-center justify-between gap-4 flex-wrap rounded-t-[24px]">
                             <div className="flex items-center gap-4">
                                 <div className="w-10 h-10 shrink-0 aspect-square rounded-xl bg-rose-500/10 flex items-center justify-center text-rose-500 shadow-sm border border-rose-500/20">

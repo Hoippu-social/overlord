@@ -98,7 +98,7 @@ export function LandingUserMenu({ language, children, className = "", variant = 
     };
   }, []);
 
-  const checking = sessionStatus === null || status === "loading";
+  const checking = sessionStatus === null && status === "loading";
   const authenticated = status === "authenticated" || sessionStatus?.authenticated === true;
   const text = strings[language];
 
@@ -128,7 +128,7 @@ export function LandingUserMenu({ language, children, className = "", variant = 
   }
 
   if (!authenticated) {
-    return <>{children}</>;
+    return variant === "mobile" ? <>{children}</> : <div className={className}>{children}</div>;
   }
 
   const avatar = (

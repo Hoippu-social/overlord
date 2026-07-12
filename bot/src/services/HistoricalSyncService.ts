@@ -207,7 +207,7 @@ export class HistoricalSyncService {
         // Use statsDB as source for aggregation
         // To avoid OOM on aggregation (loading 100k messages), we should probably use groupBy in database
         // But Prisma groupBy doesn't support generic date truncation easily in all providers.
-        // For SQLite, we can raw query or load in chunks.
+        // Historical sync reads in chunks to avoid loading the entire workload at once.
         // Given current constraints, let's load efficiently.
 
         // Optimisation: Delete old aggregations for this period first?

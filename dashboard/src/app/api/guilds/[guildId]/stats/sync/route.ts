@@ -402,7 +402,7 @@ export async function POST(
             const m = String(zoned.getUTCMonth() + 1).padStart(2, '0');
             const d = String(zoned.getUTCDate()).padStart(2, '0');
             const h = truncateTo === 'hour' ? String(zoned.getUTCHours()).padStart(2, '0') : '00';
-            
+
             const localTruncatedStr = `${y}-${m}-${d}T${h}:00:00`;
             const result = fromZonedTime(localTruncatedStr, tz);
 
@@ -458,7 +458,7 @@ export async function POST(
         console.time('[StatsSync] Process Messages Loop');
         let msgCursor: number | undefined = undefined;
         let fetchedMsgs = 0;
-        
+
         while (true) {
             const chunk: Array<{ id: number; createdAt: Date; authorId: string; channelId: string }> = await statsPrisma.statMessage.findMany({
                 where: { guildId, createdAt: { gte: since } },
@@ -487,7 +487,7 @@ export async function POST(
             msgCursor = chunk[chunk.length - 1].id;
         }
         console.timeEnd('[StatsSync] Process Messages Loop');
-        console.log(`[StatsSync] Fetched and processed ${fetchedMsgs} messages from stats.db`);
+        console.log(`[StatsSync] Fetched and processed ${fetchedMsgs} messages from PostgreSQL stats storage`);
 
         // --- 2. Aggregating Voice ---
         updateSyncStatus(guildId, { progress: 30, message: 'Fetching voice data...' });
@@ -560,7 +560,7 @@ export async function POST(
             voiceCursor = chunk[chunk.length - 1].id;
         }
         console.timeEnd('[StatsSync] Process Voice Loop');
-        console.log(`[StatsSync] Fetched and processed ${fetchedVoice} voice sessions from stats.db`);
+        console.log(`[StatsSync] Fetched and processed ${fetchedVoice} voice sessions from PostgreSQL stats storage`);
 
         // --- 3. Aggregating Interactions for daily read models ---
         updateSyncStatus(guildId, { progress: 40, message: 'Fetching interactions...' });
@@ -596,7 +596,7 @@ export async function POST(
             interactionCursor = chunk[chunk.length - 1].id;
         }
         console.timeEnd('[StatsSync] Process Interactions Loop');
-        console.log(`[StatsSync] Fetched and processed ${fetchedInteractions} interactions from stats.db`);
+        console.log(`[StatsSync] Fetched and processed ${fetchedInteractions} interactions from PostgreSQL stats storage`);
 
         // --- 4. Aggregating Members (Joins/Leaves) from Audit Logs ---
         updateSyncStatus(guildId, { progress: 45, message: 'Fetching member events...' });

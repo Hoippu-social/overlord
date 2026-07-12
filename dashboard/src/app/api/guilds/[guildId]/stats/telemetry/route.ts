@@ -22,8 +22,8 @@ export async function GET(
 ): Promise<Response> {
     const { guildId } = await params;
     const access = await requireGuildStatsAccess(request, guildId);
-    if ('error' in access) {
-        return access.error as Response;
+    if (!access.ok) {
+        return access.response;
     }
 
     if (!isStatsPostgres) {

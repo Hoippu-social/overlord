@@ -170,7 +170,7 @@ export function AnalyticsTab({ guildId, analyticsState, locale, tr, windowDays, 
     };
 
     return (
-        <div className="space-y-8 animate-fade-in">
+        <div className="space-y-8 animate-fade-in" data-tour="mod-analytics">
             <div className="mb-2 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
                 <div>
                     <h2 className="mb-1 text-2xl font-black tracking-tight text-white drop-shadow-sm">

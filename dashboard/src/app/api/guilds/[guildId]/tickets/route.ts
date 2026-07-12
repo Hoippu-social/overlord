@@ -4,44 +4,6 @@ import { fetchGuildChannels, parseChannels } from '@/lib/discord-api';
 import { authorizeGuildApiRequest, isGuildApiAuthFailure } from '@/lib/guildApiAuth';
 import { readAppealSettings } from '@/lib/appealsConfig';
 
-type TicketConfigRecord = {
-    enabled: boolean;
-    logChannelId: string | null;
-};
-
-type TicketCategoryRecord = {
-    id: number;
-    guildId: string;
-    name: string;
-    channelId: string | null;
-    saveHistory: boolean;
-    mentionAgents: boolean;
-    allowUserClose: boolean;
-    enableRating: boolean;
-    messagePayload: string | null;
-    buttonText: string;
-    buttonEmoji: string | null;
-    buttonStyle: string;
-    _count: {
-        tickets: number;
-    };
-};
-
-type ActiveCountRecord = {
-    categoryId: number;
-    _count: {
-        _all: number;
-    };
-};
-
-type PeriodTicketRecord = {
-    status: string;
-    createdAt: Date;
-    closedAt: Date | null;
-    rating: number | null;
-    categoryId: number | null;
-};
-
 export async function GET(request: NextRequest, { params }: { params: Promise<{ guildId: string }> }) {
     try {
         const { guildId } = await params;
@@ -58,25 +20,47 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
         const startDate = new Date();
         startDate.setDate(startDate.getDate() - days);
-        startDate.setHours(0, 0, 0, 0); // Start of day
+        startDate.setHours(0, 0, 0, 0);
 
-        // @ts-expect-error Legacy Prisma client in this workspace is behind the live DB schema.
-        const config = await prisma.ticketConfig.findUnique({ where: { guildId } }) as TicketConfigRecord | null;
-        // @ts-expect-error Legacy Prisma client in this workspace is behind the live DB schema.
-        const categories = await prisma.ticketCategory.findMany({
-            where: { guildId },
-            include: { _count: { select: { tickets: true } } }
-        }) as TicketCategoryRecord[];
+        const [
+            config,
+            categories,
+            priorities,
+            accessProfiles,
+            notificationRules,
+            activeCounts,
+            appealSettings,
+            rawChannels,
+            periodTickets,
+        ] = await Promise.all([
+            prisma.ticketConfig.findUnique({ where: { guildId } }),
+            prisma.ticketCategory.findMany({
+                where: { guildId },
+                include: {
+                    routingRule: true,
+                    _count: { select: { tickets: true } },
+                },
+            }),
+            prisma.ticketPriority.findMany({ where: { guildId }, orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }] }),
+            prisma.ticketAccessProfile.findMany({ where: { guildId }, orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }] }),
+            prisma.ticketNotificationRule.findMany({ where: { guildId }, orderBy: { id: 'asc' } }),
+            prisma.ticket.groupBy({
+                by: ['categoryId'],
+                where: { guildId, status: { in: ['OPEN', 'ON_HOLD'] } },
+                _count: { _all: true },
+            }),
+            readAppealSettings(guildId),
+            fetchGuildChannels(guildId).catch((error) => {
+                console.warn('Ticket workspace: Discord channels are temporarily unavailable', error);
+                return [];
+            }),
+            prisma.ticket.findMany({
+                where: { guildId, createdAt: { gte: startDate } },
+                select: { status: true, createdAt: true, closedAt: true, rating: true, categoryId: true },
+            }),
+        ]);
 
-        // 1. Calculate active tickets per category
-        // @ts-expect-error Legacy Prisma client in this workspace is behind the live DB schema.
-        const activeCounts = await prisma.ticket.groupBy({
-            by: ['categoryId'],
-            where: { guildId, status: 'OPEN' },
-            _count: { _all: true }
-        }) as ActiveCountRecord[];
-
-        const activeMap = new Map(activeCounts.map((count) => [count.categoryId, count._count._all]));
+        const activeMap = new Map(activeCounts.map((c) => [c.categoryId, c._count._all]));
 
         const categoriesWithStats = categories.map((cat) => ({
             ...cat,
@@ -86,7 +70,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
             }
         }));
 
-        const appealSettings = await readAppealSettings(guildId);
         const appealPlacementCategory = appealSettings.sharedPlacement.enabled
             ? {
                 id: -1,
@@ -98,7 +81,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
                 mentionAgents: false,
                 allowUserClose: false,
                 enableRating: false,
-                messagePayload: null,
+                messageText: appealSettings.sharedPlacement.description,
+                messageEmbeds: JSON.stringify([]),
+                messageDesignJson: null,
                 buttonText: appealSettings.sharedPlacement.label,
                 buttonEmoji: appealSettings.sharedPlacement.emoji,
                 buttonStyle: 'PRIMARY',
@@ -112,24 +97,11 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
             ? [...categoriesWithStats, appealPlacementCategory]
             : categoriesWithStats;
 
-        // Fetch Discord channels for selector
-        const rawChannels = await fetchGuildChannels(guildId);
-        const channels = parseChannels(rawChannels || []);
-
-        // 2. Global stats based on period
-        // @ts-expect-error Legacy Prisma client in this workspace is behind the live DB schema.
-        const periodTickets = await prisma.ticket.findMany({
-            where: {
-                guildId,
-                createdAt: { gte: startDate }
-            },
-            select: { status: true, createdAt: true, closedAt: true, rating: true, categoryId: true }
-        }) as PeriodTicketRecord[];
+        const channels = parseChannels(rawChannels || []).text;
 
         let open = 0, onHold = 0, closed = 0;
         let totalResolutionTime = 0;
         let resolvedCount = 0;
-
         const ratings = { positive: 0, neutral: 0, negative: 0, total: 0 };
         const categoryPieData: Record<string, number> = {};
 
@@ -151,7 +123,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
                 else ratings.negative++;
             }
 
-            const catName = categories.find((category) => category.id === ticket.categoryId)?.name || 'Unknown';
+            const catName = categories.find((c) => c.id === ticket.categoryId)?.name || 'Unknown';
             categoryPieData[catName] = (categoryPieData[catName] || 0) + 1;
         });
 
@@ -166,7 +138,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
             categoryPieData: Object.entries(categoryPieData).map(([name, value]) => ({ name, value }))
         };
 
-        // 3. Activity Chart Data (grouped by day)
         const activityData = Array.from({ length: days }, (_, i) => {
             const d = new Date(Date.now() - (days - 1 - i) * 24 * 60 * 60 * 1000);
             return {
@@ -180,21 +151,26 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
             const d = ticket.createdAt;
             const dateStr = `${d.getDate().toString().padStart(2, '0')}.${(d.getMonth() + 1).toString().padStart(2, '0')}`;
             const dayEntry = activityData.find(a => a.date === dateStr);
-            if (dayEntry) {
-                dayEntry.created++;
-            }
+            if (dayEntry) dayEntry.created++;
 
             if (ticket.status === 'CLOSED' && ticket.closedAt) {
                 const cd = ticket.closedAt;
                 const cdateStr = `${cd.getDate().toString().padStart(2, '0')}.${(cd.getMonth() + 1).toString().padStart(2, '0')}`;
                 const cdayEntry = activityData.find(a => a.date === cdateStr);
-                if (cdayEntry) {
-                    cdayEntry.solved++;
-                }
+                if (cdayEntry) cdayEntry.solved++;
             }
         });
 
-        return NextResponse.json({ config, categories: mergedCategories, channels, globalStats, activityData });
+        return NextResponse.json({
+            config,
+            categories: mergedCategories,
+            channels,
+            priorities,
+            accessProfiles,
+            notificationRules,
+            globalStats,
+            activityData,
+        });
     } catch (error: unknown) {
         console.error('Error fetching tickets:', error);
         const message = error instanceof Error ? error.message : 'Failed to load tickets';
@@ -217,23 +193,32 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             return NextResponse.json({ error: 'Name is required' }, { status: 400 });
         }
 
-        const defaultPayload = {
-            content: "",
-            embeds: [{
-                title: "Create Ticket",
-                description: "Click the button below to create a ticket.",
-                color: 5793266
-            }]
-        };
+        const defaultEmbeds = JSON.stringify([{
+            title: 'Create Ticket',
+            description: 'Click the button below to create a ticket.',
+            color: 5793266
+        }]);
+        const defaultDesignJson = JSON.stringify({
+            version: 1,
+            mode: 'classic_embed',
+            opener: { label: 'Create Ticket', emoji: null, style: 'PRIMARY' },
+            content: '',
+            embeds: JSON.parse(defaultEmbeds),
+        });
 
-        // @ts-expect-error Legacy Prisma client in this workspace is behind the live DB schema.
         const category = await prisma.ticketCategory.create({
             data: {
                 guildId,
                 name,
+                defaultPriorityId: await prisma.ticketPriority.findFirst({
+                    where: { guildId, isDefault: true, enabled: true },
+                    select: { id: true },
+                }).then((priority) => priority?.id ?? null),
                 buttonStyle: 'PRIMARY',
                 buttonText: 'Create Ticket',
-                messagePayload: JSON.stringify(defaultPayload),
+                messageText: null,
+                messageEmbeds: defaultEmbeds,
+                messageDesignJson: defaultDesignJson,
                 saveHistory: true,
                 mentionAgents: true,
                 allowUserClose: true,
@@ -256,14 +241,31 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
             return auth.response;
         }
 
-        const body = await request.json() as { enabled: boolean; logChannelId: string | null };
-        const { enabled, logChannelId } = body;
+        const body = await request.json() as {
+            enabled: boolean;
+            logChannelId: string | null;
+            maxOpenPerUser?: number;
+            cooldownSeconds?: number;
+            transcriptRetentionDays?: number;
+        };
 
-        // @ts-expect-error Legacy Prisma client in this workspace is behind the live DB schema.
         const config = await prisma.ticketConfig.upsert({
             where: { guildId },
-            update: { enabled, logChannelId },
-            create: { guildId, enabled, logChannelId }
+            update: {
+                enabled: body.enabled,
+                logChannelId: body.logChannelId,
+                ...(body.maxOpenPerUser !== undefined && { maxOpenPerUser: body.maxOpenPerUser }),
+                ...(body.cooldownSeconds !== undefined && { cooldownSeconds: body.cooldownSeconds }),
+                ...(body.transcriptRetentionDays !== undefined && { transcriptRetentionDays: body.transcriptRetentionDays }),
+            },
+            create: {
+                guildId,
+                enabled: body.enabled,
+                logChannelId: body.logChannelId,
+                maxOpenPerUser: body.maxOpenPerUser ?? 1,
+                cooldownSeconds: body.cooldownSeconds ?? 60,
+                transcriptRetentionDays: body.transcriptRetentionDays ?? 90,
+            }
         });
 
         return NextResponse.json({ config });

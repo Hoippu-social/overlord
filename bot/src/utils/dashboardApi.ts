@@ -4,14 +4,28 @@ import logger from './logger';
 import { prisma, statsPrisma } from './database';
 import { reviewAppealTicket } from '../services/AppealService';
 import { syncAppealPanels } from '../services/AppealInteractionService';
+import { sendTicketPanelPreview, syncAllTicketPanels, syncTicketPanel } from '../services/TicketPanelService';
 import { parseAuditRouteChannelIds, serializeAuditRouteChannelIds } from './auditRouteChannels';
 
 const PORT = Number.parseInt(process.env.DASHBOARD_API_PORT || '3002', 10);
 const API_KEY = process.env.DASHBOARD_API_KEY || '';
+const REQUIRE_API_KEY = process.env.NODE_ENV === 'production' || process.env.DASHBOARD_API_REQUIRE_KEY === 'true';
 
 function isLocalRequest(req: http.IncomingMessage) {
     const addr = req.socket.remoteAddress;
     return addr === '127.0.0.1' || addr === '::1' || addr === '::ffff:127.0.0.1';
+}
+
+async function validateGuildChannelIds(client: Client, guildId: string, channelIds: string[]) {
+    const guild = client.guilds.cache.get(guildId) ?? await client.guilds.fetch(guildId).catch(() => null);
+    if (!guild) return false;
+
+    for (const channelId of channelIds) {
+        const channel = guild.channels.cache.get(channelId) ?? await guild.channels.fetch(channelId).catch(() => null);
+        if (!channel) return false;
+    }
+
+    return true;
 }
 
 async function readBody(req: http.IncomingMessage) {
@@ -247,6 +261,12 @@ function searchGuildChannels(guild: any, rawQuery: string, limit: number) {
 }
 
 export function startDashboardApi(client: Client): http.Server {
+    if (!API_KEY && REQUIRE_API_KEY) {
+        logger.error('[DashboardAPI] DASHBOARD_API_KEY is not set; privileged dashboard API requests will be rejected.');
+    } else if (!API_KEY) {
+        logger.warn('[DashboardAPI] DASHBOARD_API_KEY is not set; accepting local development requests only.');
+    }
+
     const server = http.createServer(async (req, res) => {
         try {
             if (!isLocalRequest(req)) {
@@ -255,13 +275,17 @@ export function startDashboardApi(client: Client): http.Server {
                 return;
             }
 
-            if (API_KEY) {
-                const headerKey = req.headers['x-dashboard-key'];
-                if (!headerKey || headerKey !== API_KEY) {
-                    res.writeHead(401);
-                    res.end('Unauthorized');
-                    return;
-                }
+            if (!API_KEY && REQUIRE_API_KEY) {
+                res.writeHead(503);
+                res.end('Dashboard API key is not configured');
+                return;
+            }
+
+            const headerKey = req.headers['x-dashboard-key'];
+            if (API_KEY && headerKey !== API_KEY) {
+                res.writeHead(401);
+                res.end('Unauthorized');
+                return;
             }
 
             const url = new URL(req.url || '/', 'http://127.0.0.1');
@@ -563,6 +587,12 @@ export function startDashboardApi(client: Client): http.Server {
                         return;
                     }
 
+                    if (!await validateGuildChannelIds(client, guildId, channelIds)) {
+                        res.writeHead(400);
+                        res.end('channelIds must belong to the requested guild');
+                        return;
+                    }
+
                     const serializedChannelIds = serializeAuditRouteChannelIds(channelIds);
                     const routes = await prisma.$transaction(
                         tags.map((tag) =>
@@ -721,6 +751,264 @@ export function startDashboardApi(client: Client): http.Server {
                 }
             }
 
+            // --- Ticket Module Bridge ---
+
+            if (url.pathname === '/api/tickets/sync-panel') {
+                if (req.method !== 'POST') { res.writeHead(405); res.end('Method Not Allowed'); return; }
+                const raw = await readBody(req);
+                const body = raw ? JSON.parse(raw) : {};
+                const guildId = typeof body.guildId === 'string' ? body.guildId : '';
+                const categoryId = typeof body.categoryId === 'number' ? body.categoryId : null;
+                if (!guildId) { res.writeHead(400); res.end('guildId is required'); return; }
+                try {
+                    if (categoryId !== null) {
+                        const result = await syncTicketPanel(client, guildId, categoryId);
+                        res.writeHead(200, { 'Content-Type': 'application/json' });
+                        res.end(JSON.stringify({ ok: true, results: [result] }));
+                    } else {
+                        await syncAllTicketPanels(client, guildId);
+                        res.writeHead(200, { 'Content-Type': 'application/json' });
+                        res.end(JSON.stringify({ ok: true, results: [] }));
+                    }
+                } catch (error) {
+                    const message = error instanceof Error ? error.message : 'Failed to sync ticket panel';
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ ok: false, error: message }));
+                }
+                return;
+            }
+
+            if (url.pathname === '/api/tickets/preview-panel') {
+                if (req.method !== 'POST') { res.writeHead(405); res.end('Method Not Allowed'); return; }
+                const raw = await readBody(req);
+                const body = raw ? JSON.parse(raw) : {};
+                const guildId = typeof body.guildId === 'string' ? body.guildId : '';
+                const categoryId = typeof body.categoryId === 'number' ? body.categoryId : null;
+                const channelId = typeof body.channelId === 'string' && body.channelId.trim() ? body.channelId.trim() : null;
+                const messageDesignJson = typeof body.messageDesignJson === 'string' ? body.messageDesignJson : null;
+                if (!guildId || categoryId === null) { res.writeHead(400); res.end('guildId and categoryId are required'); return; }
+                try {
+                    const result = await sendTicketPanelPreview(client, guildId, categoryId, messageDesignJson, channelId);
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ ok: true, ...result }));
+                } catch (error) {
+                    const message = error instanceof Error ? error.message : 'Failed to send ticket panel preview';
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ ok: false, error: message }));
+                }
+                return;
+            }
+
+            if (url.pathname === '/api/tickets/close') {
+                if (req.method !== 'POST') { res.writeHead(405); res.end('Method Not Allowed'); return; }
+                const raw = await readBody(req);
+                const body = raw ? JSON.parse(raw) : {};
+                const { guildId, ticketId, reason } = body as { guildId: string; ticketId: number; reason?: string };
+                if (!guildId || !ticketId) { res.writeHead(400); res.end('guildId and ticketId required'); return; }
+                try {
+                    const guild = client.guilds.cache.get(guildId) ?? await client.guilds.fetch(guildId);
+                    const { closeTicket } = await import('../services/TicketService');
+                    await closeTicket({ client, guild, ticketId, actorId: 'dashboard', reason: reason ?? null });
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ ok: true }));
+                } catch (error) {
+                    const message = error instanceof Error ? error.message : 'Failed';
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ ok: false, error: message }));
+                }
+                return;
+            }
+
+            if (url.pathname === '/api/tickets/action') {
+                if (req.method !== 'POST') { res.writeHead(405); res.end('Method Not Allowed'); return; }
+                const raw = await readBody(req);
+                const body = raw ? JSON.parse(raw) : {};
+                const { guildId, ticketId, action, actorId } = body as { guildId: string; ticketId: number; action: string; actorId?: string };
+                if (!guildId || !ticketId || !action) { res.writeHead(400); res.end('guildId, ticketId, action required'); return; }
+                try {
+                    const guild = client.guilds.cache.get(guildId) ?? await client.guilds.fetch(guildId);
+                    const svc = await import('../services/TicketService');
+                    const opts = { client, guild, ticketId, actorId: actorId ?? 'dashboard' };
+                    if (action === 'claim') await svc.claimTicket(opts);
+                    else if (action === 'unclaim') await svc.unclaimTicket(opts);
+                    else if (action === 'hold') await svc.setTicketOnHold(opts);
+                    else if (action === 'resume') await svc.resumeTicket(opts);
+                    else if (action === 'reopen') await svc.reopenTicket(opts);
+                    else { res.writeHead(400); res.end('Unknown action'); return; }
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ ok: true }));
+                } catch (error) {
+                    const message = error instanceof Error ? error.message : 'Failed';
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ ok: false, error: message }));
+                }
+                return;
+            }
+
+            if (url.pathname === '/api/tickets/priority') {
+                if (req.method !== 'POST') { res.writeHead(405); res.end('Method Not Allowed'); return; }
+                const raw = await readBody(req);
+                const body = raw ? JSON.parse(raw) : {};
+                const { guildId, ticketId, priorityId, actorId } = body as { guildId: string; ticketId: number; priorityId: number; actorId?: string };
+                if (!guildId || !ticketId || !priorityId) { res.writeHead(400); res.end('guildId, ticketId, priorityId required'); return; }
+                try {
+                    const guild = client.guilds.cache.get(guildId) ?? await client.guilds.fetch(guildId);
+                    const svc = await import('../services/TicketSaasService');
+                    await svc.setTicketPriority({ guildId, ticketId, priorityId, actorId: actorId ?? 'dashboard' });
+                    await svc.notifyTicketEvent(client, guild, ticketId, 'PRIORITY_CHANGED');
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ ok: true }));
+                } catch (error) {
+                    const message = error instanceof Error ? error.message : 'Failed';
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ ok: false, error: message }));
+                }
+                return;
+            }
+
+            if (url.pathname === '/api/tickets/transfer') {
+                if (req.method !== 'POST') { res.writeHead(405); res.end('Method Not Allowed'); return; }
+                const raw = await readBody(req);
+                const body = raw ? JSON.parse(raw) : {};
+                const { guildId, ticketId, fromUserId, toUserId, note } = body as { guildId: string; ticketId: number; fromUserId?: string; toUserId?: string; note?: string };
+                if (!guildId || !ticketId || !fromUserId || !toUserId) { res.writeHead(400); res.end('guildId, ticketId, fromUserId, toUserId required'); return; }
+                try {
+                    const guild = client.guilds.cache.get(guildId) ?? await client.guilds.fetch(guildId);
+                    const svc = await import('../services/TicketSaasService');
+                    const request = await svc.createTransferRequest({ guildId, ticketId, fromUserId, toUserId, note: note ?? null });
+                    await svc.postTransferRequestPrompt(guild, ticketId, request.id);
+                    await svc.notifyTicketEvent(client, guild, ticketId, 'TRANSFER_REQUESTED');
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ ok: true, request }));
+                } catch (error) {
+                    const message = error instanceof Error ? error.message : 'Failed';
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ ok: false, error: message }));
+                }
+                return;
+            }
+
+            if (url.pathname === '/api/tickets/transfer/resolve') {
+                if (req.method !== 'POST') { res.writeHead(405); res.end('Method Not Allowed'); return; }
+                const raw = await readBody(req);
+                const body = raw ? JSON.parse(raw) : {};
+                const { guildId, ticketId, requestId, actorId, accept } = body as { guildId: string; ticketId: number; requestId: number; actorId?: string; accept?: boolean };
+                if (!guildId || !ticketId || !requestId || !actorId || typeof accept !== 'boolean') { res.writeHead(400); res.end('guildId, ticketId, requestId, actorId, accept required'); return; }
+                try {
+                    const guild = client.guilds.cache.get(guildId) ?? await client.guilds.fetch(guildId);
+                    const svc = await import('../services/TicketSaasService');
+                    const request = await prisma.ticketTransferRequest.findFirst({ where: { id: requestId, guildId, ticketId } });
+                    await svc.resolveTransferRequest({ guildId, ticketId, requestId, actorId, accept });
+                    if (accept && request) {
+                        await svc.applyTransferThreadAccess(guild, ticketId, request.fromUserId, request.toUserId);
+                    }
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ ok: true }));
+                } catch (error) {
+                    const message = error instanceof Error ? error.message : 'Failed';
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ ok: false, error: message }));
+                }
+                return;
+            }
+
+            if (url.pathname === '/api/tickets/note') {
+                if (req.method !== 'POST') { res.writeHead(405); res.end('Method Not Allowed'); return; }
+                const raw = await readBody(req);
+                const body = raw ? JSON.parse(raw) : {};
+                const { guildId, ticketId, authorId, body: noteBody } = body as { guildId: string; ticketId: number; authorId?: string; body?: string };
+                if (!guildId || !ticketId || !authorId || !noteBody?.trim()) { res.writeHead(400); res.end('guildId, ticketId, authorId, body required'); return; }
+                try {
+                    const svc = await import('../services/TicketSaasService');
+                    const note = await svc.addTicketInternalNote({ guildId, ticketId, authorId, body: noteBody.trim() });
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ ok: true, note }));
+                } catch (error) {
+                    const message = error instanceof Error ? error.message : 'Failed';
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ ok: false, error: message }));
+                }
+                return;
+            }
+
+            if (url.pathname === '/api/economy/grant') {
+                if (req.method !== 'POST') { res.writeHead(405); res.end('Method Not Allowed'); return; }
+                const raw = await readBody(req);
+                const body = raw ? JSON.parse(raw) : {};
+                const { guildId, userId, account, amount, reason, mode, actorId } = body as { guildId: string; userId: string; account: 'WALLET' | 'BANK'; amount: string | number; reason?: string; mode: 'grant' | 'deduct'; actorId?: string };
+                if (!guildId || !userId || !account || amount === undefined || !mode) { res.writeHead(400); res.end('guildId, userId, account, amount, mode required'); return; }
+                try {
+                    const { EconomyService } = await import('../services/EconomyService');
+                    const params = {
+                        guildId,
+                        userId,
+                        account,
+                        amount: BigInt(amount),
+                        type: (mode === 'grant' ? 'ADMIN_GRANT' : 'ADMIN_DEDUCT') as 'ADMIN_GRANT' | 'ADMIN_DEDUCT',
+                        actorId: actorId ?? 'dashboard',
+                        metadata: reason ? { reason } : undefined,
+                    };
+                    const result = mode === 'grant'
+                        ? await EconomyService.credit(params, client)
+                        : await EconomyService.debit(params, client);
+                    if (!result.ok) {
+                        res.writeHead(200, { 'Content-Type': 'application/json' });
+                        res.end(JSON.stringify({ ok: false, error: result.reason }));
+                        return;
+                    }
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ ok: true }));
+                } catch (error) {
+                    const message = error instanceof Error ? error.message : 'Failed';
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ ok: false, error: message }));
+                }
+                return;
+            }
+
+            if (url.pathname === '/api/economy/season-end') {
+                if (req.method !== 'POST') { res.writeHead(405); res.end('Method Not Allowed'); return; }
+                const raw = await readBody(req);
+                const body = raw ? JSON.parse(raw) : {};
+                const { guildId, resetBalances } = body as { guildId: string; resetBalances?: boolean };
+                if (!guildId) { res.writeHead(400); res.end('guildId required'); return; }
+                try {
+                    const { EconomySeasonService } = await import('../services/EconomySeasonService');
+                    const result = await EconomySeasonService.endSeason(guildId, { resetBalances: !!resetBalances, client });
+                    if (!result.ok) {
+                        res.writeHead(200, { 'Content-Type': 'application/json' });
+                        res.end(JSON.stringify({ ok: false, error: result.reason }));
+                        return;
+                    }
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ ok: true }));
+                } catch (error) {
+                    const message = error instanceof Error ? error.message : 'Failed';
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ ok: false, error: message }));
+                }
+                return;
+            }
+
+            if (url.pathname === '/api/economy/invalidate-cache') {
+                if (req.method !== 'POST') { res.writeHead(405); res.end('Method Not Allowed'); return; }
+                const raw = await readBody(req);
+                const body = raw ? JSON.parse(raw) : {};
+                const { guildId } = body as { guildId: string };
+                if (!guildId) { res.writeHead(400); res.end('guildId required'); return; }
+                try {
+                    const { EconomyService } = await import('../services/EconomyService');
+                    EconomyService.invalidateCache(guildId);
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ ok: true }));
+                } catch (error) {
+                    const message = error instanceof Error ? error.message : 'Failed';
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ ok: false, error: message }));
+                }
+                return;
+            }
+
             if (url.pathname === '/api/enrich') {
                 if (req.method !== 'POST') {
                     res.writeHead(405);
@@ -750,7 +1038,7 @@ export function startDashboardApi(client: Client): http.Server {
                         // Try guild member first (get server nickname)
                         let member = guild?.members.cache.get(userId);
                         if (!member && guild) {
-                            try { member = await guild.members.fetch(userId); } catch { }
+                            try { member = await guild.members.fetch(userId); } catch { /* member left the guild — fall through to user lookup */ }
                         }
 
                         if (member) {
@@ -799,7 +1087,7 @@ export function startDashboardApi(client: Client): http.Server {
 
                 // Resolve channels
                 for (const channelId of channelIds) {
-                    const channel = guild?.channels.cache.get(channelId) || client.channels.cache.get(channelId);
+                    const channel = guild?.channels.cache.get(channelId);
                     if (channel && 'name' in channel) {
                         channels[channelId] = {
                             id: channelId,
@@ -911,12 +1199,12 @@ export function startDashboardApi(client: Client): http.Server {
                     });
 
                     const sendEvent = (data: any) => {
-                        try { res.write(`data: ${JSON.stringify(data)}\n\n`); } catch { }
+                        try { res.write(`data: ${JSON.stringify(data)}\n\n`); } catch { /* client disconnected */ }
                     };
 
                     // Heartbeat to keep connection alive during long syncs
                     const heartbeat = setInterval(() => {
-                        try { res.write(': heartbeat\n\n'); } catch { }
+                        try { res.write(': heartbeat\n\n'); } catch { /* client disconnected */ }
                     }, 15_000);
 
                     try {

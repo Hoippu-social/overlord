@@ -5,9 +5,17 @@ import path from 'path';
 
 type DiscordChannel = {
     id: string | number;
+    name?: string | null;
     parentId?: string | number | null;
     type?: string | number | null;
     position?: number | null;
+};
+
+type DiscordEmoji = {
+    id: string | number;
+    name?: string | null;
+    animated?: boolean | null;
+    available?: boolean | null;
 };
 
 const DISCORD_API = 'https://discord.com/api/v10';
@@ -28,7 +36,9 @@ export function getBotToken() {
                 dotenv.config({ path: p, override: true });
                 if (process.env.DISCORD_TOKEN) return process.env.DISCORD_TOKEN;
             }
-        } catch { }
+        } catch {
+            // Best-effort: this candidate .env path is unreadable, try the next one.
+        }
     }
 
     throw new Error('DISCORD_TOKEN is not configured on dashboard');
@@ -60,6 +70,12 @@ export async function discordRequest(method: string, path: string, token: string
 export async function fetchGuildChannels(guildId: string) {
     const token = getBotToken();
     return await discordRequest('GET', `/guilds/${guildId}/channels`, token);
+}
+
+export async function fetchGuildEmojis(guildId: string): Promise<DiscordEmoji[]> {
+    const token = getBotToken();
+    const emojis = await discordRequest('GET', `/guilds/${guildId}/emojis`, token);
+    return Array.isArray(emojis) ? emojis as DiscordEmoji[] : [];
 }
 
 export function parseChannels(channels: DiscordChannel[]) {

@@ -1,11 +1,10 @@
 const path = require('path');
 const dotenv = require('dotenv');
 const { PrismaClient } = require('@prisma/client');
+const { PrismaClient: StatsPgPrismaClient } = require('../src/generated/stats-pg-client');
 const { toZonedTime, fromZonedTime } = require('date-fns-tz');
 
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
-
-const DEFAULT_STATS_DB_PATH = path.resolve(__dirname, '../../bot/prisma/stats.db');
 
 function getArg(name) {
     const prefix = `--${name}=`;
@@ -13,11 +12,11 @@ function getArg(name) {
     return match ? match.slice(prefix.length) : undefined;
 }
 
-function buildStatsUrl(statsPath) {
-    if (statsPath.startsWith('file:')) {
-        return statsPath;
+function getStatsPgUrl() {
+    if (!process.env.STATS_PG_DATABASE_URL) {
+        throw new Error('STATS_PG_DATABASE_URL is not configured');
     }
-    return `file:${path.resolve(statsPath)}`;
+    return process.env.STATS_PG_DATABASE_URL;
 }
 
 function normalizeDateValue(value) {
@@ -57,10 +56,8 @@ async function getGuildIds(statsPrisma, targetGuildId) {
 }
 
 async function main() {
-    const statsPathArg = getArg('stats-path');
     const targetGuildId = getArg('guild');
     const mark = getArg('mark') !== 'false';
-    const statsUrl = buildStatsUrl(statsPathArg || DEFAULT_STATS_DB_PATH);
 
     const appPrisma = new PrismaClient({
         datasources: {
@@ -70,10 +67,10 @@ async function main() {
         },
     });
 
-    const statsPrisma = new PrismaClient({
+    const statsPrisma = new StatsPgPrismaClient({
         datasources: {
             db: {
-                url: statsUrl,
+                url: getStatsPgUrl(),
             },
         },
     });

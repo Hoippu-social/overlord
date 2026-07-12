@@ -1,13 +1,14 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { CheckCircle, Keyboard, Prohibit, ShieldCheck, WarningCircle } from '@phosphor-icons/react';
+import { CheckCircle, Prohibit, ShieldCheck, WarningCircle } from '@phosphor-icons/react';
 import { useGuildLocale } from '@/lib/i18n';
 import { ConfigState } from '@/app/dashboard/[guildId]/moderation/types';
 import { emptyConfig } from '@/app/dashboard/[guildId]/moderation/constants';
 import { buildConfigStateFromResponse, buildModerationSavePayload } from '@/app/dashboard/[guildId]/moderation/configState';
 import { CommandOverridesPanel } from '@/components/commands/CommandOverridesPanel';
 import { FloatingSaveBar } from '@/components/common/FloatingSaveBar';
+import { LoadingSkeleton } from '@/components/common/LoadingSkeleton';
 import { AnimatedCard, Badge, MultiSelectField } from '@/components/moderation/ui';
 import { buildChannelSelectOptions } from '@/lib/channelSelectOptions';
 
@@ -273,16 +274,17 @@ export default function CommandsPage({ params }: { params: Promise<{ guildId: st
 
     if (loading) {
         return (
-            <div className="flex h-[400px] w-full animate-pulse flex-col items-center justify-center gap-4">
-                <Keyboard size={48} className="text-[var(--color-primary-1)] opacity-50" />
-                <p className="text-sm font-semibold tracking-wide text-[var(--text-muted)]">{text.loading}</p>
+            <div className="flex h-[400px] w-full flex-col items-center justify-center gap-4">
+                <LoadingSkeleton className="h-14 w-14 rounded-2xl" />
+                <LoadingSkeleton className="h-4 w-56 rounded-full" />
+                <p className="sr-only">{text.loading}</p>
             </div>
         );
     }
 
     return (
         <div className="relative mx-auto flex w-full max-w-[1500px] flex-col gap-6 animate-fade-in pb-32 pt-6">
-            <div className="px-2 md:px-6">
+            <div className="px-2 md:px-6" data-tour="commands-channel-mode">
                 <AnimatedCard
                     title={tr('Каналы для команд', 'Command channels')}
                     subtitle={
@@ -313,7 +315,7 @@ export default function CommandsPage({ params }: { params: Promise<{ guildId: st
                                 </div>
                             </div>
 
-                            <div className="inline-flex items-center rounded-2xl border border-white/10 bg-black/30 p-1 shadow-inner">
+                            <div className="inline-flex items-center rounded-2xl border border-white/10 bg-black/30 p-1 shadow-inner" data-tour="commands-mode-toggle">
                                 <button
                                     type="button"
                                     onClick={() => setBotSettings((current) => ({ ...current, commandChannelMode: 'whitelist' }))}
@@ -356,7 +358,7 @@ export default function CommandsPage({ params }: { params: Promise<{ guildId: st
                 </div>
             ) : null}
 
-            <div className="px-2 md:px-6">
+            <div className="px-2 md:px-6" data-tour="commands-overrides">
                 <CommandOverridesPanel
                     config={config}
                     setConfig={setConfig}

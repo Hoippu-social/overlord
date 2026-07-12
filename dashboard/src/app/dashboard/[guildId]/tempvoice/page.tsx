@@ -395,7 +395,7 @@ export default function TempVoicePage({ params }: { params: Promise<{ guildId: s
                         <p className="text-[var(--text-muted)] text-sm mt-0.5">{text.subtitle}</p>
                     </div>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3" data-tour="tempvoice-header-actions">
                     {config && (
                         <div className="px-3 py-1.5 rounded-full bg-[var(--color-primary-1)]/10 border border-[var(--color-primary-1)]/20 text-[var(--color-primary-1)] flex items-center gap-2 text-xs font-bold shadow-sm">
                             <span className="relative flex h-2 w-2">
@@ -426,7 +426,7 @@ export default function TempVoicePage({ params }: { params: Promise<{ guildId: s
 
                 {/* Column 1: Infrastructure (Jira Ticket Like) */}
                 <div className="lg:col-span-2 space-y-6">
-                    <div className={cardClass}>
+                    <div className={cardClass} data-tour="tempvoice-infrastructure">
                         <div className="flex items-center justify-between mb-8 border-b border-[var(--border-divider)] pb-6">
                             <div className="flex items-center gap-4">
                                 <div className={`${headerIconClass} bg-[#3b82f6]/10 text-[#3b82f6]`}>
@@ -438,7 +438,7 @@ export default function TempVoicePage({ params }: { params: Promise<{ guildId: s
                                 </div>
                             </div>
 
-                            <div className="flex bg-[var(--surface-hover)] p-1 rounded-xl border border-[var(--border-divider)]">
+                            <div className="flex bg-[var(--surface-hover)] p-1 rounded-xl border border-[var(--border-divider)]" data-tour="tempvoice-mode">
                                 <button
                                     onClick={() => setMode('create')}
                                     className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${mode === 'create' ? 'bg-[var(--surface-card)] text-white shadow-sm' : 'text-[var(--text-muted)] hover:text-white'}`}
@@ -536,7 +536,7 @@ export default function TempVoicePage({ params }: { params: Promise<{ guildId: s
                     </div>
 
                     {/* Room Settings */}
-                    <div className={cardClass}>
+                    <div className={cardClass} data-tour="tempvoice-room-settings">
                         <div className="flex items-center gap-4 mb-6 border-b border-[var(--border-divider)] pb-4">
                             <div className={`${headerIconClass} bg-[var(--color-warning)]/10 text-[var(--color-warning)]`}>
                                 <GearSix size={20} weight="duotone" />
@@ -594,7 +594,7 @@ export default function TempVoicePage({ params }: { params: Promise<{ guildId: s
                 {/* Column 2: Status & Dangerous Actions */}
                 <div className="space-y-6">
                     {/* Metrics/Status Card */}
-                    <div className={`${cardClass} bg-[#111] overflow-hidden relative`}>
+                    <div className={`${cardClass} bg-[#111] overflow-hidden relative`} data-tour="tempvoice-status">
                         {/* Decorative background pulse if rooms exist */}
                         {roomsCount > 0 && <div className="absolute top-0 right-0 -mr-6 -mt-6 w-32 h-32 bg-[var(--color-primary-1)]/10 blur-[40px] rounded-full point-events-none" />}
 

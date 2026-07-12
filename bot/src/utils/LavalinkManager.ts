@@ -11,10 +11,15 @@ declare module 'lavalink-client' {
 }
 
 export function initializeLavalink(client: Client) {
+    const lavalinkPassword = process.env.LAVALINK_PASSWORD;
+    if (!lavalinkPassword) {
+        throw new Error('LAVALINK_PASSWORD is not configured');
+    }
+
     client.lavalink = new LavalinkManager({
         nodes: [
             {
-                authorization: process.env.LAVALINK_PASSWORD || 'youshallnotpass',
+                authorization: lavalinkPassword,
                 host: process.env.LAVALINK_HOST || 'localhost',
                 port: parseInt(process.env.LAVALINK_PORT || '2333'),
                 id: 'LocalNode',

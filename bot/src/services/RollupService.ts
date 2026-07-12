@@ -9,7 +9,7 @@ import { BackupService } from './BackupService';
  * 2. Top rankings recalculation for all dashboard periods (hourly + daily)
  * 3. Daily maintenance: 90D/180D/ALL tops, backup, 2-year TTL rotation
  *
- * All data is written exclusively to stats.db (statsPrisma).
+ * All data is written exclusively to PostgreSQL stats storage (statsPrisma).
  */
 
 // Dashboard periods and their day windows

@@ -110,7 +110,7 @@ export default function MembersPage() {
             />
 
             {/* Summary Cards */}
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 sm:gap-4 lg:gap-6">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 sm:gap-4 lg:gap-6" data-tour="stats-members-cards">
                 <StatsCard
                     title={text.totalMembers}
                     value={formatLocaleNumber(stats.total, locale)}
@@ -142,7 +142,7 @@ export default function MembersPage() {
             </div>
 
             {/* Growth & Activity Charts */}
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 sm:gap-6">
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 sm:gap-6" data-tour="stats-members-chart">
                 <ChartContainer title={text.memberGrowth} loading={loading} height={380}>
                     <ResponsiveContainer width="100%" height="100%">
                         <AreaChart data={growthData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>

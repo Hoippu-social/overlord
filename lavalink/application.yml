@@ -1,6 +1,6 @@
 server: # REST and WS server
   port: 2334
-  address: 0.0.0.0
+  address: 127.0.0.1
 lavalink:
   plugins:
     - dependency: "dev.lavalink.youtube:youtube-plugin:1.18.0"
@@ -8,7 +8,7 @@ lavalink:
     - dependency: "com.github.topi314.lavasrc:lavasrc-plugin:4.8.1"
       repository: "https://maven.lavalink.dev/releases"
   server:
-    password: "youshallnotpass"
+    password: "${LAVALINK_PASSWORD}"
     sources:
       youtube: false # Disabled to use the plugin
       bandcamp: true
@@ -84,8 +84,8 @@ plugins:
       flowerytts: false
       youtube: false
     spotify:
-      clientId: "72d3f66d0cc042dfac49e132c3ad912d"
-      clientSecret: "d6b13c9bf6a84374bdcada20ca7b43b6"
+      clientId: "${LAVASRC_SPOTIFY_CLIENT_ID}"
+      clientSecret: "${LAVASRC_SPOTIFY_CLIENT_SECRET}"
       countryCode: "US"
       playlistLoadLimit: 6
       albumLoadLimit: 6

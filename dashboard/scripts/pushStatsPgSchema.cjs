@@ -1,11 +1,11 @@
 const path = require('path');
 const { spawnSync } = require('child_process');
-const { getTargetStatsPgUrl, loadEnv } = require('./lib/statsPgMigration.cjs');
+const { getStatsPostgresUrl, loadEnv } = require('./lib/postgresOnly.cjs');
 
 function main() {
     loadEnv();
 
-    if (!getTargetStatsPgUrl()) {
+    if (!getStatsPostgresUrl()) {
         throw new Error('STATS_PG_DATABASE_URL is not configured');
     }
 

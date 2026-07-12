@@ -38,8 +38,8 @@ export function RetentionTab({ config, setConfig, locale, tr }: RetentionTabProp
     // Let's just render whatever is in the config + add button.
     
     return (
-        <div className="space-y-6">
-            <SectionCard 
+        <div className="space-y-6" data-tour="mod-retention">
+            <SectionCard
                 title={tr('Хранение данных (Retention)', 'Data Retention')} 
                 subtitle={tr('Управляйте тем, как долго бот хранит различные типы модератских логов.', 'Manage how long the bot retains different types of moderation logs.')}
             >

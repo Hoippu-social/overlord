@@ -6,7 +6,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -39,7 +39,8 @@ model Guild {
   nowPlaying        MusicNowPlaying?
   tempVoiceConfig   TempVoiceConfig?
   userVoiceSettings UserVoiceSettings[]
-
+  ticketConfig      TicketConfig?
+  tickets           Ticket[]
 }
 
 model BotSettings {
@@ -89,6 +90,7 @@ model ModerationConfig {
   ignoredRoles        String?
   ignoredUsers        String?
   commandOnlyChannels String?
+  commandRules        String?
   aiProvider          String?
   aiModel             String?
   aiDefaultThreshold  Int      @default(80)
@@ -141,15 +143,20 @@ model ModerationCase {
 }
 
 model AppealConfig {
-  id                Int      @id @default(autoincrement())
-  guildId           String   @unique
-  enabled           Boolean  @default(false)
-  appealChannelId   String?
-  pardonLogChannelId String?
-  allowUserAppeals  Boolean  @default(true)
-  allowDirectPardon Boolean  @default(true)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id                       Int      @id @default(autoincrement())
+  guildId                  String   @unique
+  enabled                  Boolean  @default(false)
+  appealChannelId          String?
+  pardonLogChannelId       String?
+  allowUserAppeals         Boolean  @default(true)
+  allowDirectPardon        Boolean  @default(true)
+  settingsJson             String?
+  panelChannelId           String?
+  panelMessageId           String?
+  sharedPanelChannelId     String?
+  sharedPanelMessageId     String?
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
 }
 
 model AppealTicket {
@@ -164,13 +171,31 @@ model AppealTicket {
   resolutionNote String?
   reviewerId     String?
   reviewedAt     DateTime?
+  threadChannelId String?
+  threadMessageId String?
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
   moderationCase ModerationCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  events         AppealEvent[]
 
   @@index([guildId, status, createdAt])
   @@index([guildId, userId, createdAt])
   @@index([caseId, createdAt])
+}
+
+model AppealEvent {
+  id          Int          @id @default(autoincrement())
+  guildId     String
+  ticketId    Int
+  eventType   String
+  actorUserId String?
+  note        String?
+  payload     String?
+  createdAt   DateTime     @default(now())
+  ticket      AppealTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId, createdAt])
+  @@index([guildId, createdAt])
 }
 
 model RetentionPolicy {
@@ -659,4 +684,300 @@ model StatsJob {
   @@index([guildId, status, createdAt])
 }
 
+// --- Tickets Module ---
 
+model TicketConfig {
+  id                      Int      @id @default(autoincrement())
+  guildId                 String   @unique
+  guild                   Guild    @relation(fields: [guildId], references: [id])
+  enabled                 Boolean  @default(true)
+  logChannelId            String?
+  maxOpenPerUser          Int      @default(1)
+  cooldownSeconds         Int      @default(60)
+  transcriptRetentionDays Int      @default(90)
+  nextTicketNumber        Int      @default(1)
+  blacklist               String?  // JSON: [{ userId, reason, addedBy, addedAt }]
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+}
+
+model TicketCategory {
+  id              Int      @id @default(autoincrement())
+  guildId         String
+  name            String
+  channelId       String?  // panel text channel; threads are created here
+  panelMessageId  String?
+  assignedRoleId  String?
+  assignedTemplateId Int?
+  defaultPriorityId Int?
+  nameTemplate    String   @default("ticket-{number}") // supports {number}, {user}
+  closeAction     String   @default("ARCHIVE")         // ARCHIVE | DELETE
+  autoDeleteHours Int?     // ARCHIVE only: hours after close before auto-delete; null = never
+  saveHistory     Boolean  @default(false)
+  mentionAgents   Boolean  @default(true)
+  allowUserClose  Boolean  @default(true)
+  splitLogs       Boolean  @default(false)
+  enableRating    Boolean  @default(false)
+  agentRoles      String?  // JSON: string[]
+  messageText     String?
+  messageEmbeds   String?  // JSON: embed objects
+  messageDesignJson String?
+  buttonText      String   @default("Create Ticket")
+  buttonEmoji     String?
+  buttonStyle     String   @default("PRIMARY")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  forms           TicketFormQuestion[]
+  items           TicketItem[]
+  tickets         Ticket[]
+  routingRule     TicketCategoryRoutingRule?
+
+  @@index([guildId])
+}
+
+model TicketItem {
+  id            Int            @id @default(autoincrement())
+  categoryId    Int
+  category      TicketCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  type          String         // DEPARTMENT | REPLY
+  label         String
+  description   String?
+  emoji         String?
+  replyContent  String?
+  agentRoles    String?        // JSON: string[]
+  requiredRoles String?        // JSON: string[]
+}
+
+model TicketFormQuestion {
+  id          Int            @id @default(autoincrement())
+  categoryId  Int
+  category    TicketCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  label       String
+  type        String         // TEXT | PARAGRAPH | NUMBER | SELECT
+  required    Boolean        @default(true)
+  placeholder String?
+  order       Int            @default(0)
+}
+
+model Ticket {
+  id              Int            @id @default(autoincrement())
+  guildId         String
+  guild           Guild          @relation(fields: [guildId], references: [id])
+  number          Int
+  threadId        String         @unique
+  categoryId      Int
+  category        TicketCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  itemId          Int?
+  authorId        String
+  claimedBy       String?
+  priorityId      Int?
+  priority        TicketPriority? @relation(fields: [priorityId], references: [id], onDelete: SetNull)
+  assignedRoleId  String?
+  assignedTemplateId Int?
+  responsibleUserId String?
+  previousResponsibleUserId String?
+  transferState   String         @default("NONE") // NONE | PENDING | ACCEPTED | DECLINED | EXPIRED
+  transferRequestedBy String?
+  transferRequestedTo String?
+  transferRequestedAt DateTime?
+  transferResolvedAt DateTime?
+  status          String         @default("OPEN") // OPEN | ON_HOLD | CLOSED
+  formAnswers     String?        // JSON: [{ label, answer }]
+  participants    String?        // JSON: string[]
+  closedBy        String?
+  closeReason     String?
+  lastActivityAt  DateTime       @default(now())
+  firstResponseAt DateTime?
+  lastStaffResponseAt DateTime?
+  slaFirstResponseDueAt DateTime?
+  slaResolutionDueAt DateTime?
+  slaState        String         @default("OK") // OK | DUE_SOON | BREACHED | PAUSED
+  tags            String?        // JSON: string[]
+  source          String         @default("DISCORD")
+  transcript      String?
+  transcriptToken String?        @unique
+  deleteAfterAt   DateTime?
+  rating          Int?
+  createdAt       DateTime       @default(now())
+  closedAt        DateTime?
+  internalNotes   TicketInternalNote[]
+  transferRequests TicketTransferRequest[]
+
+  @@unique([guildId, number])
+  @@index([guildId, status, createdAt])
+  @@index([guildId, authorId, status])
+  @@index([guildId, responsibleUserId, status])
+  @@index([guildId, priorityId, status])
+  @@index([guildId, transferState])
+}
+
+model TicketEvent {
+  id          Int      @id @default(autoincrement())
+  guildId     String
+  ticketId    Int
+  eventType   String   // CREATED|CLAIMED|UNCLAIMED|ON_HOLD|RESUMED|CLOSED|REOPENED|USER_ADDED|USER_REMOVED|RENAMED|RATED|NOTE
+  actorUserId String?
+  note        String?
+  payload     String?
+  createdAt   DateTime @default(now())
+
+  @@index([ticketId, createdAt])
+  @@index([guildId, createdAt])
+}
+
+model TicketPriority {
+  id                   Int      @id @default(autoincrement())
+  guildId              String
+  key                  String
+  name                 String
+  color                String   @default("#64748b")
+  sortOrder            Int      @default(0)
+  enabled              Boolean  @default(true)
+  isDefault            Boolean  @default(false)
+  firstResponseMinutes Int?
+  resolutionMinutes    Int?
+  firstResponseSeconds Int?
+  resolutionSeconds    Int?
+  notifyRoleIds        String?  // JSON: string[]
+  escalationRoleIds    String?  // JSON: string[]
+  forceNotify          Boolean  @default(false)
+  requiresReview       Boolean  @default(false)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  tickets              Ticket[]
+
+  @@unique([guildId, key])
+  @@index([guildId, enabled, sortOrder])
+}
+
+model TicketAccessProfile {
+  id            Int      @id @default(autoincrement())
+  guildId       String
+  name          String
+  roleIds       String?  // JSON: string[]
+  permissions   String   // JSON: permission keys
+  dashboardHomeOnly Boolean @default(false)
+  enabled       Boolean  @default(true)
+  sortOrder     Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([guildId, enabled, sortOrder])
+}
+
+model TicketCategoryRoutingRule {
+  id                 Int      @id @default(autoincrement())
+  guildId            String
+  categoryId         Int      @unique
+  category           TicketCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  assignedRoleId     String?
+  assignedTemplateId Int?
+  defaultPriorityId  Int?
+  notifyRoleIds      String?  // JSON: string[]
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([guildId])
+}
+
+model TicketTransferRequest {
+  id          Int      @id @default(autoincrement())
+  guildId     String
+  ticketId    Int
+  ticket      Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  fromUserId  String
+  toUserId    String
+  status      String   @default("PENDING") // PENDING | ACCEPTED | DECLINED | EXPIRED
+  note        String?
+  requestedAt DateTime @default(now())
+  resolvedAt  DateTime?
+  expiresAt   DateTime
+
+  @@index([guildId, status, requestedAt])
+  @@index([ticketId, status])
+  @@index([toUserId, status])
+}
+
+model TicketNotificationRule {
+  id                 Int      @id @default(autoincrement())
+  guildId            String
+  categoryId         Int?
+  priorityId         Int?
+  assignedRoleId     String?
+  assignedTemplateId Int?
+  eventType          String   // CREATED | PRIORITY_CHANGED | SLA_BREACHED | TRANSFER_REQUESTED
+  targetRoleIds      String?  // JSON: string[]
+  targetChannelId    String?
+  cooldownSeconds    Int      @default(300)
+  enabled            Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([guildId, eventType, enabled])
+}
+
+model TicketInternalNote {
+  id          Int      @id @default(autoincrement())
+  guildId     String
+  ticketId    Int
+  ticket      Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  authorId    String
+  body        String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([ticketId, createdAt])
+  @@index([guildId, createdAt])
+}
+
+model TicketMacro {
+  id          Int      @id @default(autoincrement())
+  guildId     String
+  name        String
+  body        String
+  enabled     Boolean  @default(true)
+  createdBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([guildId, enabled, name])
+}
+
+model TicketTag {
+  id          Int      @id @default(autoincrement())
+  guildId     String
+  key         String
+  name        String
+  color       String   @default("#64748b")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([guildId, key])
+}
+
+model TicketSlaPolicy {
+  id                   Int      @id @default(autoincrement())
+  guildId              String
+  name                 String
+  firstResponseMinutes Int
+  resolutionMinutes    Int
+  businessHoursId      Int?
+  enabled              Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@index([guildId, enabled])
+}
+
+model TicketBusinessHours {
+  id          Int      @id @default(autoincrement())
+  guildId     String
+  name        String
+  timezone    String   @default("UTC")
+  schedule    String   // JSON: weekday windows
+  holidays    String?  // JSON: ISO dates
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([guildId])
+}

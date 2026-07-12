@@ -16,6 +16,7 @@ interface SectionBlockProps {
     className?: string;
     /** Remove inner padding */
     noPadding?: boolean;
+    dataTour?: string;
 }
 
 export const SectionBlock: React.FC<SectionBlockProps> = ({
@@ -29,11 +30,12 @@ export const SectionBlock: React.FC<SectionBlockProps> = ({
     children,
     className = '',
     noPadding = false,
+    dataTour,
 }) => {
     const [open, setOpen] = useState(defaultOpen);
 
     return (
-        <div className={`bg-[#111111] border border-white/[0.04] rounded-[32px] overflow-hidden shadow-xl ${className}`}>
+        <div data-tour={dataTour} className={`bg-[#111111] border border-white/[0.04] rounded-[32px] overflow-hidden shadow-xl ${className}`}>
             {/* Header row */}
             <div
                 className={`flex items-center gap-3 px-6 py-5 ${collapsible ? 'cursor-pointer hover:bg-white/[0.02] transition-colors select-none' : ''}`}

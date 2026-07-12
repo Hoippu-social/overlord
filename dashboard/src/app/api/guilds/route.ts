@@ -2,16 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getAuthToken } from '@/lib/auth';
 import { resolveAllowedGuildIds } from '@/lib/discordAccess';
-import { LOCAL_SESSION_COOKIE_NAME } from '@/lib/authCookies';
 
 export async function GET(request: NextRequest) {
     const token = await getAuthToken(request);
     const accessToken = typeof token?.accessToken === 'string' ? token.accessToken : null;
 
-    const sessionToken = request.cookies.get(LOCAL_SESSION_COOKIE_NAME);
-
-    // Admin login using password
-    if (sessionToken && sessionToken.value) {
+    if (token?.role === 'admin' || token?.role === 'owner') {
         try {
             const allGuilds = await prisma.guild.findMany({
                 select: {

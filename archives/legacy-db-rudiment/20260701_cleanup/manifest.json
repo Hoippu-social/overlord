@@ -1,0 +1,107 @@
+[
+    {
+        "from":  "dashboard\\prisma\\main-sqlite-source.schema.prisma",
+        "to":  "archives\\sqlite-rudiment\\20260701_cleanup\\dashboard\\prisma\\main-sqlite-source.schema.prisma"
+    },
+    {
+        "from":  "dashboard\\prisma\\stats-sqlite-source.schema.prisma",
+        "to":  "archives\\sqlite-rudiment\\20260701_cleanup\\dashboard\\prisma\\stats-sqlite-source.schema.prisma"
+    },
+    {
+        "from":  "dashboard\\src\\generated\\main-sqlite-source-client",
+        "to":  "archives\\sqlite-rudiment\\20260701_cleanup\\dashboard\\src\\generated\\main-sqlite-source-client"
+    },
+    {
+        "from":  "dashboard\\src\\generated\\stats-sqlite-source-client",
+        "to":  "archives\\sqlite-rudiment\\20260701_cleanup\\dashboard\\src\\generated\\stats-sqlite-source-client"
+    },
+    {
+        "from":  "dashboard\\scripts\\archiveSqliteDbs.cjs",
+        "to":  "archives\\sqlite-rudiment\\20260701_cleanup\\dashboard\\scripts\\archiveSqliteDbs.cjs"
+    },
+    {
+        "from":  "dashboard\\scripts\\backfillMainToPostgres.cjs",
+        "to":  "archives\\sqlite-rudiment\\20260701_cleanup\\dashboard\\scripts\\backfillMainToPostgres.cjs"
+    },
+    {
+        "from":  "dashboard\\scripts\\backfillStatsToPostgres.cjs",
+        "to":  "archives\\sqlite-rudiment\\20260701_cleanup\\dashboard\\scripts\\backfillStatsToPostgres.cjs"
+    },
+    {
+        "from":  "dashboard\\scripts\\bootstrapStatsPostMigration.cjs",
+        "to":  "archives\\sqlite-rudiment\\20260701_cleanup\\dashboard\\scripts\\bootstrapStatsPostMigration.cjs"
+    },
+    {
+        "from":  "dashboard\\scripts\\compareMainPgParity.cjs",
+        "to":  "archives\\sqlite-rudiment\\20260701_cleanup\\dashboard\\scripts\\compareMainPgParity.cjs"
+    },
+    {
+        "from":  "dashboard\\scripts\\compareStatsPgParity.cjs",
+        "to":  "archives\\sqlite-rudiment\\20260701_cleanup\\dashboard\\scripts\\compareStatsPgParity.cjs"
+    },
+    {
+        "from":  "dashboard\\scripts\\generateMainSqliteSource.cjs",
+        "to":  "archives\\sqlite-rudiment\\20260701_cleanup\\dashboard\\scripts\\generateMainSqliteSource.cjs"
+    },
+    {
+        "from":  "dashboard\\scripts\\generateStatsSqliteSource.cjs",
+        "to":  "archives\\sqlite-rudiment\\20260701_cleanup\\dashboard\\scripts\\generateStatsSqliteSource.cjs"
+    },
+    {
+        "from":  "dashboard\\scripts\\prepareMainPgMigration.cjs",
+        "to":  "archives\\sqlite-rudiment\\20260701_cleanup\\dashboard\\scripts\\prepareMainPgMigration.cjs"
+    },
+    {
+        "from":  "dashboard\\scripts\\prepareStatsPgMigration.cjs",
+        "to":  "archives\\sqlite-rudiment\\20260701_cleanup\\dashboard\\scripts\\prepareStatsPgMigration.cjs"
+    },
+    {
+        "from":  "dashboard\\scripts\\lib\\mainPgMigration.cjs",
+        "to":  "archives\\sqlite-rudiment\\20260701_cleanup\\dashboard\\scripts\\lib\\mainPgMigration.cjs"
+    },
+    {
+        "from":  "dashboard\\scripts\\lib\\statsPgMigration.cjs",
+        "to":  "archives\\sqlite-rudiment\\20260701_cleanup\\dashboard\\scripts\\lib\\statsPgMigration.cjs"
+    },
+    {
+        "from":  "bot\\src\\scripts\\stageStatsMigration.ts",
+        "to":  "archives\\sqlite-rudiment\\20260701_cleanup\\bot\\src\\scripts\\stageStatsMigration.ts"
+    },
+    {
+        "from":  "bot\\scripts\\migrate_to_stats.ts",
+        "to":  "archives\\sqlite-rudiment\\20260701_cleanup\\bot\\scripts\\migrate_to_stats.ts"
+    },
+    {
+        "from":  "bot\\prisma\\staging",
+        "to":  "archives\\sqlite-rudiment\\20260701_cleanup\\bot\\prisma\\staging"
+    },
+    {
+        "from":  "bot\\prisma\\dev.db",
+        "to":  "archives\\sqlite-rudiment\\20260701_cleanup\\bot\\prisma\\dev.db"
+    },
+    {
+        "from":  "bot\\prisma\\development.db",
+        "to":  "archives\\sqlite-rudiment\\20260701_cleanup\\bot\\prisma\\development.db"
+    },
+    {
+        "from":  "bot\\prisma\\development_pre_migration.db",
+        "to":  "archives\\sqlite-rudiment\\20260701_cleanup\\bot\\prisma\\development_pre_migration.db"
+    },
+    {
+        "from":  "bot\\prisma\\stats.db",
+        "to":  "archives\\sqlite-rudiment\\20260701_cleanup\\bot\\prisma\\stats.db"
+    },
+    {
+        "from":  "bot\\prisma\\stats_pre_migration.db",
+        "to":  "archives\\sqlite-rudiment\\20260701_cleanup\\bot\\prisma\\stats_pre_migration.db"
+    },
+    {
+        "from":  "bot\\prisma\\prisma\\stats.db",
+        "to":  "archives\\sqlite-rudiment\\20260701_cleanup\\bot\\prisma\\prisma\\stats.db"
+    },
+    {
+        "from":  "bot\\development.db",
+        "to":  "archives\\sqlite-rudiment\\20260701_cleanup\\bot\\development.db"
+    }
+]
+

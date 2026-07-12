@@ -196,7 +196,7 @@ export function OverviewTab({
 
     return (
         <div className="space-y-8 animate-fade-in">
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4" data-tour="mod-overview-cards">
                 <StatsCard
                     title={tr('Всего кейсов', 'Total Cases')}
                     value={casesState.summary.total}
@@ -248,7 +248,7 @@ export function OverviewTab({
             )}
 
             <div className="flex flex-col items-start gap-8 lg:flex-row">
-                <div className="flex w-full flex-col gap-6 lg:w-[60%]">
+                <div className="flex w-full flex-col gap-6 lg:w-[60%]" data-tour="mod-cases-feed">
                     <AnimatedCard
                         title={tr('Лента Действий', 'Recent Actions')}
                         subtitle={tr('Управление и фильтрация всех модерационных кейсов.', 'Manage and filter all moderation cases.')}
@@ -378,7 +378,7 @@ export function OverviewTab({
                     </AnimatedCard>
                 </div>
 
-                <div className="w-full lg:sticky lg:top-[90px] lg:w-[40%]">
+                <div className="w-full lg:sticky lg:top-[90px] lg:w-[40%]" data-tour="mod-case-details">
                     <AnimatedCard
                         title={tr('Детали кейса', 'Case Details')}
                         subtitle={tr('Подробная информация о нарушении', 'Detailed violation info')}

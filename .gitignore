@@ -41,3 +41,15 @@ dashboard/test-results/
 # Internal documentation (kept in a separate private repo, never committed here)
 docs-internal/
 
+# Local Codex/browser sessions and transferred attachments
+.codex-chrome-tour/
+.codex-remote-attachments/
+.claude/
+
+# One-off local documents and generated research assets
+MRI_CT_PET-CT_Brain_SpinalCord.docx
+create_referat.py
+referat_images/
+dashboard/prod-start.err
+dashboard/src/app/dashboard/*/stats/contacts/__old_check.tsx
+

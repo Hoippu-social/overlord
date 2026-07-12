@@ -3,13 +3,14 @@ import { cookies } from 'next/headers';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { LOCAL_SESSION_COOKIE_NAME } from '@/lib/authCookies';
+import { verifyLocalSessionToken } from '@/lib/localSession';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
     const session = await getServerSession(authOptions);
     const cookieStore = await cookies();
-    const hasLocalSession = Boolean(cookieStore.get(LOCAL_SESSION_COOKIE_NAME)?.value);
+    const hasLocalSession = await verifyLocalSessionToken(cookieStore.get(LOCAL_SESSION_COOKIE_NAME)?.value);
 
     return NextResponse.json(
         {
